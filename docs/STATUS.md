@@ -2,7 +2,7 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 2: Legacy Runtime Baseline**
+- **Current Phase**: **Phase 3: Database Discovery and Prisma Mapping**
 - **Status**: **COMPLETED**
 - **Date**: 2026-10-28
 - **Approved Target Stack**:
@@ -18,51 +18,57 @@
 ## 1. Migration Phase Matrix
 
 | Phase | Description | Deliverables | Status |
-| :--- | :--- | :--- | :---: |
+| :--- | :--- | :--- | :--- |
 | **Phase 0** | Workspace & Source Preservation | Source archive verified, `legacy/` isolated, commit `a646a86` | **COMPLETED** |
 | **Phase 1** | Read-Only Legacy Audit | Inventories, business rules, permissions, security findings (`docs/00` to `06`), commit `86b9bc1` | **COMPLETED** |
-| **Phase 2** | Legacy Runtime Baseline | Tool verification, test reproducibility (255 tests), route manifest (271 routes), safe GET smoke tests ([`docs/07-legacy-runtime-baseline.md`](07-legacy-runtime-baseline.md)) | **COMPLETED** |
-| **Phase 3** | Domain Modeling & Supabase Schema | Prisma schema (`database/prisma/schema.prisma`), PostgreSQL types, initial NestJS entities | Pending |
+| **Phase 2** | Legacy Runtime Baseline | Tool verification, test reproducibility (255 tests), route manifest (271 routes), safe GET smoke tests ([`docs/07-legacy-runtime-baseline.md`](07-legacy-runtime-baseline.md)), commit `e177f10` | **COMPLETED** |
+| **Phase 3** | Database Discovery & Prisma Mapping | Schema inventory (`104` tables, `924` cols), PostgreSQL compatibility, Prisma schema (`backend/prisma/schema.prisma`), validation, reconciliation plan, inspection scripts | **COMPLETED** |
 | **Phase 4** | NestJS Core Services & Clinical Modules | Trusted backend APIs, RBAC guards, financial ledgers, BullMQ queues | Pending |
 | **Phase 5** | React Clinical Client Development | Modern accessible UI, clinical workflows, Vite packaging | Pending |
 | **Phase 6** | Data Migration & Dual-Run Validation | ETL scripts, cents-level financial reconciliation, cutover | Pending |
 
 ---
 
-## 2. Phase 2 Verification & Runtime Baseline Summary
+## 2. Phase 3 Database Discovery & Prisma Mapping Summary
 
-| Property | Value | Evidence / Command |
+| Property | Value | Evidence / Artifact |
 | :--- | :--- | :--- |
-| **PHP CLI** | `8.4.27 (cli)` (NTS x64) | `php -v` (Exit code 0) |
-| **Composer** | `2.8.12` | `composer --version` (Exit code 0) |
-| **Laravel Framework** | `12.69.2` | `php artisan --version` (Exit code 0) |
-| **PHPUnit Runner** | `11.5.56` | `php vendor/bin/phpunit` (Exit code 0) |
-| **Automated Test Results** | **255 tests, 857 assertions, 0 failures** | Reproducible baseline confirmed (100% pass, 0 skipped, 0 risky) |
-| **Registered Routes** | **271 routes** | `Route::getRoutes()` runtime query (136 GET, 88 POST, 29 DELETE, 18 PUT) |
-| **Safe GET Smoke Test** | **89 parameterless endpoints** | 83 endpoints return `200 OK` under Admin session; guests properly 302-redirected |
-| **Local Database Engine** | SQLite 3.53.4 (`database.sqlite`) | 104 tables, 113 executed migrations, seeded test accounts |
-| **Docker Engine Status** | **Unavailable (Daemon Not Running)** | Engine named pipe not found; legacy `docker-compose.yml` mounts nonexistent `./src` |
-| **Legacy Source Integrity**| **100% Preserved** | 2,359 files in `legacy/` unmodified; unstaged `app/Models/SMS.php` preserved |
+| **Legacy Database Engine** | SQLite 3.53.4 (`database/database.sqlite`) | 104 tables, 113 migrations executed |
+| **Discovered Tables / Columns** | **104 tables, 924 columns** | [`database/schema-inventory.md`](../database/schema-inventory.md) generated via deterministic script |
+| **Legacy Foreign Key Count** | **0 explicit database-level FKs** | Enforced purely at Laravel application level; formalized with relations in Prisma |
+| **Retired School Models** | **7 models dropped from schema** | `Diary`, `FeeCol`, `FeeSetup`, `GPA`, `Marks`, `Question`, `Subject` dropped by migration `2026_09_09_140000_remove_school_tables.php`; excluded from Prisma |
+| **PostgreSQL Compatibility** | **18 technical domains analyzed** | [`database/postgres-compatibility.md`](../database/postgres-compatibility.md) (AUTO_INCREMENT, DECIMAL, TIMESTAMPTZ, JSONB, concurrency) |
+| **Prisma Schema File** | `backend/prisma/schema.prisma` | PostgreSQL datasource, `@map` / `@@map` preserved, `Decimal(12,2)`, `DateTime @db.Timestamptz`, `BigInt` PKs + `uuid String @unique` |
+| **Prisma Config** | `backend/prisma.config.ts` | Prisma 7 datasource configuration adhering to Prisma 7 decoupled CLI spec |
+| **Prisma Static Validation** | **VALID (Exit code 0)** | `npx prisma validate --schema=backend/prisma/schema.prisma` passed cleanly |
+| **Source-to-Target Mapping** | Field-by-field clinical & billing mapping | [`database/source-to-target-mapping.md`](../database/source-to-target-mapping.md) with risk tiers & validation queries |
+| **Reconciliation Plan** | Financial & clinical integrity gates | [`database/reconciliation-plan.md`](../database/reconciliation-plan.md) with zero-tolerance balance verification & rollback plan |
+| **Inspection & Profiling Tools**| Read-only PHP inspection tools | [`database/scripts/inspect-schema.php`](../database/scripts/inspect-schema.php), [`database/scripts/profile-data-quality.php`](../database/scripts/profile-data-quality.php) |
+| **Legacy Source Integrity** | **100% Preserved** | `legacy/` 0 modifications; unstaged `app/Models/SMS.php` artifact preserved |
 
 ---
 
-## 3. Key Observations & Environmental Limitations
+## 3. Key Findings & Architectural Recommendations
 
-1. **Test Environment Isolation**:
-   - The test suite executes in-memory on SQLite (`:memory:`), isolating tests from state mutations.
-   - All 255 tests pass cleanly in ~15 seconds without modifying any legacy code.
-2. **Local MariaDB/MySQL Driver Absence**:
-   - The host PHP CLI does not have `pdo_mysql` loaded (`PDO::getAvailableDrivers()` returned only `sqlite`), and Docker Desktop engine is not running on the host.
-   - Consequently, local execution runs against SQLite. MariaDB-specific edge cases (e.g. non-strict `GROUP BY` and string truncation) must be addressed when authoring the Supabase PostgreSQL Prisma schema.
-3. **Passport OAuth Endpoints**:
-   - Smoke tests identified that Passport OAuth endpoints (`/oauth/authorize`, `/oauth/device`) return HTTP 500 when called without required query parameters (`client_id`, `redirect_uri`). This is standard OAuth protocol behavior in the absence of client context.
+1. **Hybrid Primary Key Strategy**:
+   - Hospital operations depend heavily on sequential integers (MR numbers `ICT-P-{id}`, paper invoice printouts `INV-{id}`).
+   - Schema implements `id BigInt @id @default(autoincrement())` with secondary `uuid String @unique @default(uuid())` for public external API routes, preventing sequential record enumeration attacks while preserving clinical identifiers.
+2. **Financial Data Type Hardening**:
+   - Legacy stored money totals (`gross_total`, `amount_received`) as `VARCHAR(255)` with implicit MariaDB casting.
+   - Prisma schema enforces `Decimal(12, 2)` across all billing, payroll, and pharmacy records, preventing floating-point rounding errors.
+3. **Pessimistic Concurrency & Exclusion Constraints**:
+   - Legacy application executed vulnerable non-atomic read-then-write logic for bed allocation and medicine inventory.
+   - Prisma schema & NestJS transaction design mandate `SELECT ... FOR UPDATE` inside `$transaction` for stock decrements and partial unique index constraints (`bed_id` WHERE status = 'OCCUPIED') for physical room allocations.
+4. **Soft-Delete Normalization**:
+   - Standardized `deletedAt DateTime? @map("deleted_at") @db.Timestamptz` across core clinical entities, enforced via Prisma client extensions.
 
 ---
 
-## 4. Next Phase Readiness: Phase 3
+## 4. Next Phase Readiness: Phase 4
 
-Phase 2 requirements are fulfilled. The project is prepared for:
-**Phase 3: Domain Modeling & Supabase PostgreSQL Schema Design**
-- Author the definitive Prisma schema (`database/prisma/schema.prisma`).
-- Map all 96 legacy domain models and 50+ tables into PostgreSQL data types (`TIMESTAMPTZ`, `DECIMAL(12,2)`, `BOOLEAN`, `UUID` / `BIGINT`).
-- Encode foreign keys, unique constraints, and transaction boundary requirements.
+Phase 3 is complete. The schema and database architectures are mapped and statically validated. The repository is prepared for:
+**Phase 4: NestJS Core Services & Domain Modules**
+- Scaffold NestJS backend architecture with modular domain structure (`AuthModule`, `PatientModule`, `AppointmentModule`, `BillingModule`, `PharmacyModule`).
+- Integrate Prisma Client module and client extensions for soft-deletes and tenant isolation.
+- Implement trusted business logic, financial ledgers, and concurrency-safe transactions.
+

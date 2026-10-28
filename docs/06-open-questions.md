@@ -112,4 +112,81 @@ The legacy Laravel application relies on scheduled console commands:
 10. **Telephony & Multi-Channel Gateway Architecture**:
     - Legacy notifications depend tightly on ICTCore and Telenor SMS APIs.
     - *Decision needed*: Should the NestJS `NotificationModule` implement an extensible adapter pattern supporting international providers (Twilio, AWS SNS, Vonage) alongside local telecom APIs?
+---
 
+## 9. Phase 3 Database Discovery & Prisma Mapping Decisions
+
+The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, legacy Eloquent relationships, and financial schemas. Below are the architectural findings, engineer recommendations, and explicitly marked decisions required from project ownership.
+
+### 11. UUID versus BIGINT Primary Keys
+- **Evidence**: Legacy tables use auto-incrementing integer identifiers (`BIGINT` / `INTEGER`). Crucially, physical hospital processes rely on these numbers: patient MR numbers (`ICT-P-{id}`), appointment slips, invoice numbers (`INV-{id}`), prescription printouts, and barcoded specimen vials.
+- **Recommendation**: Maintain a **Hybrid Identifier Pattern**:
+  - Retain `id BigInt @id @default(autoincrement())` as the primary key and internal/physical display identifier.
+  - Introduce `uuid String @unique @default(uuid())` as the public API identifier (for REST/GraphQL endpoints, client route URLs, and external webhook callbacks) to prevent integer enumeration attacks.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Adopt hybrid `id (BigInt PK)` + `uuid (UUID Unique Public Identifier)`.
+  - [ ] **Option B**: Transition purely to `UUIDv7` as the primary key, mapping legacy IDs into a `legacy_id BigInt?` column, and generating human-readable sequential sequence codes separately for physical printouts.
+
+### 12. Legacy Identifier Preservation & Sequence Offsets
+- **Evidence**: Over 100,000 historical records may exist across patient registers, lab reports, and ledger entries. In PostgreSQL, inserting explicit legacy primary keys requires manually synchronizing sequences via `SELECT setval(pg_get_serial_sequence('...', 'id'), max(id) + 1000)`.
+- **Recommendation**: During initial migration load, insert historical rows with their exact legacy integer IDs. Run sequence elevation scripts immediately after staging load to reserve a buffer of 5,000 IDs before new records are inserted by Medora 2.0.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Explicitly preserve legacy integer IDs 1:1, synchronizing PostgreSQL sequences with a safety buffer (+5000).
+  - [ ] **Option B**: Re-key records sequentially starting from 1 with a separate lookup cross-reference table `legacy_id_mapping`.
+
+### 13. Soft-Delete Architecture & Prisma Middleware
+- **Evidence**: In legacy SQLite, only `hospital_branch` had an actual `deleted_at` column in the migration schema, despite multiple Laravel models including the `SoftDeletes` trait without migration columns. Clinical audit regulations (HIPAA, ISO 27001) prohibit physical hard deletes of medical consultations, lab results, prescriptions, and financial ledgers.
+- **Recommendation**: Standardize soft-deletes across all clinical and operational entities in Prisma with `deletedAt DateTime? @map("deleted_at") @db.Timestamptz`. Enforce non-deleted filtering via Prisma client extensions (`prisma.$extends`) or a repository base class in NestJS, rather than ad-hoc controller queries.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Standardize `deletedAt DateTime? @db.Timestamptz` on all core clinical and billing models, backed by automated Prisma client extension filters and hard-delete prohibition.
+  - [ ] **Option B**: Use explicit status enums (`status: ACTIVE | ARCHIVED | CANCELLED`) instead of timestamp-based soft deletes.
+
+### 14. Hospital Timezone Policy & UTC Normalization
+- **Evidence**: Legacy MariaDB/SQLite instances stored datetimes as naive local strings (e.g. `2026-10-28 14:30:00` in Asia/Karachi `UTC+5`). PostgreSQL supports `TIMESTAMPTZ` (UTC internally, client timezone representation).
+- **Recommendation**: Store all database timestamps as UTC `TIMESTAMPTZ`. Store the facility/branch default timezone (e.g. `Asia/Karachi`) in `hospital_branch.timezone`. The NestJS backend transforms timestamps to UTC on write and serializes ISO-8601 strings to the React frontend.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Full UTC normalization (`TIMESTAMPTZ`) in Supabase PostgreSQL; frontend renders local hospital time based on user or branch profile.
+  - [ ] **Option B**: Store naive timestamps with an explicit hospital timezone configuration fixed globally.
+
+### 15. PostgreSQL Concurrency & Row-Locking Implementation
+- **Evidence**: Legacy PHP controllers executed vulnerable non-atomic read-then-write sequences for pharmacy stock reduction, room/bed allocation, and appointment slot booking (Audit findings `SEC-06`, `SEC-08`).
+- **Recommendation**:
+  - For **Pharmacy Inventory & Payments**: Use PostgreSQL pessimistic locking via raw interactive queries inside Prisma transactions: `await tx.$queryRaw\`SELECT id, stock FROM medicine WHERE id = ${id} FOR UPDATE\``.
+  - For **Appointments & Bed Allocation**: Use PostgreSQL exclusion constraints (`EXCLUDE USING gist`) and unique compound partial indexes (`UNIQUE (bed_id) WHERE status = 'OCCUPIED'`) to make overlapping bookings physically impossible at the database engine level.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Adopt pessimistic row locks (`SELECT FOR UPDATE`) for financial/inventory mutations and PostgreSQL exclusion/unique constraints for bed/appointment occupancy.
+  - [ ] **Option B**: Rely solely on optimistic concurrency tokens (`version Int @default(1)`) with application-level retry loops.
+
+### 16. Supabase Connection Strategy: Connection Pooler (PgBouncer/Supavisor) vs Direct URL
+- **Evidence**: Supabase provides two connection strings:
+  - Port 6543 (Transaction Pooled / Supavisor): Required for serverless / auto-scaling instances to prevent max connection exhaustion. Cannot use prepared statements without configuration.
+  - Port 5432 (Session Direct): Required for long-lived Prisma migration runners, advisory locks, and DDl operations.
+- **Recommendation**: Configure both connection URLs in `prisma.config.ts` and NestJS environment variables:
+  - `DATABASE_URL` (pooled, port 6543) with `?pgbouncer=true` for normal application queries and worker jobs.
+  - `DIRECT_URL` (direct, port 5432) for running Prisma migrations and CLI introspections.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Adopt dual pooled/direct configuration (`DATABASE_URL` + `DIRECT_URL`).
+  - [ ] **Option B**: Connect directly via port 5432 with NestJS controlling a fixed connection pool size (10-20 connections).
+
+### 17. Migration Ownership & Deployment Pipeline
+- **Evidence**: Medora 2.0 requires seamless cutover from legacy MariaDB to Supabase PostgreSQL without data loss or prolonged hospital downtime.
+- **Recommendation**:
+  - Use `prisma migrate dev` exclusively during local and staging development.
+  - For production deployment, use `prisma migrate deploy` driven by GitHub Actions CI/CD with mandatory backup verification prior to execution.
+  - Historical data extraction will run via dedicated read-only PHP/Node ETL scripts writing directly to the staging Supabase instance during rehearsed maintenance windows.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Automated Prisma deployment (`prisma migrate deploy`) integrated into CI/CD pipeline with pre-migration snapshot triggers.
+  - [ ] **Option B**: Manual DBA execution of generated raw SQL migration scripts for every production schema modification.
+
+### 18. Ambiguous Legacy Relationships & Retired Domain Entities
+- **Evidence**:
+  - Migration `2026_09_09_140000_remove_school_tables.php` dropped school tables, but 7 models (`Diary`, `FeeCol`, `FeeSetup`, `GPA`, `Marks`, `Question`, `Subject`) remained in `legacy/app/Models/`.
+  - `hospital_setting` is a multi-tenant or key-value store lacking consistent foreign keys.
+  - `package` and `package_item` link to treatments and laboratory tests using implicit numeric IDs without foreign keys.
+- **Recommendation**:
+  - Explicitly omit all 7 retired ICTSchool models from Prisma.
+  - Normalize `hospital_setting` into typed config JSONB columns where appropriate or a typed key-value table with branch foreign key.
+  - Define explicit foreign key constraints in Prisma for `package_item` (`service_id`, `lab_test_id`).
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Permanently deprecate legacy school entities and formalize implicit package/setting links with foreign keys.
+  - [ ] **Option B**: Retain flexible polymorphic identifiers for package items without foreign key enforcement.
