@@ -1,25 +1,96 @@
+# ==============================================================================
+# Medora 2.0 Monorepo .gitignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Environment & Secrets (Never commit credentials)
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+auth.json
+
+# ------------------------------------------------------------------------------
+# Node.js / JavaScript / TypeScript (Frontend & Backend)
+# ------------------------------------------------------------------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build artifacts & caches (scoped to avoid ignoring legacy vendor dist folders)
+/dist/
+/frontend/dist/
+/backend/dist/
+/build/
+/frontend/build/
+/backend/build/
+.next/
+out/
+.turbo/
+coverage/
+*.tsbuildinfo
+.eslintcache
+
+# ------------------------------------------------------------------------------
+# Composer Vendor Directories (Specific to Composer dependencies)
+# Do NOT ignore assets/vendor or resources/views/vendor
+# ------------------------------------------------------------------------------
+/vendor/
+/legacy/vendor/
+legacy/.env
+legacy/.env.backup
+legacy/.env.production
 /.phpunit.cache
-/node_modules
+/legacy/.phpunit.cache
+.phpunit.result.cache
+/legacy/.phpunit.result.cache
+.phpactor.json
+/legacy/.phpactor.json
+Homestead.json
+Homestead.yaml
+
+# Laravel runtime directories
 /public/build
 /public/hot
 /public/storage
-/storage/*.key
-/vendor
-.env
-.env.backup
-.env.production
-.phpactor.json
-.phpunit.result.cache
-Homestead.json
-Homestead.yaml
-auth.json
-npm-debug.log
-yarn-error.log
-/.fleet
-/.idea
-/.vscode
+/legacy/public/build
+/legacy/public/hot
+/legacy/public/storage
+storage/*.key
+storage/logs/*.log
+/legacy/storage/*.key
+/legacy/storage/logs/*.log
+/legacy/storage/framework/cache/*
+/legacy/storage/framework/sessions/*
+/legacy/storage/framework/views/*
 
-# runtime logs
-/storage/logs/*.log
-/storage/oauth-private.key
-/storage/oauth-public.key
+# ------------------------------------------------------------------------------
+# Databases (Local SQLite, test files, and local dumps)
+# ------------------------------------------------------------------------------
+*.sqlite
+*.sqlite3
+*.sqlite-journal
+*.db
+database/*.sqlite*
+legacy/database/*.sqlite*
+
+# ------------------------------------------------------------------------------
+# Operating System & IDE Files
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*.swo
+.fleet/
