@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleDestroy,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -36,16 +31,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       adapter
         ? {
             adapter,
-            log:
-              process.env.NODE_ENV === 'development'
-                ? ['warn', 'error']
-                : ['error'],
+            log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
           }
         : {
-            log:
-              process.env.NODE_ENV === 'development'
-                ? ['warn', 'error']
-                : ['error'],
+            log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
           },
     );
 
