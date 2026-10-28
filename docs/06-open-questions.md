@@ -219,3 +219,15 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
 - **Owner Decision Required**:
   - [ ] **Option A (Recommended)**: Confirm deferral of Redis + BullMQ until background job domain features are implemented.
   - [ ] **Option B**: Pre-scaffold empty BullMQ module in backend foundation.
+
+---
+
+## 11. Phase 9 Clinical Consultation Decisions & Open Questions
+
+### 22. Clinical Record Amendment & Retention Policy
+- **Evidence**: In legacy ICTHospital, consultations had basic status transitions (`draft`, `completed`). Completed consultations in Phase 9 are made immutable by default to prevent silent overwriting of medical records (`400 Bad Request: Cannot modify a completed consultation record.`).
+- **Recommendation**: Introduce a formal clinical amendment workflow in a future phase (e.g. `POST /consultations/:id/amend`) that captures the reason for addendum, preserves the original note verbatim with author timestamp, and creates an append-only audit trail (`ConsultationAddendum`).
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Append-only clinical addendum model where finalized notes cannot be edited, only supplemented with signed addenda.
+  - [ ] **Option B**: Allow authoring doctor to unlock and amend completed notes within a 24-hour grace period with revision logging.
+

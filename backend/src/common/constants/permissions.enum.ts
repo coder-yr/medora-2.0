@@ -36,6 +36,8 @@ export enum HospitalPermission {
   WARD_DELETE = 'ward_delete',
 
   // Clinical & Lab
+  CONSULTATION_VIEW = 'consultation_view',
+  CONSULTATION_ADD = 'consultation_add',
   PRESCRIPTION_VIEW = 'prescription_view',
   PRESCRIPTION_ADD = 'prescription_add',
   PRESCRIPTION_UPDATE = 'prescription_update',
@@ -129,6 +131,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.PATIENT_MEDICAL_HISTORY,
     HospitalPermission.APPOINTMENT_VIEW,
     HospitalPermission.APPOINTMENT_CALENDAR,
+    HospitalPermission.CONSULTATION_VIEW,
+    HospitalPermission.CONSULTATION_ADD,
     HospitalPermission.PRESCRIPTION_VIEW,
     HospitalPermission.PRESCRIPTION_ADD,
     HospitalPermission.PRESCRIPTION_UPDATE,

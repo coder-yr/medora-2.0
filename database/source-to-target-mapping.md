@@ -223,6 +223,50 @@ SELECT
 
 ---
 
+### Domain 9: Clinical Consultations & Encounters (`consultation`, `consult_template` -> `Consultation`, `ConsultTemplate`)
+
+| Legacy Column | Target Prisma Field | PostgreSQL Type | Transform / Business Logic | Risk | Status |
+| :--- | :--- | :--- | :--- | :---: | :---: |
+| `id` (INT) | `id` | `BigInt @id autoincrement`| Serialized as String in API responses | Low | Mapped |
+| `appointment_id` (INT) | `appointmentId` | `BigInt? @unique` | 1:1 optional link to `appointment.id` | High | Mapped |
+| `patient_id` (INT) | `patientId` | `BigInt` | Foreign key -> `patient.id` (strictly validated) | High | Mapped |
+| `doctor_id` (INT) | `doctorId` | `BigInt?` | Foreign key -> `doctor.id` | Med | Mapped |
+| `date` (DATE) | `date` | `DateTime @db.Date` | Encounter calendar date | Low | Mapped |
+| `presenting_complaint` (TEXT) | `presentingComplaint`| `String? @db.Text` | Chief complaint / reason for visit | Low | Mapped |
+| `history` (TEXT) | `history` | `String? @db.Text` | Clinical narrative / HPI | Low | Mapped |
+| `examination` (JSON/TEXT) | `examination` | `Json? @db.JsonB` | Physical examination grid: system -> [status, note] | Med | Mapped |
+| `provisional_diagnosis` (TEXT) | `provisionalDiagnosis`| `String? @db.Text` | Working differential diagnosis | Low | Mapped |
+| `diagnosis` (TEXT) | `diagnosis` | `String? @db.Text` | Final confirmed diagnosis | Low | Mapped |
+| `plan` (TEXT) | `plan` | `String? @db.Text` | Management plan / investigation orders | Low | Mapped |
+| `treatment` (TEXT) | `treatment` | `String? @db.Text` | Prescription summary / regimen | Low | Mapped |
+| `follow_up_date` (DATE) | `followUpDate` | `DateTime? @db.Date` | Recommended review date | Low | Mapped |
+| `follow_up_notes` (VARCHAR) | `followUpNotes` | `String? @db.VarChar(255)`| Specific follow-up instructions / red flags | Low | Mapped |
+| `allergies` (TEXT) | `allergies` | `String? @db.Text` | Carried forward automatically across encounters | High (Clinical) | Mapped |
+| `past_history` (JSON/TEXT) | `pastHistory` | `Json? @db.JsonB` | Past medical/surgical conditions | Med | Mapped |
+| `social_history` (JSON/TEXT) | `socialHistory` | `Json? @db.JsonB` | Lifestyle, occupation, habits | Low | Mapped |
+| `specialty` (JSON/TEXT) | `specialty` | `Json? @db.JsonB` | Gynae (LMP, EDD, GA via Naegele rule), dental, eye | High (Clinical) | Mapped |
+| `immunizations` (JSON/TEXT)| `immunizations` | `Json? @db.JsonB` | Vaccine name -> date administered | Low | Mapped |
+| `status` (VARCHAR) | `status` | `String @db.VarChar(20)` | `draft` or `completed` (immutable once completed) | High | Mapped |
+| `completed_at` (TIMESTAMP) | `completedAt` | `DateTime? @db.Timestamptz`| Finalization timestamp | Low | Mapped |
+| `created_by` (INT) | `createdBy` | `BigInt?` | Staff user ID who authored the note | Low | Mapped |
+| `created_at`, `updated_at` | `createdAt`, `updatedAt`| `DateTime? @db.Timestamptz`| Audit timestamps | Low | Mapped |
+
+**ConsultTemplate Model (`consult_template` -> `ConsultTemplate`)**:
+- `id` (BigInt): Primary key
+- `doctorId` (BigInt?): Optional owner doctor (null = hospital-wide)
+- `name` (String, VarChar 100): Template name
+- `fields` (JsonB): Pre-filled sections (`presenting_complaint`, `plan`, `treatment`, etc.)
+
+**Reconciliation Query**:
+```sql
+SELECT
+  (SELECT COUNT(*) FROM legacy.consultations) AS legacy_consultation_count,
+  (SELECT COUNT(*) FROM target.consultation) AS target_consultation_count,
+  (SELECT COUNT(*) FROM target.consultation WHERE status = 'completed') AS target_completed_count;
+```
+
+---
+
 ## 4. Retired & Unmapped Entity Inventory
 
 The following 7 legacy school tables were removed by migration `2026_09_09_140000_remove_school_tables.php` and are intentionally **omitted** from Prisma:

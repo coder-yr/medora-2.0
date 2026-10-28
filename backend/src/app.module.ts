@@ -10,6 +10,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { AppointmentModule } from './modules/appointment/appointment.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { ConsultationModule } from './modules/consultation/consultation.module';
 import { DepartmentModule } from './modules/department/department.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
 import { HealthModule } from './modules/health/health.module';
@@ -31,6 +32,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     DepartmentModule,
     DoctorModule,
     AppointmentModule,
+    ConsultationModule,
   ],
   providers: [
     {

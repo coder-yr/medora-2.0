@@ -953,6 +953,11 @@ export class AppointmentService {
             department: app.doctor.department || null,
           }
         : undefined,
+      checkedInAt: app.checkedInAt ? app.checkedInAt.toISOString() : null,
+      consultStartedAt: app.consultStartedAt ? app.consultStartedAt.toISOString() : null,
+      calledInAt: app.calledInAt ? app.calledInAt.toISOString() : null,
+      checkedOutAt: app.checkedOutAt ? app.checkedOutAt.toISOString() : null,
+      completedAt: app.completedAt ? app.completedAt.toISOString() : null,
       createdAt: app.createdAt ? app.createdAt.toISOString() : null,
       updatedAt: app.updatedAt ? app.updatedAt.toISOString() : null,
     };
@@ -1003,6 +1008,11 @@ export class AppointmentService {
             department: doctor.department || null,
           }
         : undefined,
+      checkedInAt: m.checkedInAt ? m.checkedInAt.toISOString() : null,
+      consultStartedAt: m.consultStartedAt ? m.consultStartedAt.toISOString() : null,
+      calledInAt: m.calledInAt ? m.calledInAt.toISOString() : null,
+      checkedOutAt: m.checkedOutAt ? m.checkedOutAt.toISOString() : null,
+      completedAt: m.completedAt ? m.completedAt.toISOString() : null,
       createdAt: m.createdAt.toISOString(),
       updatedAt: m.updatedAt.toISOString(),
     };

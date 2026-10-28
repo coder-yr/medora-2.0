@@ -90,6 +90,21 @@ export class AppointmentResponseDto {
   doctor?: DoctorSummaryDto;
 
   @ApiPropertyOptional()
+  checkedInAt?: string | null;
+
+  @ApiPropertyOptional()
+  consultStartedAt?: string | null;
+
+  @ApiPropertyOptional()
+  calledInAt?: string | null;
+
+  @ApiPropertyOptional()
+  checkedOutAt?: string | null;
+
+  @ApiPropertyOptional()
+  completedAt?: string | null;
+
+  @ApiPropertyOptional()
   createdAt?: string | null;
 
   @ApiPropertyOptional()

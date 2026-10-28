@@ -303,6 +303,7 @@ model Doctor {
   slotBlocks      SlotBlock[]
   visitFees       VisitFee[]
   consultations   Consultation[]
+  consultTemplates ConsultTemplate[]
   prescriptions   Prescription[]
   labOrders       Lab[]
   radiologyOrders RadiologyOrder[]
@@ -433,47 +434,54 @@ model Holiday {
 // =============================================================================
 
 model Consultation {
-  id                            BigInt       @id @default(autoincrement())
-  appointmentId                 BigInt?      @unique @map("appointment_id")
-  patientId                     BigInt       @map("patient_id")
-  doctorId                      BigInt       @map("doctor_id")
-  date                          DateTime     @db.Date
-  startedAt                     DateTime?    @map("started_at") @db.Timestamptz
-  endedAt                       DateTime?    @map("ended_at") @db.Timestamptz
-  presentingComplaint           String?      @map("presenting_complaint") @db.Text
-  historyOfPresentingComplaint  String?      @map("history_of_presenting_complaint") @db.Text
-  pastMedicalHistory            String?      @map("past_medical_history") @db.Text
-  examinationFindings           String?      @map("examination_findings") @db.Text
-  provisionalDiagnosis          String?      @map("provisional_diagnosis") @db.Text
-  finalDiagnosis                String?      @map("final_diagnosis") @db.Text
-  investigationsOrdered         String?      @map("investigations_ordered") @db.Text
-  prescriptionNotes             String?      @map("prescription_notes") @db.Text
-  advice                        String?      @db.Text
-  followUpDate                  DateTime?    @map("follow_up_date") @db.Date
-  followUpInstructions          String?      @map("follow_up_instructions") @db.Text
-  status                        String       @default("finalised") @db.VarChar(20)
-  createdAt                     DateTime?    @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt                     DateTime?    @updatedAt @map("updated_at") @db.Timestamptz
+  id                   BigInt    @id @default(autoincrement())
+  appointmentId        BigInt?   @unique @map("appointment_id")
+  patientId            BigInt    @map("patient_id")
+  doctorId             BigInt?   @map("doctor_id")
+  date                 DateTime  @db.Date
+  presentingComplaint  String?   @map("presenting_complaint") @db.Text
+  history              String?   @db.Text
+  examination          Json?     @db.JsonB // system => [status, note]
+  provisionalDiagnosis String?   @map("provisional_diagnosis") @db.Text
+  diagnosis            String?   @db.Text
+  plan                 String?   @db.Text
+  treatment            String?   @db.Text
+  followUpDate         DateTime? @map("follow_up_date") @db.Date
+  followUpNotes        String?   @map("follow_up_notes") @db.VarChar(255)
+  allergies            String?   @db.Text
+  pastHistory          Json?     @map("past_history") @db.JsonB
+  socialHistory        Json?     @map("social_history") @db.JsonB
+  specialty            Json?     @db.JsonB // gynae (with lmp, edd, gestational_age), dental, eye
+  immunizations        Json?     @db.JsonB
+  status               String    @default("draft") @db.VarChar(20) // draft, completed
+  completedAt          DateTime? @map("completed_at") @db.Timestamptz
+  createdBy            BigInt?   @map("created_by")
+  createdAt            DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   appointment Appointment? @relation(fields: [appointmentId], references: [id])
   patient     Patient      @relation(fields: [patientId], references: [id])
-  doctor      Doctor       @relation(fields: [doctorId], references: [id])
+  doctor      Doctor?      @relation(fields: [doctorId], references: [id])
 
   @@index([patientId])
   @@index([doctorId])
+  @@index([date])
   @@map("consultation")
 }
 
 model ConsultTemplate {
-  id           BigInt    @id @default(autoincrement())
-  doctorId     BigInt?   @map("doctor_id")
-  title        String    @db.VarChar(100)
-  category     String?   @db.VarChar(50)
-  templateData Json      @map("template_data") @db.JsonB
-  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id        BigInt    @id @default(autoincrement())
+  doctorId  BigInt?   @map("doctor_id")
+  name      String    @db.VarChar(100)
+  fields    Json      @db.JsonB
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Relations
+  doctor Doctor? @relation(fields: [doctorId], references: [id])
+
+  @@index([doctorId])
   @@map("consult_template")
 }
 
