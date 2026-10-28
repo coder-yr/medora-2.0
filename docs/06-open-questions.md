@@ -1,3 +1,4 @@
+
 # Medora 2.0 — PostgreSQL Compatibility, Legacy Assumptions, & Open Questions
 
 ## 1. Architectural Decision Record (ADR)
@@ -85,3 +86,30 @@ The legacy Laravel application relies on scheduled console commands:
 2. **Auth Identity Provider**: Will user authentication rely on Supabase Auth (with NestJS validating Supabase JWTs), or custom NestJS JWT auth with user credentials stored directly in PostgreSQL?
 3. **Soft Deletes**: Legacy Laravel models heavily utilize `SoftDeletes` (`deleted_at`). Should Prisma models implement a standard `deletedAt DateTime?` field and middleware filter, or will historical records use an archive/status table?
 4. **Pessimistic Locking in Prisma**: Since Prisma's high-level API abstracts row locks, how will critical concurrency sections (bed allocations, appointment slots) be structured—via raw queries (`SELECT ... FOR UPDATE`) inside interactive transactions or optimistic concurrency tokens (`version` field)?
+
+---
+
+## 8. Additional Unresolved Questions Discovered in Phase 1 Audit
+
+5. **Legacy Financial `VARCHAR` Data Cleansing**:
+   - In legacy MariaDB/MySQL, columns such as `payment.gross_total` and `payment.amount_received` are declared as `VARCHAR(255)`, requiring runtime SQL `CAST` operations.
+   - For Supabase PostgreSQL, Prisma models must enforce `Decimal(12, 2)`.
+   - *Decision needed*: What automated sanitization or fallback rules should apply if historical migration extracts encounter non-numeric strings, empty spaces, or invalid currency symbols?
+6. **Retirement of Hardcoded SuperAdmin Backdoor**:
+   - Audit finding `SEC-01` confirmed a hardcoded bypass in `SuperAdmin.php` for `login == 'ictkashif'`.
+   - *Decision needed*: In Medora 2.0, will initial administrator provisioning rely on environment variables (`INITIAL_ADMIN_EMAIL`), an automated seed script, or Supabase Auth console provisioning?
+7. **Background Job Triggering & Manual Overrides**:
+   - The legacy system allowed triggering payment reminders via public HTTP `GET /cronjob/payment-reminder`.
+   - In Medora 2.0, scheduled reminders will run on Redis + BullMQ.
+   - *Decision needed*: Should front-desk supervisors or accountants have an authenticated, rate-limited "Run Reminder Batch Now" action button in the React UI in addition to automated cron schedules?
+8. **Clinical Attachment Storage & HIPAA/GDPR Compliance**:
+   - Audit finding `SEC-04` revealed historical patient attachments residing on public storage disks.
+   - In Medora 2.0, documents will be stored in private Supabase Storage buckets served via short-lived pre-signed URLs.
+   - *Decision needed*: What cryptographic retention policy and patient consent rules apply when patients request data deletion under soft-delete versus hard-purge mandates?
+9. **Telemedicine Provider & Room Encryption**:
+   - Legacy telemedicine generates unauthenticated public Jitsi Meet links (`https://meet.jit.si/icthospital-...`).
+   - *Decision needed*: Should Medora 2.0 continue using Jitsi Meet (with JWT moderation tokens), deploy a self-hosted Jitsi instance, or transition to a HIPAA-compliant WebRTC platform (e.g. Daily.co, LiveKit, or Twilio Video)?
+10. **Telephony & Multi-Channel Gateway Architecture**:
+    - Legacy notifications depend tightly on ICTCore and Telenor SMS APIs.
+    - *Decision needed*: Should the NestJS `NotificationModule` implement an extensible adapter pattern supporting international providers (Twilio, AWS SNS, Vonage) alongside local telecom APIs?
+
