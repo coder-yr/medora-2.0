@@ -166,6 +166,30 @@ SELECT
   (SELECT SUM(quantity) FROM target.medicine) AS target_stock_units;
 ```
 
+### Domain 7: Doctors & Clinical Staff (`doctor` -> `Doctor`)
+| Source Field | Target Field | Target Type | Transformation & Handling | Risk | Status |
+| :--- | :--- | :--- | :--- | :---: | :---: |
+| `id` (INT) | `id` | `BigInt` | Primary key transfer; synchronize sequence post-import | Low | Mapped |
+| `name` (VARCHAR) | `name` | `String (VarChar 100)` | Doctor full legal/professional name (required) | Low | Mapped |
+| `email` (VARCHAR) | `email` | `String? (VarChar 100)` | Unique across doctors when provided; empty strings mapped to NULL | Low | Mapped |
+| `phone` (VARCHAR) | `phone` | `String? (VarChar 50)` | Phone number | Low | Mapped |
+| `address` (VARCHAR) | `address` | `String? (VarChar 255)`| Clinic / chamber address | Low | Mapped |
+| `department` (VARCHAR)| `department` | `String? (VarChar 100)`| Stored as text (varchar) per legacy compatibility; cascade renamed by DepartmentModule | Med | Mapped |
+| `profile` (VARCHAR) | `profile` | `String? (Text)` | Qualifications and clinical experience | Low | Mapped |
+| `img_url` (VARCHAR) | `imageUrl` | `String? (VarChar 255)`| Photo path | Low | Mapped |
+| `ion_user_id` (VARCHAR)| `ionUserId` | `String? (VarChar 50)` | Optional link to `users.id` for staff login; empty string if no login | Med | Mapped |
+| `procedure_id` (VARCHAR)| `procedureId` | `String? (VarChar 100)`| External procedure identifier | Low | Mapped |
+| `share_policy_id` (INT)| `sharePolicyId` | `BigInt?` | Foreign reference to revenue share policy | Low | Mapped |
+| `branch_id` (INT) | `branchId` | `BigInt?` | Foreign key -> `hospital_branch.id` | Low | Mapped |
+| `x`, `y` (VARCHAR) | `x`, `y` | `String? (VarChar 50)` | Legacy layout coordinates, default `""` | Low | Mapped |
+
+**Reconciliation Query**:
+```sql
+SELECT
+  (SELECT COUNT(*) FROM legacy.doctor) AS legacy_doctor_count,
+  (SELECT COUNT(*) FROM target.doctor) AS target_doctor_count;
+```
+
 ---
 
 ## 4. Retired & Unmapped Entity Inventory

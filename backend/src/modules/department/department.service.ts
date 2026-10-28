@@ -190,8 +190,8 @@ export class DepartmentService {
 
     if (this.prisma.connected) {
       try {
-        const clash = await this.prisma.department.findUnique({
-          where: { name },
+        const clash = await this.prisma.department.findFirst({
+          where: { name: { equals: name, mode: 'insensitive' } },
         });
         if (clash) {
           throw new BadRequestException('That department is already on the list.');
@@ -265,10 +265,13 @@ export class DepartmentService {
     if (this.prisma.connected) {
       try {
         if (targetName !== existing.name) {
-          const clash = await this.prisma.department.findUnique({
-            where: { name: targetName },
+          const clash = await this.prisma.department.findFirst({
+            where: {
+              name: { equals: targetName, mode: 'insensitive' },
+              NOT: { id: BigInt(existing.id) },
+            },
           });
-          if (clash && clash.id !== BigInt(existing.id)) {
+          if (clash) {
             throw new BadRequestException('That department is already on the list.');
           }
         }

@@ -58,29 +58,42 @@ export class PatientService {
 
   /**
    * Generates the next atomic sequential 6-digit patient ID.
-   * Derived from the highest existing numeric ID rather than row count,
-   * so deleting a record never reuses an issued MR number (including when
-   * the highest-numbered patient is deleted).
+   * Derived from a database-managed sequence or monotonic counter,
+   * guaranteeing that deleting a record (including the highest-numbered)
+   * never reuses an issued MR number, persisting durability across restarts.
    */
   async nextPatientId(): Promise<string> {
     if (this.prisma.connected) {
       try {
-        const result: any = await this.prisma.$queryRaw`
+        // In PostgreSQL, maintain sequence durability across restarts and deletions
+        await this.prisma.$executeRaw`
+          CREATE SEQUENCE IF NOT EXISTS patient_mrn_seq START WITH 1;
+        `;
+
+        // Align sequence with highest existing patient ID if needed
+        const maxResult: any = await this.prisma.$queryRaw`
           SELECT COALESCE(MAX(NULLIF(regexp_replace(patient_id, '\\D', '', 'g'), '')::bigint), 0) AS max_id 
           FROM patient
         `;
-        let highestNum = 0;
-        if (result && result[0] && result[0].max_id !== undefined) {
-          highestNum = Number(result[0].max_id);
+        const maxId = Number(maxResult[0]?.max_id || 0);
+
+        const nextValResult: any = await this.prisma.$queryRaw`
+          SELECT nextval('patient_mrn_seq') AS next_val
+        `;
+        let seqVal = Number(nextValResult[0]?.next_val || 1);
+
+        if (seqVal <= maxId) {
+          await this.prisma.$executeRaw`
+            SELECT setval('patient_mrn_seq', ${maxId} + 1, false)
+          `;
+          seqVal = maxId + 1;
         }
 
-        // Monotonic guarantee: never reissue an MR number lower than or equal to the highest issued
-        this.memoryMaxMrnIssued = Math.max(this.memoryMaxMrnIssued, highestNum);
-        this.memoryMaxMrnIssued++;
-        return this.memoryMaxMrnIssued.toString().padStart(6, '0');
+        this.memoryMaxMrnIssued = Math.max(this.memoryMaxMrnIssued, seqVal);
+        return seqVal.toString().padStart(6, '0');
       } catch (err: any) {
         this.logger.warn(
-          `Failed to query next patientId from database: ${err.message}. Using fallback.`,
+          `Failed to query next patientId from database sequence: ${err.message}. Using fallback.`,
         );
       }
     }

@@ -279,18 +279,22 @@ model PatientDeposit {
 // =============================================================================
 
 model Doctor {
-  id          BigInt    @id @default(autoincrement())
-  name        String    @db.VarChar(100)
-  email       String?   @db.VarChar(100)
-  phone       String?   @db.VarChar(50)
-  address     String?   @db.VarChar(255)
-  department  String?   @db.VarChar(100)
-  profile     String?   @db.Text
-  photo       String?   @db.VarChar(255)
-  ionUserId   String?   @map("ion_user_id") @db.VarChar(50)
-  branchId    BigInt?   @map("branch_id")
-  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id            BigInt    @id @default(autoincrement())
+  name          String    @db.VarChar(100)
+  email         String?   @db.VarChar(100)
+  phone         String?   @db.VarChar(50)
+  address       String?   @db.VarChar(255)
+  department    String?   @db.VarChar(100)
+  profile       String?   @db.Text
+  imageUrl      String?   @map("img_url") @db.VarChar(255)
+  x             String?   @default("") @db.VarChar(50)
+  y             String?   @default("") @db.VarChar(50)
+  ionUserId     String?   @map("ion_user_id") @db.VarChar(50)
+  procedureId   String?   @map("procedure_id") @db.VarChar(100)
+  sharePolicyId BigInt?   @map("share_policy_id")
+  branchId      BigInt?   @map("branch_id")
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   branch          HospitalBranch?   @relation(fields: [branchId], references: [id])
@@ -304,6 +308,7 @@ model Doctor {
   radiologyOrders RadiologyOrder[]
   doctorShares    DoctorShare[]
 
+  @@index([email])
   @@index([department])
   @@index([branchId])
   @@map("doctor")
