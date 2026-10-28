@@ -192,6 +192,37 @@ SELECT
 
 ---
 
+### Domain 8: Appointments & OPD Scheduling (`appointment` -> `Appointment`)
+
+| Legacy Column | Target Prisma Field | PostgreSQL Type | Transform / Business Logic | Risk | Status |
+| :--- | :--- | :--- | :--- | :---: | :---: |
+| `id` (INT) | `id` | `BigInt @id autoincrement`| Serialized as String in API responses | Low | Mapped |
+| `patient` (VARCHAR) | `patientId` | `BigInt` | Foreign key -> `patient.id` (strictly validated) | High | Mapped |
+| `doctor` (VARCHAR) | `doctorId` | `BigInt` | Foreign key -> `doctor.id` (strictly validated) | High | Mapped |
+| `date` (VARCHAR) | `date` | `VarChar(50)` | YYYY-MM-DD day view anchor | Med | Mapped |
+| `time_slot` (VARCHAR) | `timeSlot` | `String? (VarChar 100)`| Derived formatting: `HH:mm - HH:mm` | Low | Mapped |
+| `s_time` (VARCHAR) | `sTime` | `VarChar(50)` | Derived start datetime: `YYYY-MM-DD HH:mm:ss` | High | Mapped |
+| `e_time` (VARCHAR) | `eTime` | `VarChar(50)` | Derived end datetime: `s_time + minutes` | High | Mapped |
+| `s_time_key` (VARCHAR) | `sTimeKey` | `String? (VarChar 50)` | Legacy chronological sort key: `YYYYMMDDHHmm` | Low | Mapped |
+| `status` (VARCHAR) | `status` | `VarChar(50)` | `scheduled`, `arrived`, `in consultation`, `completed`, `cancelled`, `no show` | High | Mapped |
+| `remarks` (VARCHAR) | `remarks` | `String? (Text)` | Free text notes | Low | Mapped |
+| `mode` (VARCHAR) | `mode` | `VarChar(20)` | `in_person` or `video` | Med | Mapped |
+| `video_room` (VARCHAR) | `videoRoom` | `String? (VarChar 100)`| Jitsi cryptographic meeting room (`icthospital-<24hex>`) | Med | Mapped |
+| `b_p`, `pulse`, `temprature`, `weight` | `bp`, `pulse`, `temperature`, `weight` | `VarChar(100)` | Outpatient vitals taken at check-in | Low | Mapped |
+| `add_date` (VARCHAR) | `addDate` | `String? (VarChar 50)` | Creation calendar date | Low | Mapped |
+| `registration_time` | `registrationTime` | `String? (VarChar 50)` | Creation ISO timestamp | Low | Mapped |
+| `user` (VARCHAR) | `user` | `String? (VarChar 100)`| Identity of staff/clerk booking the slot | Low | Mapped |
+| `branch_id` (INT) | `branchId` | `BigInt?` | Multi-branch routing | Low | Mapped |
+
+**Reconciliation Query**:
+```sql
+SELECT
+  (SELECT COUNT(*) FROM legacy.appointment) AS legacy_appointment_count,
+  (SELECT COUNT(*) FROM target.appointment) AS target_appointment_count;
+```
+
+---
+
 ## 4. Retired & Unmapped Entity Inventory
 
 The following 7 legacy school tables were removed by migration `2026_09_09_140000_remove_school_tables.php` and are intentionally **omitted** from Prisma:

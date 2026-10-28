@@ -357,6 +357,13 @@ export class PatientService {
     const label = `${existing.patientId} ${existing.name}`;
 
     if (this.prisma.connected) {
+      const appointments = await this.prisma.appointment.findFirst({
+        where: { patientId: BigInt(existing.id) },
+      });
+      if (appointments) {
+        throw new BadRequestException(`${label} has appointments on file, so the record stays.`);
+      }
+
       try {
         await this.prisma.patient.delete({
           where: { id: BigInt(existing.id) },
@@ -364,6 +371,7 @@ export class PatientService {
         return { message: `Deleted patient ${label}.` };
       } catch (err: any) {
         this.logger.warn(`Database deletion failed: ${err.message}`);
+        throw new BadRequestException(`Could not delete patient ${label}: ${err.message}`);
       }
     }
 

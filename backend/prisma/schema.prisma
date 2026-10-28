@@ -315,25 +315,39 @@ model Doctor {
 }
 
 model Appointment {
-  id           BigInt    @id @default(autoincrement())
-  patientId    BigInt    @map("patient")
-  doctorId     BigInt    @map("doctor")
-  date         String    @db.VarChar(50)
-  sTime        String    @map("s_time") @db.VarChar(50) // HH:mm or timestamp
-  eTime        String    @map("e_time") @db.VarChar(50) // HH:mm or timestamp
-  status       String    @default("scheduled") @db.VarChar(50)
-  remarks      String?   @db.Text
-  mode         String    @default("in_person") @db.VarChar(20) // in_person or video
-  videoRoom    String?   @map("video_room") @db.VarChar(100)
-  branchId     BigInt?   @map("branch_id")
-  queueNumber  Int?      @map("queue_number")
-  tokenNumber  String?   @map("token_number") @db.VarChar(50)
-  visitType    String?   @default("first_visit") @map("visit_type") @db.VarChar(50)
-  checkedInAt  DateTime? @map("checked_in_at") @db.Timestamptz
-  calledInAt   DateTime? @map("called_in_at") @db.Timestamptz
-  completedAt  DateTime? @map("completed_at") @db.Timestamptz
-  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id               BigInt    @id @default(autoincrement())
+  patientId        BigInt    @map("patient")
+  doctorId         BigInt    @map("doctor")
+  date             String    @db.VarChar(50)
+  timeSlot         String?   @map("time_slot") @db.VarChar(100)
+  sTime            String    @map("s_time") @db.VarChar(50) // e.g. "2026-10-01 09:00:00"
+  eTime            String    @map("e_time") @db.VarChar(50) // e.g. "2026-10-01 09:30:00"
+  sTimeKey         String?   @map("s_time_key") @db.VarChar(50)
+  status           String    @default("scheduled") @db.VarChar(50)
+  remarks          String?   @db.Text
+  addDate          String?   @map("add_date") @db.VarChar(50)
+  registrationTime String?   @map("registration_time") @db.VarChar(50)
+  user             String?   @default("") @db.VarChar(100)
+  request          String?   @default("") @db.VarChar(100)
+  bp               String?   @map("b_p") @db.VarChar(100)
+  pulse            String?   @db.VarChar(100)
+  temperature      String?   @map("temprature") @db.VarChar(100)
+  weight           String?   @db.VarChar(100)
+  tokenNo          Int?      @map("token_no")
+  queueNumber      Int?      @map("queue_number")
+  tokenNumber      String?   @map("token_number") @db.VarChar(50)
+  visitType        String?   @default("first_visit") @map("visit_type") @db.VarChar(50)
+  paymentId        BigInt?   @map("payment_id")
+  mode             String    @default("in_person") @db.VarChar(20) // in_person or video
+  videoRoom        String?   @map("video_room") @db.VarChar(100)
+  branchId         BigInt?   @map("branch_id")
+  checkedInAt      DateTime? @map("checked_in_at") @db.Timestamptz
+  consultStartedAt DateTime? @map("consult_started_at") @db.Timestamptz
+  calledInAt       DateTime? @map("called_in_at") @db.Timestamptz
+  checkedOutAt     DateTime? @map("checked_out_at") @db.Timestamptz
+  completedAt      DateTime? @map("completed_at") @db.Timestamptz
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   patient      Patient         @relation(fields: [patientId], references: [id])
@@ -344,6 +358,8 @@ model Appointment {
   @@index([doctorId, date])
   @@index([patientId])
   @@index([status])
+  @@index([sTimeKey])
+  @@index([branchId])
   @@map("appointment")
 }
 
