@@ -190,3 +190,32 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
 - **Owner Decision Required**:
   - [ ] **Option A (Recommended)**: Permanently deprecate legacy school entities and formalize implicit package/setting links with foreign keys.
   - [ ] **Option B**: Retain flexible polymorphic identifiers for package items without foreign key enforcement.
+
+---
+
+## 10. Phase 4 NestJS Backend Foundation Decisions
+
+### 19. Identity Provider Boundary: Custom NestJS JWT vs Supabase Auth
+- **Evidence**: The prompt mandates: *"Do not silently combine Supabase Auth with custom NestJS authentication. Record the chosen boundary and required owner decisions."*
+- **Implementation State**:
+  - The foundation implements a trusted **NestJS JWT Authentication Service** (`AuthService` + `JwtStrategy`) where NestJS signs and verifies JWTs containing user claims (`sub`, `email`, `group`, `permissions`, `branchId`).
+  - An adapter method `validateSupabaseToken()` is prepared in `AuthService` to verify Supabase Auth RS256/HS256 tokens using `SUPABASE_JWT_SECRET` if Supabase Auth is adopted as the primary identity provider.
+- **Recommendation**: Retain custom NestJS JWT as the default trusted authority for staff logins, which preserves hospital multi-branch staff profiles and avoids tight external vendor coupling. If external OAuth/SSO is required later, Supabase Auth can serve as the OAuth provider with NestJS mapping the external JWT.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Custom NestJS JWT with staff credentials stored securely in PostgreSQL (Argon2id hashing), allowing full standalone operation and offline local development.
+  - [ ] **Option B**: Fully delegate identity to Supabase Auth (staff accounts managed in Supabase Auth console/API), with NestJS validating inbound Supabase JWTs.
+
+### 20. Initial System Administrator Bootstrap
+- **Evidence**: Legacy audit finding `SEC-01` confirmed a hardcoded backdoor in `SuperAdmin.php` (`login == 'ictkashif'`). This has been completely eliminated in Phase 4.
+- **Recommendation**: Use a deterministic CLI seed script (`npm run seed:admin`) reading `INITIAL_ADMIN_EMAIL` and `INITIAL_ADMIN_PASSWORD` from local environment variables on first deployment, then requiring password rotation on first login.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Environment variable-driven admin seed script (`INITIAL_ADMIN_EMAIL`) with mandatory first-login password rotation.
+  - [ ] **Option B**: Manual database insert by authorized DBA during deployment rehearsal.
+
+### 21. Background Queue Engine (Redis + BullMQ)
+- **Evidence**: The approved stack notes that Redis + BullMQ are optional and must not be added unless a concrete, justified requirement exists in this phase.
+- **Assessment**: Phase 4 focuses strictly on foundation (bootstrap, config, logging, correlation IDs, health, auth/RBAC primitives). No background queue is required for Phase 4. Queue infrastructure will be introduced in subsequent phases when scheduled payment reminders (remediating `SEC-02`) or SMS batch dispatching are implemented.
+- **Recommendation**: Defer Redis + BullMQ integration until the domain module requiring asynchronous background jobs is scaffolded.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Confirm deferral of Redis + BullMQ until background job domain features are implemented.
+  - [ ] **Option B**: Pre-scaffold empty BullMQ module in backend foundation.
