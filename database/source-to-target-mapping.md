@@ -267,6 +267,68 @@ SELECT
 
 ---
 
+### Domain 10: Invoicing & Billing (`payment`, `invoice_item`, `invoice_payment`, `doctor_share` -> `Payment`, `InvoiceItem`, `InvoicePayment`, `DoctorShare`)
+
+| Legacy Column | Target Prisma Field | PostgreSQL Type | Transform / Business Logic | Risk | Status |
+| :--- | :--- | :--- | :--- | :---: | :---: |
+| `payment.id` (INT) | `id` | `BigInt @id autoincrement` | Serialized as String in API responses | Low | Mapped |
+| `payment.patient` (VARCHAR/INT) | `patientId` | `BigInt` | Foreign key -> `patient.id` (strictly validated) | High | Mapped |
+| `payment.doctor` (VARCHAR) | `doctor` | `String? @db.VarChar(100)` | ID or name of attending doctor | Med | Mapped |
+| `payment.date` (VARCHAR) | `date` | `String @db.VarChar(50)` | YYYY-MM-DD invoice date | Low | Mapped |
+| `payment.amount` (VARCHAR/DECIMAL) | `amount` | `Decimal(12, 2)` | Server-calculated subtotal of charge line items | High (Financial) | Mapped |
+| `payment.discount` (VARCHAR) | `discount` | `Decimal(12, 2)` | Discount amount; validated: discount <= subtotal | High (Financial) | Mapped |
+| `payment.vat` (VARCHAR) | `vat` | `Decimal(12, 2)` | Tax addition; validated: non-negative | High (Financial) | Mapped |
+| `payment.gross_total` (VARCHAR) | `grossTotal` | `Decimal(12, 2)` | Server-enforced: `subtotal - discount + vat` | High (Financial) | Mapped |
+| `payment.amount_received` (VARCHAR)| `amountReceived` | `Decimal(12, 2)` | Sum of all `invoice_payment.amount` rows | High (Financial) | Mapped |
+| `payment.status` (VARCHAR) | `status` | `String @db.VarChar(50)` | `unpaid`, `part paid`, `paid` (derived from balance) | High (Financial) | Mapped |
+| `payment.care_setting` (VARCHAR) | `careSetting` | `String? @db.VarChar(20)` | `opd` or `ipd` | Low | Mapped |
+| `payment.remarks` (VARCHAR) | `remarks` | `String? @db.VarChar(500)` | Billing notes | Low | Mapped |
+| `payment.patient_type_id` (INT) | `patientTypeId` | `BigInt?` | Snapshot of patient classification type | Med | Mapped |
+| `payment.referring_doctor` (VARCHAR)| `referringDoctor`| `String? @db.VarChar(100)` | External or internal referring doctor ID | Low | Mapped |
+| `payment.category_name` (VARCHAR) | `categoryName` | `String? @db.VarChar(1000)`| Comma-separated summary string for legacy reports | Low | Mapped |
+| `payment.category_amount` (VARCHAR)| `categoryAmount`| `String? @db.VarChar(1000)`| Comma-separated line totals for legacy reports | Low | Mapped |
+| `payment.category` (VARCHAR) | `category` | `String? @db.VarChar(1000)`| Comma-separated category IDs for legacy reports | Low | Mapped |
+
+**InvoiceItem Model (`invoice_item` -> `InvoiceItem`)**:
+- `id` (BigInt): Primary key
+- `paymentId` (BigInt): Foreign key -> `payment.id` (cascade delete allowed only when unpaid)
+- `paymentCategoryId` (BigInt?): Optional FK -> `payment_category.id`
+- `name` (String, VarChar 200): Charge item title
+- `quantity` (Int): Minimum 1
+- `unitPrice` (Decimal 12, 2): Non-negative unit fee
+- `lineTotal` (Decimal 12, 2): Recalculated server-side: `unitPrice * quantity`
+- `doctorId` (BigInt?): Optional servicing doctor receiving share allocation
+
+**InvoicePayment Model (`invoice_payment` -> `InvoicePayment`)**:
+- `id` (BigInt): Primary key
+- `paymentId` (BigInt): Foreign key -> `payment.id`
+- `amount` (Decimal 12, 2): Payment installment; strictly refused if `amount > balance + 0.004`
+- `method` (String, VarChar 60): Tender type (`Cash`, `Card`, `Bank transfer`, `Cheque`, `Online`, `Write-off`)
+- `reference` (String, VarChar 120): Receipt number / transaction ID
+- `paidAt` (String, VarChar 50): Payment datetime
+- `receivedBy` (BigInt?): Staff ID of cashier/accountant accepting money
+
+**DoctorShare Model (`doctor_share` -> `DoctorShare`)**:
+- `id` (BigInt): Primary key
+- `paymentId` (BigInt): Foreign key -> `payment.id`
+- `doctorId` (BigInt): Servicing doctor
+- `baseAmount` (Decimal 12, 2): Base fee eligible for revenue share
+- `percent` (Decimal 6, 2): Commission percentage
+- `amount` (Decimal 12, 2): Calculated share amount
+- `status` (String, VarChar 20): `pending`, `approved`, `paid`
+- `payoutRef` (String, VarChar 100): Settlement reference
+
+**Reconciliation Query**:
+```sql
+SELECT
+  (SELECT COUNT(*) FROM legacy.payment) AS legacy_invoice_count,
+  (SELECT COUNT(*) FROM target.payment) AS target_invoice_count,
+  (SELECT SUM(gross_total) FROM target.payment) AS target_gross_sum,
+  (SELECT SUM(amount) FROM target.invoice_payment) AS target_collected_sum;
+```
+
+---
+
 ## 4. Retired & Unmapped Entity Inventory
 
 The following 7 legacy school tables were removed by migration `2026_09_09_140000_remove_school_tables.php` and are intentionally **omitted** from Prisma:

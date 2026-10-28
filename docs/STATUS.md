@@ -2,7 +2,7 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 9: ConsultationModule Migration**
+- **Current Phase**: **Phase 10: Invoicing and Billing Domain Migration (`InvoiceModule`)**
 - **Status**: **COMPLETED**
 - **Date**: 2026-10-28
 - **Approved Target Stack**:
@@ -28,24 +28,24 @@
 | **Phase 6** | Dependency Audit & Domain Migration (2nd Module) | `DepartmentModule` (specialty catalogue, alphabetical ordering, doctor usage counting, cascade rename across doctors, deletion protection, unlisted specialty adoption, RBAC), commit `46f7ac2` | **COMPLETED** |
 | **Phase 7** | Clinical Staff Register (3rd Module) | `DoctorModule` (doctor register, only name required, email uniqueness without blank clash, appointment deletion protection, upcoming load tracking, department suggestion merge, optional staff login linking, RBAC), commit `2b94b19` | **COMPLETED** |
 | **Phase 8** | Outpatient Scheduling & Visits (4th Module) | `AppointmentModule` (double-booking overlap protection, transaction locks, doctor clinic hours & slot blocks, free slots calculator, day view, vitals recording, Jitsi video visits, RBAC), commit `eb0ed18` | **COMPLETED** |
-| **Phase 9** | Clinical Consultations & Encounters (5th Module) | `ConsultationModule` (outpatient consultation notes, Naegele obstetric math, history carry-forward, vitals sync, note templates, printable summaries, completed note immutability, RBAC) | **COMPLETED** |
-| **Phase 10** | Prescriptions & Pharmacy Integration | Prescription generation, medication regimens, dosage lines | Pending |
+| **Phase 9** | Clinical Consultations & Encounters (5th Module) | `ConsultationModule` (outpatient consultation notes, Naegele obstetric math, history carry-forward, vitals sync, note templates, printable summaries, completed note immutability, RBAC), commit `1b09259` | **COMPLETED** |
+| **Phase 10** | Invoicing & Billing Domain Migration (6th Module) | `InvoiceModule` (patient invoicing, multi-item breakdown, server calculations, installment payments, pessimistic row lock, overpayment rejection, deletion guards, doctor share calculations, RBAC) | **COMPLETED** |
 
 ---
 
-## 2. Phase 9 Domain Migration Summary: `ConsultationModule`
+## 2. Phase 10 Domain Migration Summary: `InvoiceModule`
 
 | Property | Value | Evidence / Command |
 | :--- | :--- | :--- |
-| **Selected Domain** | **`ConsultationModule`** (Clinical Consultations & Encounters) | Core clinical documentation connecting outpatient visits to patient medical history and doctor records |
-| **Target Database Mapping** | `consultation` and `consult_template` tables aligned in Prisma with all legacy columns, relations, and JSONB structures | `npm run prisma:validate` (Exit code 0), `npm run prisma:generate` |
-| **Legacy Source Parity** | `legacy/app/Http/Controllers/ConsultationController.php`, `legacy/app/Models/Consultation.php`, `legacy/app/Models/ConsultTemplate.php`, `legacy/tests/Feature/ConsultationTest.php` | Full parity across consultation lifecycle, note templates, and obstetric math |
-| **Endpoints Implemented** | `GET /api/v1/consultations`<br>`GET /api/v1/consultations/visit/:appointmentId`<br>`POST /api/v1/consultations/visit/:appointmentId`<br>`GET /api/v1/consultations/templates`<br>`POST /api/v1/consultations/templates`<br>`DELETE /api/v1/consultations/templates/:id`<br>`GET /api/v1/consultations/:id`<br>`GET /api/v1/consultations/:id/print` | Versioned REST endpoints with OpenAPI annotations and RBAC guards |
-| **Business Rules Preserved** | 1. 1:1 encounter-to-appointment cardinality (`appointment_id UNIQUE`)<br>2. Automatic carry-forward of allergies and past history from patient's previous consultation record<br>3. Naegele's rule obstetric calculations: `EDD = LMP + 280 days`, gestational age formatted as `Xw Yd`<br>4. Simultaneous outpatient vitals sync (`b_p`, `pulse`, `temprature`, `weight`) persisted to appointment record<br>5. Encounter lifecycle status transitions (`save` keeps `draft` and marks visit `in consultation`; `complete` marks consultation and visit `completed` with timestamps)<br>6. Clinical immutability: completed consultations cannot be silently overwritten or modified without an authorized amend workflow<br>7. Doctor note templates (create, list by doctor/hospital, delete, apply to note fields)<br>8. Formatted printable summary view for discharge and medical records | `ConsultationService` unit & E2E test suites (11 unit tests, 12 E2E tests) |
-| **Authorization & Security** | Granular RBAC (`consultation_view`, `consultation_add`) | Receptionist restricted; Doctor and Admin authorized; public access denied (401) |
-| **Unit Test Coverage** | **13 suites passed, 82 tests passed** (11 new tests in `consultation.service.spec.ts`) | `npm test` (Exit code 0) |
-| **E2E Integration Tests**| **6 suites passed, 55 tests passed** (12 new tests in `consultation.e2e-spec.ts`) | `npm run test:e2e` (Exit code 0) |
-| **Total Test Baseline** | **137 passing automated tests** | Verified across all backend layers |
+| **Selected Domain** | **`InvoiceModule`** (Invoicing, Charge Items & Installment Payments) | Critical hospital revenue workflow replacing legacy packed string pairs (`payment.category_name`, `category_amount`) with relational tables |
+| **Target Database Mapping** | `payment`, `invoice_item`, `invoice_payment`, and `doctor_share` aligned in Prisma schema with decimal currency precision | `npm run prisma:validate` (Exit code 0), `npm run prisma:generate` |
+| **Legacy Source Parity** | `legacy/app/Http/Controllers/InvoiceController.php`, `legacy/app/Support/Billing.php`, `legacy/app/Models/Payment.php`, `legacy/app/Models/InvoiceItem.php`, `legacy/app/Models/InvoicePayment.php`, `legacy/app/Support/ShareCalculator.php`, `legacy/tests/Feature/InvoiceTest.php`, `legacy/tests/Feature/ConcurrentWriteTest.php` | Full parity across invoice header creation, line item recalculation, installment payments, balance locking, and overpayment rejection |
+| **Endpoints Implemented** | `GET /api/v1/invoices`<br>`POST /api/v1/invoices`<br>`GET /api/v1/invoices/:id`<br>`POST /api/v1/invoices/:id/pay`<br>`DELETE /api/v1/invoices/:id` | Versioned REST endpoints with OpenAPI annotations and RBAC guards |
+| **Business Rules Preserved** | 1. Relational charge items in `invoice_item` replacing error-prone legacy packed strings<br>2. Recalculation of all prices, quantities, subtotals, and gross totals server-side (`gross = subtotal - discount + vat`)<br>3. Discount validation: discount cannot exceed subtotal (`400 Bad Request: The discount is larger than the invoice.`)<br>4. Invoice requires at least one charge item (`400 Bad Request: Add at least one charge, or the invoice is for nothing.`)<br>5. Multi-tender installment payments in `invoice_payment` (`Cash`, `Card`, `Bank transfer`, `Cheque`, `Online`, `Write-off`)<br>6. Derived settlement lifecycle: balance strictly calculated as `gross_total - sum(payments)`; status transitions dynamically (`unpaid` -> `part paid` -> `paid`)<br>7. Pessimistic row locking (`SELECT id, gross_total FROM payment WHERE id = $id FOR UPDATE`) inside interactive transaction to eliminate concurrent payment overpayment race conditions<br>8. Strict overpayment refusal: `amount > balance + 0.004` throws `400 Bad Request ("Only X is outstanding on this invoice.")` and preserves balance<br>9. Financial deletion guard: an invoice cannot be deleted if any money has been received (`paid > 0`) or if a doctor share is approved/settled<br>10. Doctor revenue share allocation initialized (`doctor_share`) for billing reconciliation | `InvoiceService` unit & E2E test suites (14 unit tests, 15 E2E tests) |
+| **Authorization & Security** | Granular RBAC (`invoice_view`, `invoice_add`, `invoice_delete`, `payment_view`, `payment_add`, `payment_delete`) | Doctor role restricted (403); Receptionist allowed create/view/pay but barred from delete (403); Accountant and Admin authorized for delete; public access denied (401) |
+| **Unit Test Coverage** | **14 suites passed, 96 tests passed** (14 new tests in `invoice.service.spec.ts`) | `npm test` (Exit code 0) |
+| **E2E Integration Tests**| **7 suites passed, 69 tests passed** (15 new tests in `invoice.e2e-spec.ts`) | `npm run test:e2e` (Exit code 0) |
+| **Total Test Baseline** | **165 passing automated tests** | Verified across all backend layers |
 | **Test Environment Scope** | In-memory & test mock drivers | Local PostgreSQL service and Docker daemon are not active on this host; live PostgreSQL integration tests could not be run |
 | **Linting & Code Quality**| **ESLint 9 + Prettier + Strict TypeScript** | `npm run lint` (Exit code 0), `npx tsc --noEmit` (Exit code 0) |
 | **Build Validation** | **NestJS Production Build** | `npm run build` (Exit code 0) |
@@ -53,20 +53,20 @@
 
 ---
 
-## 3. Foundation Verification Summary
+## 3. Financial Integrity & Concurrency Architecture
 
-1. **Clinical Data Protection & Immutability**:
-   - Outpatient consultation notes, findings, and diagnoses are strictly protected by `JwtAuthGuard` and `RequirePermissions`.
-   - Once a consultation is finalized (`status === 'completed'`), subsequent save attempts reject with `400 Bad Request ("Cannot modify a completed consultation record.")` preventing silent overwrites.
-2. **Clinical Continuity (Carry-Forward)**:
-   - When a patient visits a doctor, opening the encounter workspace automatically pulls known allergies and surgical/past history from their previous completed or draft consultations.
-3. **Obstetric Calculations**:
-   - Implements standard Naegele's rule (`LMP + 280 days`) and accurate gestational age duration (`Xw Yd`) without relying on external unverified packages.
+1. **Elimination of Packed String Corruption**:
+   - The legacy MariaDB system stored charges and prices as position-matched comma-separated strings in `payment.category_name` and `payment.category_amount`. Mismatched pairs silently misallocated line items. Medora 2.0 stores every line item as an explicit row in `invoice_item` with `name`, `quantity`, `unit_price`, `line_total`, and servicing `doctor_id`.
+2. **Server-Authoritative Arithmetic & Rounding**:
+   - Client-submitted totals are strictly ignored and recalculated from charge catalog items and explicit overrides with 2-decimal financial rounding (`InvoiceService.round2`), preventing floating-point rounding drift.
+3. **Pessimistic Concurrency & Overpayment Prevention**:
+   - Payment acceptance utilizes PostgreSQL `SELECT ... FOR UPDATE` row locks within interactive transactions (`tx.$transaction`) to re-query the true outstanding balance before inserting payments. Attempted overpayments are rejected with `400 Bad Request` and zero ledger mutation.
+4. **Audit Immutability & Deletion Protections**:
+   - An invoice with recorded payments cannot be deleted, preserving the financial ledger and cashier audit trail.
 
 ---
 
 ## 4. Next Module Readiness
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, and `ConsultationModule` completed, the clinical outpatient flow is complete. The next recommended candidate is:
-- **`PrescriptionModule`**: Prescription generation, medication regimens, dosage, frequency, and pharmacy dispensing link.
-
+With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, and `InvoiceModule` completed, patient administrative, clinical, and billing workflows are operational. The next candidate module is:
+- **`PrescriptionModule`**: Prescription generation, medication regimens, dosage lines, and future pharmacy dispensing links.

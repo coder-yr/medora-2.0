@@ -231,3 +231,28 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [ ] **Option A (Recommended)**: Append-only clinical addendum model where finalized notes cannot be edited, only supplemented with signed addenda.
   - [ ] **Option B**: Allow authoring doctor to unlock and amend completed notes within a 24-hour grace period with revision logging.
 
+---
+
+## 12. Phase 10 Billing & Invoice Decisions & Open Questions
+
+### 23. Cashier Shift Closeout & Physical Cash Reconciliation
+- **Evidence**: Legacy ICTHospital contains a separate `CashController` managing cashier shifts (`shift_close` table), where `invoice_payment.shift_close_id` binds receipts to a daily till handover. Phase 10 migrated core invoice issuance, installment tracking, and pessimistic locking, leaving `shift_close_id` nullable.
+- **Recommendation**: Maintain nullable `shift_close_id` until the dedicated Cashier / Financial Reporting domain is migrated, then enforce cashier session binding upon collecting payments.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Migrate Cashier Shift Closeout in a subsequent finance phase, linking open shifts to invoice payments.
+  - [ ] **Option B**: Keep invoice payments decoupled from physical cashier till sessions, recording only `received_by` staff ID.
+
+### 24. Direct Refund & Credit Balance Policy
+- **Evidence**: Legacy source code strictly refuses any payment exceeding outstanding balance (`400 Bad Request: Only X is outstanding on this invoice.`), preventing negative balances or implicit customer credit. Furthermore, invoices with recorded payments cannot be deleted (`Money has been taken against this invoice, so it cannot be deleted.`).
+- **Recommendation**: Retain the strict legacy overpayment refusal. Implement a dedicated, auditable refund / reversal transaction entity in a future phase rather than allowing negative balances on the main invoice header.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Retain strict overpayment refusal; require formal refund/credit note records for returns.
+  - [ ] **Option B**: Allow customer advance deposits / negative balances stored on patient accounts.
+
+### 25. Clinical Encounter & Service Billing Association
+- **Evidence**: Legacy source investigation reveals that clinical consultations do not automatically raise an invoice. Front-desk receptionists or billing accountants raise invoices explicitly, linking charge catalog items (`payment_category`) and optionally specifying the servicing doctor.
+- **Recommendation**: Maintain decoupled invoice raising in Medora 2.0 while providing an optional reference linkage (`appointment_id` / `consultation_id`) on invoices for unified reporting.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Retain manual billing workflow by default, with UI shortcuts to populate invoice charges from completed appointment/consultation services.
+  - [ ] **Option B**: Enforce automated invoice creation upon consultation completion.
+

@@ -14,6 +14,7 @@ import { ConsultationModule } from './modules/consultation/consultation.module';
 import { DepartmentModule } from './modules/department/department.module';
 import { DoctorModule } from './modules/doctor/doctor.module';
 import { HealthModule } from './modules/health/health.module';
+import { InvoiceModule } from './modules/invoice/invoice.module';
 import { PatientModule } from './modules/patient/patient.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 
@@ -33,6 +34,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     DoctorModule,
     AppointmentModule,
     ConsultationModule,
+    InvoiceModule,
   ],
   providers: [
     {
