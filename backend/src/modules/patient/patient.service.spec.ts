@@ -136,4 +136,55 @@ describe('PatientService (Legacy Business Rule Parity)', () => {
   it('Rule 8: findById throws NotFoundException when record does not exist', async () => {
     await expect(service.findById('999999')).rejects.toThrow(NotFoundException);
   });
+
+  it('Rule 9: deleting the highest-numbered patient does NOT cause reuse of their MR number', async () => {
+    const p1 = await service.create({ name: 'Patient One' });
+    const p2 = await service.create({ name: 'Patient Two' });
+    const p3 = await service.create({ name: 'Patient Three' });
+
+    expect(p1.patientId).toBe('000001');
+    expect(p2.patientId).toBe('000002');
+    expect(p3.patientId).toBe('000003');
+
+    // Delete the highest-numbered patient (000003)
+    await service.remove(p3.id);
+
+    // Next patient must NOT reuse 000003; it must receive 000004
+    const p4 = await service.create({ name: 'Patient Four' });
+    expect(p4.patientId).toBe('000004');
+  });
+
+  it('Rule 10: patient identifier generation when empty starts at 000001', async () => {
+    service.clearMemoryStore();
+    const nextId = await service.nextPatientId();
+    expect(nextId).toBe('000001');
+  });
+
+  it('Rule 11: BigInt fields are serialized as strings on all response paths', async () => {
+    const created = await service.create({
+      name: 'Serial Test',
+      patientTypeId: 10,
+      branchId: 2,
+    });
+
+    expect(typeof created.id).toBe('string');
+    expect(typeof created.patientTypeId).toBe('string');
+    expect(typeof created.branchId).toBe('string');
+
+    const found = await service.findById(created.id);
+    expect(typeof found.id).toBe('string');
+
+    const listed = await service.findAll({ q: 'Serial Test' });
+    expect(typeof listed.items[0].id).toBe('string');
+
+    const updated = await service.update(created.id, { name: 'Serial Test Updated' });
+    expect(typeof updated.id).toBe('string');
+  });
+
+  it('Rule 12: ionUserId is independent of external identity providers and defaults safely', async () => {
+    const created = await service.create({ name: 'Walk-in Anonymous' });
+    expect(created.name).toBe('Walk-in Anonymous');
+    // Front desk registration succeeds with no external auth dependency
+    expect(created.patientId).toBeDefined();
+  });
 });

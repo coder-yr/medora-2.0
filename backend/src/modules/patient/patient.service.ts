@@ -11,7 +11,8 @@ export class PatientService {
 
   // In-memory fallback repository for offline test and local standalone development
   private memoryPatients: Map<string, any> = new Map();
-  private memoryCounter = 0;
+  private memoryIdCounter = 0;
+  private memoryMaxMrnIssued = 0;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -58,25 +59,25 @@ export class PatientService {
   /**
    * Generates the next atomic sequential 6-digit patient ID.
    * Derived from the highest existing numeric ID rather than row count,
-   * so deleting a record never reuses an issued MR number.
+   * so deleting a record never reuses an issued MR number (including when
+   * the highest-numbered patient is deleted).
    */
   async nextPatientId(): Promise<string> {
     if (this.prisma.connected) {
       try {
-        const highestRow = await this.prisma.patient.findFirst({
-          orderBy: { id: 'desc' },
-          select: { patientId: true },
-        });
-
+        const result: any = await this.prisma.$queryRaw`
+          SELECT COALESCE(MAX(NULLIF(regexp_replace(patient_id, '\\D', '', 'g'), '')::bigint), 0) AS max_id 
+          FROM patient
+        `;
         let highestNum = 0;
-        if (highestRow?.patientId) {
-          const parsed = parseInt(highestRow.patientId, 10);
-          if (!isNaN(parsed)) {
-            highestNum = parsed;
-          }
+        if (result && result[0] && result[0].max_id !== undefined) {
+          highestNum = Number(result[0].max_id);
         }
 
-        return (highestNum + 1).toString().padStart(6, '0');
+        // Monotonic guarantee: never reissue an MR number lower than or equal to the highest issued
+        this.memoryMaxMrnIssued = Math.max(this.memoryMaxMrnIssued, highestNum);
+        this.memoryMaxMrnIssued++;
+        return this.memoryMaxMrnIssued.toString().padStart(6, '0');
       } catch (err: any) {
         this.logger.warn(
           `Failed to query next patientId from database: ${err.message}. Using fallback.`,
@@ -84,9 +85,9 @@ export class PatientService {
       }
     }
 
-    // In-memory / offline standalone fallback
-    this.memoryCounter++;
-    return this.memoryCounter.toString().padStart(6, '0');
+    // In-memory / offline standalone fallback (monotonic, non-decrementing)
+    this.memoryMaxMrnIssued++;
+    return this.memoryMaxMrnIssued.toString().padStart(6, '0');
   }
 
   /**
@@ -261,7 +262,8 @@ export class PatientService {
     }
 
     // In-memory store
-    const id = BigInt(this.memoryPatients.size + 1);
+    this.memoryIdCounter++;
+    const id = BigInt(this.memoryIdCounter);
     const inMemoryRecord = {
       ...recordData,
       id,
@@ -361,7 +363,8 @@ export class PatientService {
    */
   clearMemoryStore(): void {
     this.memoryPatients.clear();
-    this.memoryCounter = 0;
+    this.memoryIdCounter = 0;
+    this.memoryMaxMrnIssued = 0;
   }
 
   /**

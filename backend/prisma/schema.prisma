@@ -98,6 +98,18 @@ model Institute {
   @@map("institute")
 }
 
+model Department {
+  id          BigInt    @id @default(autoincrement())
+  name        String    @unique @db.VarChar(100)
+  description String?   @db.VarChar(1000)
+  x           String?   @default("") @db.VarChar(50)
+  y           String?   @default("") @db.VarChar(50)
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@map("department")
+}
+
 // =============================================================================
 // 3. PATIENTS & INPATIENT WARDS
 // =============================================================================
