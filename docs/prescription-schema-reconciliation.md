@@ -128,9 +128,9 @@ model PrescriptionMedicine {
 | Legacy table | Legacy column | Legacy type | Nullable | New Prisma field | PostgreSQL type | Mapping status | Rationale & Explanations |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `prescription` | `id` | INTEGER | NO | `id` | `bigint` (BIGSERIAL) | Compatible type conversion | Upgraded from 32-bit `INTEGER` to 64-bit `BIGINT` for long-term scalability; autoincrement sequence preserved. |
-| `prescription` | `patient` | varchar(100) | NO | `patientId` (`@map("patient")`) | `bigint` | Compatible type conversion & Renamed | Legacy stored string patient IDs (`"1"`). Mapped to typed `BigInt` with foreign key relation to `patient(id)` (RESTRICT). |
-| `prescription` | `doctor` | varchar(100) | NO | `doctorId` (`@map("doctor")`) | `bigint` | Compatible type conversion & Renamed | Legacy stored string doctor IDs (`"1"`). Mapped to typed `BigInt` with foreign key relation to `doctor(id)` (RESTRICT). |
-| `prescription` | `date` | varchar(100) | YES/NO | `date` | `character varying(50)` | Exact match | Standard calendar date (`YYYY-MM-DD`). Max length 50 safely holds standard ISO date strings. |
+| `prescription` | `patient` | varchar(100) | NO (SQLite) | `patientId` (`@map("patient")`) | `bigint` | Compatible type conversion & Renamed | Legacy stored string patient IDs (`"1"`). Mapped to typed `BigInt` with foreign key relation to `patient(id)` (RESTRICT). See Section 9 for data migration implications. |
+| `prescription` | `doctor` | varchar(100) | NO (SQLite) | `doctorId` (`@map("doctor")`) | `bigint` | Compatible type conversion & Renamed | Legacy stored string doctor IDs (`"1"`). Mapped to typed `BigInt` with foreign key relation to `doctor(id)` (RESTRICT). See Section 9 for data migration implications. |
+| `prescription` | `date` | varchar(100) | YES (SQLite) / NO (Migration 1) | `date` | `character varying(50)` NOT NULL | Intentional tightening / Compatible conversion | In SQLite, `date` is nullable (`notnull: 0`) following Laravel migration `2026_09_12_120000`. In Medora 2.0, clinical business rules require a date for every issued prescription (`NOT NULL`). ETL scripts must supply a fallback date for legacy nulls. |
 | `prescription` | `symptom` | varchar(100) | YES | `symptom` | `text` | Compatible type conversion | PostgreSQL `text` removes artificial 100-character truncation while accepting all legacy strings. |
 | `prescription` | `advice` | varchar(1000) | YES | `advice` | `text` | Compatible type conversion | PostgreSQL `text` stores clinical instructions of arbitrary length without silent truncation. |
 | `prescription` | `state` | varchar(100) | YES | `state` | `character varying(50)` | Compatible type conversion | Default `'issued'` explicitly configured. Holds lifecycle states (`issued`, `dispensed`, `completed`). |
@@ -186,21 +186,14 @@ Direct query against live Supabase PostgreSQL (`aws-1-eu-central-1.pooler.supaba
    - `prescription_medicine_prescription_id_idx` on `prescription_id`
    - `prescription_medicine_medicine_id_idx` on `medicine_id` (added during Phase 11.1 audit for SQLite parity)
 
-### B. Migration-History Gap Analysis
-- **Finding**: The `backend/prisma/migrations/` directory is currently non-existent.
-- **Root Cause**: The database was synchronized using `npx prisma db push` during active prototyping.
-- **Risk**: Without reproducible migration files, deployments to new environments cannot execute version-controlled schema upgrades via `prisma migrate deploy`.
-- **Recommended Baseline Strategy**:
-  1. Generate a non-destructive baseline migration from the current active schema:
-     ```bash
-     npx prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script > prisma/migrations/0_init/migration.sql
-     ```
-  2. Mark the baseline migration as already applied on Supabase PostgreSQL:
-     ```bash
-     npx prisma migrate resolve --applied 0_init
-     ```
-  3. Commit `prisma/migrations/` to version control.
-  4. Going forward, ban `db push` on shared environments and use `prisma migrate dev` for incremental schema changes.
+### B. Migration-History Gap Resolution (Phase 11.2)
+- **Status**: **RESOLVED in Phase 11.2**
+- **Actions Executed**:
+  1. Generated baseline migration `backend/prisma/migrations/0_init/migration.sql` (1,043 lines of standard DDL).
+  2. Verified zero schema drift against live Supabase PostgreSQL: `prisma migrate diff --from-schema prisma/schema.prisma --to-config-datasource` -> `No difference detected.`
+  3. Formally registered migration baseline: `npx prisma migrate resolve --applied 0_init` (Exit code 0).
+  4. Verified migration status: `npx prisma migrate status` -> `Database schema is up to date!`
+  5. Verified reproducibility against an isolated, disposable PostgreSQL test schema (`disposable_migration_test`): successfully created all 39 tables, foreign keys, and indexes from scratch and cleanly dropped.
 
 ---
 
@@ -228,4 +221,29 @@ Direct query against live Supabase PostgreSQL (`aws-1-eu-central-1.pooler.supaba
 1. **Schema Fidelity**: The Medora 2.0 prescription data model fully mirrors the legacy Laravel SQLite schema, successfully transforming loosely coupled varchar columns (`patient`, `doctor`) into strongly typed, indexed foreign keys while preserving legacy free-text summaries.
 2. **Missing Index Remediation**: Added `@@index([medicineId])` to `PrescriptionMedicine` to achieve 100% index parity with legacy SQLite's `prescription_medicine_medicine_id_index`.
 3. **Security Remediation**: Guarded development test credentials and the persona switcher in `frontend/src/App.tsx` behind Vite's `import.meta.env.DEV`, verifying zero credential leakage in the production bundle.
-4. **Migration Gap Documented**: Documented the absence of `backend/prisma/migrations/` and provided a safe baseline migration procedure.
+4. **Migration Baseline Established**: Created and baselined `0_init/migration.sql` in Prisma Migrate; eliminated schema drift and proved full reproducibility.
+
+---
+
+## 9. Legacy Patient/Doctor String ID Conversion Implications for Future Data Migration
+
+In the legacy Laravel and SQLite database:
+- `prescription.patient` was stored as `varchar(100)` (e.g., `"1"`, `"000001"`, or numeric string).
+- `prescription.doctor` was stored as `varchar(100)` (e.g., `"1"`, `"12"`).
+- Neither had database-level foreign key constraints.
+
+In Medora 2.0 and Supabase PostgreSQL:
+- `prescription.patient` is a strict `bigint` foreign key referencing `patient.id` (`ON DELETE RESTRICT`).
+- `prescription.doctor` is a strict `bigint` foreign key referencing `doctor.id` (`ON DELETE RESTRICT`).
+
+### Required ETL Migration Rules:
+1. **Numeric ID Resolution**:
+   - For records where `prescription.patient` contains an integer string, cast directly: `CAST(patient AS BIGINT)`.
+   - If legacy rows contain formatted MRNs (e.g. `"000042"`), join against `patient.patient_id` to resolve the corresponding internal primary key `patient.id`.
+2. **Orphaned Record Handling**:
+   - In legacy SQLite, deleting a doctor or patient did not cascade or restrict prescriptions, resulting in dangling string references.
+   - ETL scripts must identify orphaned prescriptions (`WHERE patient NOT IN (SELECT id FROM patient)`). These must either be mapped to a designated "Archived/Deleted Legacy Patient" record or flagged for review before inserting into PostgreSQL.
+3. **Date Nullability Normalization**:
+   - In legacy SQLite, `prescription.date` is nullable (`notnull: 0`).
+   - Medora 2.0 requires `date` (`NOT NULL`).
+   - ETL scripts must coalesce NULL legacy dates with the prescription creation date or fallback default: `COALESCE(date, '1970-01-01')`.

@@ -301,5 +301,24 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [ ] **Option A (Recommended)**: Lock prescriptions against updates once marked dispensed; require discontinuation order.
   - [ ] **Option B**: Continue permitting attending doctors to edit issued prescriptions prior to pharmacy dispensing.
 
+---
+
+## 15. Phase 11.2 Database Change Management & Data Migration Architecture
+
+### 31. Legacy Data Migration Strategy for Loosely-Coupled String Foreign Keys
+- **Evidence**: In legacy SQLite, `prescription.patient` and `prescription.doctor` stored `varchar` strings without database-level foreign key constraints. In Medora 2.0, PostgreSQL enforces strict `BIGINT` foreign keys referencing `patient(id)` and `doctor(id)` (`ON DELETE RESTRICT`).
+- **Recommendation**: During full ETL migration from the legacy database, any orphaned records with non-existent patient or doctor IDs should be linked to designated sentinel records (e.g., `Patient #0: Legacy Unlinked Patient`, `Doctor #0: Legacy Unlinked Doctor`) with an audit flag, preserving historical clinical orders without violating relational integrity.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Map orphaned legacy prescriptions to designated sentinel records to satisfy foreign keys while preserving historical records.
+  - [ ] **Option B**: Exclude orphaned legacy records from import into Medora 2.0.
+
+### 32. Legacy NULL Prescription Date Normalization
+- **Evidence**: Legacy SQLite PRAGMA audit revealed `prescription.date` is nullable (`notnull: 0`) due to migration `2026_09_12_120000`. Medora 2.0 enforces `date VARCHAR(50) NOT NULL` in Prisma and PostgreSQL.
+- **Recommendation**: For any legacy prescriptions lacking a date, the ETL data migration pipeline should populate the date using `COALESCE(date, SUBSTRING(created_at::text, 1, 10), '1970-01-01')`.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Enforce `NOT NULL` on `date` and populate legacy nulls with creation date or fallback epoch.
+  - [ ] **Option B**: Alter schema to allow nullable `date` on `prescription`.
+
+
 
 

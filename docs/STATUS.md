@@ -2,7 +2,7 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 11.1: Prescription SQLite Schema Verification & Hardening**
+- **Current Phase**: **Phase 11.2: Prisma Migration Baseline & Database Change Management**
 - **Status**: **COMPLETED**
 - **Date**: 2026-10-31
 - **Approved Target Stack**:
@@ -33,6 +33,7 @@
 | **Phase 10.5** | Backend Stabilization & Security Remediation | Backdoor removal, Argon2id + legacy bcrypt upgrade, session management (refresh token rotation, reuse detection), Helmet headers, login throttling, removal of all fake in-memory stores, real PostgreSQL row locking concurrency tests (`SELECT FOR UPDATE`), 100% clean CI lockfile, >= 80% coverage across all 6 services (`docs/security-hardening-report.md`), commit `e39efd1` | **COMPLETED** |
 | **Phase 11** | Prescription Domain & Frontend Clinical Screen (7th Module) | `PrescriptionModule` (catalog search, relational items, legacy summary sync, atomic transactions, RBAC), React 19 + TypeScript + Vite clinical prescription hub (role switcher, live auto-complete, dosage shortcuts, summary preview, print modal), Prisma migration to Supabase PostgreSQL, 100% unit and E2E pass rate, commit `f07c760` | **COMPLETED** |
 | **Phase 11.1** | Prescription SQLite Schema Verification & Hardening | Authentic PRAGMA audit of SQLite `prescription`, `prescription_medicine`, `medicine`, `patient`, `doctor`, column-by-column reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), `medicine_id` index alignment, PostgreSQL runtime audit, migration-history gap documentation, frontend persona switcher production security hardening (Vite tree-shaking verified) | **COMPLETED** |
+| **Phase 11.2** | Prisma Migration Baseline & Database Change Management | Baseline migration (`0_init/migration.sql`), `migration_lock.toml` (`postgresql`), verified zero drift against live Supabase PostgreSQL, official baseline resolution (`prisma migrate resolve --applied 0_init`), clean disposable PostgreSQL schema replication test, database migration runbook ([`docs/database-migration-runbook.md`](database-migration-runbook.md)), and documentation discrepancy reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)) | **COMPLETED** |
 
 ---
 
@@ -73,9 +74,24 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 4. Next Module Readiness
+## 4. Phase 11.2 Database Migration Baseline & Change Management Summary
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, and `PrescriptionModule` fully migrated and tested against Supabase PostgreSQL:
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Baseline Migration SQL** | `backend/prisma/migrations/0_init/migration.sql` (1,043 lines of clean, non-destructive DDL covering 39 models, sequences, primary keys, foreign keys, and indexes) | `npx prisma migrate diff --from-empty --to-schema prisma/schema.prisma --script -o prisma/migrations/0_init/migration.sql` |
+| **Provider Locking** | `backend/prisma/migrations/migration_lock.toml` (`provider = "postgresql"`) | Required by Prisma 7 migrate diff CLI |
+| **Schema Drift Audit** | **0 differences detected** between current `schema.prisma` and live Supabase PostgreSQL database | `npx prisma migrate diff --from-schema prisma/schema.prisma --to-config-datasource` (Exit code 0) |
+| **Supabase Baseline Resolution** | Marked `0_init` as applied on live database without re-executing or altering existing data | `npx prisma migrate resolve --applied 0_init` (Exit code 0) |
+| **Migration Recognition Status** | `1 migration found in prisma/migrations. Database schema is up to date!` | `npx prisma migrate status` (Exit code 0) |
+| **Clean Disposable Reproduction** | Created disposable PostgreSQL test schema `disposable_migration_test`, executed `0_init/migration.sql`, verified all 39 tables, constraints, foreign keys, and indexes, and cleanly dropped test schema | `node scratch/test_disposable_migration.js` (Exit code 0) |
+| **Change Management Runbook** | Documented standard 6-step migration lifecycle, safe schema evolution patterns, concurrent index rules, and emergency procedures | [`docs/database-migration-runbook.md`](database-migration-runbook.md) |
+| **Schema Reconciliation Corrections** | Corrected SQLite `prescription.date` nullability (`notnull: 0`) vs. Medora 2.0 `NOT NULL` with ETL coalesce rules, and documented legacy patient/doctor string ID conversions | [`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md) & [`docs/06-open-questions.md`](06-open-questions.md) |
+
+---
+
+## 5. Next Module Readiness
+
+With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, and `PrescriptionModule` fully migrated and backed by a reproducible Prisma migration baseline on Supabase PostgreSQL:
 - **`PharmacyModule` / `InventoryModule`**: Medicine catalog management, stock purchases, batch tracking, expiry monitoring, and dispensing against issued prescriptions.
 - **`LaboratoristModule` / `DiagnosticModule`**: Lab test orders linked to outpatient consultations and clinical diagnostic reports.
 
