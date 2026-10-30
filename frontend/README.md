@@ -1,13 +1,32 @@
-# Medora 2.0 Frontend
+# React + TypeScript + Vite
 
-## Target Stack
-- **Framework**: **React + TypeScript + Vite**
-- **Architecture**: Modular clinical UI components, role-based view routing, accessible form controls.
+This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
-## Security & Architecture Rules
-1. **Trusted Boundary**: The frontend communicates strictly with the **NestJS backend API** for all hospital workflows, appointments, clinical records, prescriptions, and billing.
-2. **No Authorization Bypass**: The frontend must never bypass the NestJS API to execute direct modifications against the database.
-3. **Key Isolation**: Only public, client-safe variables (`VITE_API_BASE_URL`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) are permitted in frontend bundles. The Supabase `SERVICE_ROLE_KEY` or direct database credentials must never exist here.
+Currently, two official plugins are available:
 
-## Status
-- **Phase 0**: Monorepo target directory established; rules documented. Scaffolding deferred to Phase 2.
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+
+## React Compiler
+
+The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+
+## Expanding the Oxlint configuration
+
+If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+
+```json
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "oxc"],
+  "options": {
+    "typeAware": true
+  },
+  "rules": {
+    "react/rules-of-hooks": "error",
+    "react/only-export-components": ["warn", { "allowConstantExport": true }]
+  }
+}
+```
+
+See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.

@@ -76,20 +76,22 @@ describe('DoctorModule (e2e)', () => {
       .expect(403);
   });
 
+  const testEmail = `sana.${Date.now()}@medora.hospital`;
+
   it('3. Admin creates a new doctor with only a name', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/doctors')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         name: 'Dr Sana Riaz',
-        email: 'sana.riaz@medora.hospital',
+        email: testEmail,
         department: 'Cardiology',
       })
       .expect(201);
 
     expect(res.body.success).toBe(true);
     expect(res.body.data.name).toBe('Dr Sana Riaz');
-    expect(res.body.data.email).toBe('sana.riaz@medora.hospital');
+    expect(res.body.data.email).toBe(testEmail);
     expect(res.body.data.department).toBe('Cardiology');
     expect(typeof res.body.data.id).toBe('string');
     createdDoctorId = res.body.data.id;
@@ -101,7 +103,7 @@ describe('DoctorModule (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
         name: 'Dr Duplicate',
-        email: 'sana.riaz@medora.hospital',
+        email: testEmail,
       })
       .expect(400);
 
@@ -165,11 +167,16 @@ describe('DoctorModule (e2e)', () => {
   });
 
   it('9. Rejects deleting doctor when appointments exist on file', async () => {
+    let p = await prisma.patient.findFirst();
+    if (!p) {
+      p = await prisma.patient.create({ data: { name: 'Appt Patient', sex: 'other' } });
+    }
+
     // Seed an appointment for this doctor
     await prisma.appointment.create({
       data: {
         doctorId: BigInt(createdDoctorId),
-        patientId: BigInt(1),
+        patientId: p.id,
         date: '2026-10-30',
         sTime: '2026-10-30 10:00:00',
         eTime: '2026-10-30 10:30:00',

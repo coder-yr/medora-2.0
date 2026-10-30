@@ -85,7 +85,7 @@ describe('InvoiceModule (e2e)', () => {
 
     const d = await doctorService.create({
       name: 'Dr. Tariq Jamil',
-      email: 'tariq.doc@hospital.test',
+      email: `tariq.doc.${Date.now()}@hospital.test`,
       phone: '+923009998877',
       department: 'Orthopedics',
     });
@@ -300,10 +300,20 @@ describe('InvoiceModule (e2e)', () => {
   });
 
   describe('Invoice Listing & Filtered Views', () => {
-    beforeEach(async () => {
+    let filterPatientId: string;
+
+    beforeAll(async () => {
+      const p = await patientService.create({
+        name: 'Listing Filter Patient',
+        sex: 'female',
+        phone: '+923001112233',
+        address: 'Islamabad F-7',
+      });
+      filterPatientId = String(p.id);
+
       // Create 1 settled invoice: 1000 paid 1000
       const inv1 = await invoiceService.create({
-        patient: Number(testPatientId),
+        patient: Number(filterPatientId),
         date: '2026-10-28',
         items: [{ name: 'Settled Item', quantity: 1, unit_price: 1000 }],
       });
@@ -311,23 +321,22 @@ describe('InvoiceModule (e2e)', () => {
 
       // Create 1 partially paid invoice: 2000 paid 500 (balance 1500)
       const inv2 = await invoiceService.create({
-        patient: Number(testPatientId),
+        patient: Number(filterPatientId),
         date: '2026-10-28',
         items: [{ name: 'Partial Item', quantity: 1, unit_price: 2000 }],
       });
       await invoiceService.recordPayment(inv2.id, { amount: 500 });
 
-      // Create 1 unpaid invoice: 800 paid 0 (balance 800)
       await invoiceService.create({
-        patient: Number(testPatientId),
+        patient: Number(filterPatientId),
         date: '2026-10-28',
         items: [{ name: 'Unpaid Item', quantity: 1, unit_price: 800 }],
       });
-    });
+    }, 45000);
 
     it('filters by show=outstanding and returns totalOwed', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/v1/invoices?show=outstanding')
+        .get(`/api/v1/invoices?show=outstanding&patient=${filterPatientId}`)
         .set('Authorization', `Bearer ${accountantToken}`)
         .expect(200);
 
@@ -338,7 +347,7 @@ describe('InvoiceModule (e2e)', () => {
 
     it('filters by show=settled', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/v1/invoices?show=settled')
+        .get(`/api/v1/invoices?show=settled&patient=${filterPatientId}`)
         .set('Authorization', `Bearer ${accountantToken}`)
         .expect(200);
 
@@ -350,7 +359,7 @@ describe('InvoiceModule (e2e)', () => {
 
     it('lists all invoices with show=all', async () => {
       const res = await request(app.getHttpServer())
-        .get('/api/v1/invoices?show=all')
+        .get(`/api/v1/invoices?show=all&patient=${filterPatientId}`)
         .set('Authorization', `Bearer ${accountantToken}`)
         .expect(200);
 

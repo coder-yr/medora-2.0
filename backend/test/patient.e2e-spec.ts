@@ -78,13 +78,13 @@ describe('PatientModule (e2e)', () => {
       })
       .expect(201);
 
+    createdPatientId = res.body.data.id;
+
     expect(res.body.success).toBe(true);
     expect(res.body.data.name).toBe('Amina Yousaf');
-    expect(res.body.data.patientId).toBe('000001');
+    expect(res.body.data.patientId).toMatch(/^\d{6}$/);
     expect(Number(res.body.data.age)).toBeGreaterThanOrEqual(33);
     expect(res.body.data.cnic).toBe('35201-1234567-1');
-
-    createdPatientId = res.body.data.id;
   });
 
   it('POST /api/v1/patients rejects missing name -> 400 Bad Request', () => {

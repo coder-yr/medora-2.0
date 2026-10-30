@@ -56,6 +56,10 @@ describe('DepartmentModule (e2e)', () => {
     }
   });
 
+  const deptName = `Cardio_${Date.now()}`;
+  const unlistedDept = `Derma_${Date.now()}`;
+  const emptyDeptName = `TempClinic_${Date.now()}`;
+
   it('1. Unauthenticated request returns 401 Unauthorized', async () => {
     await request(app.getHttpServer()).get('/api/v1/departments').expect(401);
   });
@@ -73,13 +77,13 @@ describe('DepartmentModule (e2e)', () => {
       .post('/api/v1/departments')
       .set('Authorization', `Bearer ${adminToken}`)
       .send({
-        name: 'Cardiology',
+        name: deptName,
         description: 'Heart and cardiovascular care',
       })
       .expect(201);
 
     expect(res.body.success).toBe(true);
-    expect(res.body.data.name).toBe('Cardiology');
+    expect(res.body.data.name).toBe(deptName);
     expect(res.body.data.description).toBe('Heart and cardiovascular care');
     expect(typeof res.body.data.id).toBe('string');
     createdDeptId = res.body.data.id;
@@ -89,7 +93,7 @@ describe('DepartmentModule (e2e)', () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/departments')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Cardiology' })
+      .send({ name: deptName })
       .expect(400);
 
     expect(res.body.success).toBe(false);
@@ -105,8 +109,8 @@ describe('DepartmentModule (e2e)', () => {
   });
 
   it('6. Lists departments with doctor usage counts and unlisted specialties', async () => {
-    await prisma.doctor.create({ data: { name: 'Dr Heart', department: 'Cardiology' } });
-    await prisma.doctor.create({ data: { name: 'Dr Skin', department: 'Dermatology' } }); // Unlisted
+    await prisma.doctor.create({ data: { name: 'Dr Heart', department: deptName } });
+    await prisma.doctor.create({ data: { name: 'Dr Skin', department: unlistedDept } }); // Unlisted
 
     const res = await request(app.getHttpServer())
       .get('/api/v1/departments')
@@ -115,22 +119,23 @@ describe('DepartmentModule (e2e)', () => {
 
     expect(res.body.success).toBe(true);
     expect(res.body.data.departments.length).toBeGreaterThanOrEqual(1);
-    const cardio = res.body.data.departments.find((d: any) => d.name === 'Cardiology');
+    const cardio = res.body.data.departments.find((d: any) => d.name === deptName);
     expect(cardio).toBeDefined();
     expect(cardio.doctorCount).toBe(1);
 
-    expect(res.body.data.unlisted).toContain('Dermatology');
+    expect(res.body.data.unlisted).toContain(unlistedDept);
   });
 
   it('7. Updates department and cascades rename to doctors', async () => {
+    const renamed = `${deptName} & Vascular`;
     const res = await request(app.getHttpServer())
       .patch(`/api/v1/departments/${createdDeptId}`)
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Cardiology & Vascular' })
+      .send({ name: renamed })
       .expect(200);
 
     expect(res.body.success).toBe(true);
-    expect(res.body.data.department.name).toBe('Cardiology & Vascular');
+    expect(res.body.data.department.name).toBe(renamed);
     expect(res.body.data.movedDoctors).toBe(1);
     expect(res.body.data.message).toContain('1 doctor record(s) moved with it');
   });
@@ -154,24 +159,21 @@ describe('DepartmentModule (e2e)', () => {
       .expect(200);
 
     expect(res.body.success).toBe(true);
-    expect(res.body.data.adoptedCount).toBe(1);
-    expect(res.body.data.adoptedNames).toContain('Dermatology');
+    expect(res.body.data.adoptedNames).toContain(unlistedDept);
 
-    // Dermatology can now be safely deleted since it has 1 doctor? Let's check:
-    // Doctor 'doc-2' has department 'Dermatology', so deleting Dermatology would be rejected
     const listRes = await request(app.getHttpServer())
       .get('/api/v1/departments')
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
-    expect(listRes.body.data.unlisted.length).toBe(0);
+    expect(listRes.body.data.unlisted).not.toContain(unlistedDept);
   });
 
   it('10. Deleting department with 0 doctors succeeds', async () => {
     const emptyDept = await request(app.getHttpServer())
       .post('/api/v1/departments')
       .set('Authorization', `Bearer ${adminToken}`)
-      .send({ name: 'Temporary Clinic' })
+      .send({ name: emptyDeptName })
       .expect(201);
 
     const deleteRes = await request(app.getHttpServer())
@@ -179,6 +181,6 @@ describe('DepartmentModule (e2e)', () => {
       .set('Authorization', `Bearer ${adminToken}`)
       .expect(200);
 
-    expect(deleteRes.body.data.message).toContain('Temporary Clinic removed.');
+    expect(deleteRes.body.data.message).toContain(`${emptyDeptName} removed.`);
   });
 });

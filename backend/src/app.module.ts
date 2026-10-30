@@ -17,6 +17,7 @@ import { DoctorModule } from './modules/doctor/doctor.module';
 import { HealthModule } from './modules/health/health.module';
 import { InvoiceModule } from './modules/invoice/invoice.module';
 import { PatientModule } from './modules/patient/patient.module';
+import { PrescriptionModule } from './modules/prescription/prescription.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 
 @Module({
@@ -42,6 +43,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     AppointmentModule,
     ConsultationModule,
     InvoiceModule,
+    PrescriptionModule,
   ],
   providers: [
     {

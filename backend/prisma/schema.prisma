@@ -515,7 +515,11 @@ model Prescription {
   doctorId  BigInt    @map("doctor")
   date      String    @db.VarChar(50)
   symptom   String?   @db.Text
+  advice    String?   @db.Text
+  state     String?   @default("issued") @db.VarChar(50)
+  dd        String?   @db.VarChar(100)
   medicine  String?   @db.Text // Legacy summary string
+  validity  String?   @db.VarChar(100)
   note      String?   @db.Text
   createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
@@ -534,10 +538,10 @@ model PrescriptionMedicine {
   id             BigInt  @id @default(autoincrement())
   prescriptionId BigInt  @map("prescription_id")
   medicineId     BigInt? @map("medicine_id")
-  medicineName   String  @map("medicine_name") @db.VarChar(150)
+  name           String  @db.VarChar(200)
   dosage         String? @db.VarChar(100)
-  frequency      String? @db.VarChar(100)
-  duration       String? @db.VarChar(50)
+  duration       String? @db.VarChar(100)
+  instructions   String? @db.VarChar(500)
 
   // Relations
   prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)

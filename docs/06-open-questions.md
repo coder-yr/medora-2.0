@@ -276,4 +276,30 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - Automatic rotation on every refresh request.
   - Family-based reuse detection: if an already-rotated/revoked token is submitted, the entire session family (`family_id`) is instantly revoked.
 
+---
+
+## 14. Phase 11 Prescription Module & Pharmacy Boundary Decisions
+
+### 28. Pharmacy Dispensing Integration & Inventory Deductions
+- **Evidence**: Legacy `prescription` and `prescription_medicine` are clinical order records. In the legacy Laravel code, prescribing a medicine does not automatically deduct physical inventory or dispense stock from the pharmacy until a pharmacist dispenses or bills it.
+- **Recommendation**: Keep prescription creation as a pure clinical order within `PrescriptionModule`. When `PharmacyModule` is migrated in a subsequent phase, create an explicit dispensing workflow that references `prescription_id` to decrement medicine stock batches and optionally generate invoice items.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Retain prescription as clinical ordering only; require explicit pharmacy dispensing step for inventory reduction.
+  - [ ] **Option B**: Automatically decrement pharmacy inventory upon issuing a prescription.
+
+### 29. Free-text Custom Medications vs. Catalogue-Enforced Items
+- **Evidence**: In legacy hospital operations, physicians occasionally prescribe specialized formulations, extemporaneous compounding, or external medications not present in the hospital formulary (`medicine` table).
+- **Recommendation**: Support a hybrid model: when `medicine_id` is supplied, validate it against the hospital catalog and copy the official name; if `medicine_id` is omitted/null, permit custom free-text medication names (`name` required).
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Retain hybrid model allowing both catalog drugs and free-text custom medications.
+  - [ ] **Option B**: Strictly restrict prescriptions to active items in the hospital pharmacy formulary.
+
+### 30. Regimen Immutability & Clinical Revision Audit
+- **Evidence**: Legacy Laravel permitted in-place updates to prescriptions via `PrescriptionController@edit`. In Medora 2.0, updates atomically replace line items in an interactive transaction, refreshing the synchronized legacy summary text.
+- **Recommendation**: Once prescriptions transition to an advanced state (e.g. `dispensed` or `completed`), lock the record against further updates and require a clinical revision/cancellation order.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Lock prescriptions against updates once marked dispensed; require discontinuation order.
+  - [ ] **Option B**: Continue permitting attending doctors to edit issued prescriptions prior to pharmacy dispensing.
+
+
 
