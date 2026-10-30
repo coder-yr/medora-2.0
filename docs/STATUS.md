@@ -2,9 +2,9 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 11: PrescriptionModule & Frontend Clinical Screen Migration**
+- **Current Phase**: **Phase 11.1: Prescription SQLite Schema Verification & Hardening**
 - **Status**: **COMPLETED**
-- **Date**: 2026-10-30
+- **Date**: 2026-10-31
 - **Approved Target Stack**:
   - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS / Modern CSS (scaffolded in `frontend/`)
   - **Backend**: NestJS 11 + TypeScript (trusted business logic boundary)
@@ -31,7 +31,8 @@
 | **Phase 9** | Clinical Consultations & Encounters (5th Module) | `ConsultationModule` (outpatient consultation notes, Naegele obstetric math, history carry-forward, vitals sync, note templates, printable summaries, completed note immutability, RBAC), commit `1b09259` | **COMPLETED** |
 | **Phase 10** | Invoicing & Billing Domain Migration (6th Module) | `InvoiceModule` (patient invoicing, multi-item breakdown, server calculations, installment payments, pessimistic row lock, overpayment rejection, deletion guards, doctor share calculations, RBAC), commit `ee05734` | **COMPLETED** |
 | **Phase 10.5** | Backend Stabilization & Security Remediation | Backdoor removal, Argon2id + legacy bcrypt upgrade, session management (refresh token rotation, reuse detection), Helmet headers, login throttling, removal of all fake in-memory stores, real PostgreSQL row locking concurrency tests (`SELECT FOR UPDATE`), 100% clean CI lockfile, >= 80% coverage across all 6 services (`docs/security-hardening-report.md`), commit `e39efd1` | **COMPLETED** |
-| **Phase 11** | Prescription Domain & Frontend Clinical Screen (7th Module) | `PrescriptionModule` (catalog search, relational items, legacy summary sync, atomic transactions, RBAC), React 19 + TypeScript + Vite clinical prescription hub (role switcher, live auto-complete, dosage shortcuts, summary preview, print modal), Prisma migration to Supabase PostgreSQL, 100% unit and E2E pass rate | **COMPLETED** |
+| **Phase 11** | Prescription Domain & Frontend Clinical Screen (7th Module) | `PrescriptionModule` (catalog search, relational items, legacy summary sync, atomic transactions, RBAC), React 19 + TypeScript + Vite clinical prescription hub (role switcher, live auto-complete, dosage shortcuts, summary preview, print modal), Prisma migration to Supabase PostgreSQL, 100% unit and E2E pass rate, commit `f07c760` | **COMPLETED** |
+| **Phase 11.1** | Prescription SQLite Schema Verification & Hardening | Authentic PRAGMA audit of SQLite `prescription`, `prescription_medicine`, `medicine`, `patient`, `doctor`, column-by-column reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), `medicine_id` index alignment, PostgreSQL runtime audit, migration-history gap documentation, frontend persona switcher production security hardening (Vite tree-shaking verified) | **COMPLETED** |
 
 ---
 

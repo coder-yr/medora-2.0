@@ -548,6 +548,7 @@ model PrescriptionMedicine {
   medicine     Medicine?    @relation(fields: [medicineId], references: [id])
 
   @@index([prescriptionId])
+  @@index([medicineId])
   @@map("prescription_medicine")
 }
 

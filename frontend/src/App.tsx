@@ -44,14 +44,17 @@ interface Prescription {
   createdAt: string;
 }
 
+const isDev = import.meta.env.DEV;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
+
 export function App() {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  // Auth & Token simulation
-  const [token, setToken] = useState<string>('');
+  // Auth & Token simulation (Development only)
+  const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
   const [userRole, setUserRole] = useState<'Doctor' | 'Admin'>('Doctor');
 
   // Form state
@@ -75,13 +78,27 @@ export function App() {
 
   // Authenticate on mount
   useEffect(() => {
-    loginAs(userRole);
+    const existing = sessionStorage.getItem('medora_access_token');
+    if (existing) {
+      setToken(existing);
+      fetchPrescriptions(existing);
+      return;
+    }
+
+    if (isDev) {
+      loginAs(userRole);
+    }
   }, [userRole]);
 
   const loginAs = async (role: 'Doctor' | 'Admin') => {
+    if (!isDev) {
+      // In production, authentication is handled through the dedicated login screen
+      return;
+    }
+
     try {
       const email = role === 'Doctor' ? 'doctor.test@medora.hospital' : 'admin.test@medora.hospital';
-      const res = await fetch('http://localhost:3000/api/v1/auth/login', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password: 'ValidPassword123!' })
@@ -89,6 +106,7 @@ export function App() {
       const data = await res.json();
       if (data.success && data.data?.accessToken) {
         setToken(data.data.accessToken);
+        sessionStorage.setItem('medora_access_token', data.data.accessToken);
         fetchPrescriptions(data.data.accessToken);
       }
     } catch {
@@ -100,7 +118,8 @@ export function App() {
     if (!authToken) return;
     setLoading(true);
     try {
-      const url = new URL('http://localhost:3000/api/v1/prescriptions');
+      const base = API_BASE_URL ? `${API_BASE_URL}/api/v1/prescriptions` : '/api/v1/prescriptions';
+      const url = new URL(base, window.location.origin);
       if (drug.trim()) url.searchParams.set('drug', drug.trim());
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${authToken}` }
@@ -124,7 +143,7 @@ export function App() {
     }
     const timer = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:3000/api/v1/prescriptions/medicines/search?q=${encodeURIComponent(catalogQuery)}`, {
+        const res = await fetch(`${API_BASE_URL}/api/v1/prescriptions/medicines/search?q=${encodeURIComponent(catalogQuery)}`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const data = await res.json();
@@ -186,7 +205,7 @@ export function App() {
         }))
       };
 
-      const res = await fetch('http://localhost:3000/api/v1/prescriptions', {
+      const res = await fetch(`${API_BASE_URL}/api/v1/prescriptions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -216,7 +235,7 @@ export function App() {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to permanently remove this prescription?')) return;
     try {
-      const res = await fetch(`http://localhost:3000/api/v1/prescriptions/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/v1/prescriptions/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -248,19 +267,26 @@ export function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
-            <Shield size={16} />
-            <span>Role:</span>
-            <select
-              className="form-select"
-              style={{ width: 'auto', padding: '4px 8px' }}
-              value={userRole}
-              onChange={(e) => setUserRole(e.target.value as any)}
-            >
-              <option value="Doctor">Doctor (Prescribe/View)</option>
-              <option value="Admin">Administrator (All Permissions)</option>
-            </select>
-          </div>
+          {isDev ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
+              <Shield size={16} />
+              <span>Dev Persona:</span>
+              <select
+                className="form-select"
+                style={{ width: 'auto', padding: '4px 8px' }}
+                value={userRole}
+                onChange={(e) => setUserRole(e.target.value as any)}
+              >
+                <option value="Doctor">Doctor (Prescribe/View)</option>
+                <option value="Admin">Administrator (All Permissions)</option>
+              </select>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
+              <Shield size={16} />
+              <span>Session Authenticated</span>
+            </div>
+          )}
         </div>
       </header>
 
