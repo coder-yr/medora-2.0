@@ -5,6 +5,9 @@ import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { createValidationPipe } from '../src/common/pipes/validation.pipe';
 
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 describe('Medora 2.0 Backend (e2e)', () => {
   let app: INestApplication;
 

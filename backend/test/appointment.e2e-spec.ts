@@ -4,15 +4,15 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { createValidationPipe } from '../src/common/pipes/validation.pipe';
-import { AppointmentService } from '../src/modules/appointment/appointment.service';
 import { DoctorService } from '../src/modules/doctor/doctor.service';
 import { PatientService } from '../src/modules/patient/patient.service';
+import { PrismaService } from '../src/modules/prisma/prisma.service';
 
 describe('AppointmentModule (e2e)', () => {
   let app: INestApplication;
-  let appointmentService: AppointmentService;
   let patientService: PatientService;
   let doctorService: DoctorService;
+  let prisma: PrismaService;
 
   let adminToken: string;
   let receptionistToken: string;
@@ -42,13 +42,9 @@ describe('AppointmentModule (e2e)', () => {
     app.useGlobalPipes(createValidationPipe());
     await app.init();
 
-    appointmentService = app.get<AppointmentService>(AppointmentService);
     patientService = app.get<PatientService>(PatientService);
     doctorService = app.get<DoctorService>(DoctorService);
-
-    appointmentService.clearMemory();
-    patientService.clearMemoryStore();
-    doctorService.clearMemoryStore();
+    prisma = app.get<PrismaService>(PrismaService);
 
     // Authenticate Admin
     const adminRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
@@ -202,13 +198,15 @@ describe('AppointmentModule (e2e)', () => {
 
   it('9. GET /api/v1/appointments/free-slots returns free consultation slots', async () => {
     // Add slot from 11:00 to 12:00
-    appointmentService.addTestSlot({
-      doctorId: testDoctorId,
-      weekday: 4, // 2026-10-01 is Thursday
-      startTime: '11:00',
-      endTime: '12:00',
-      slotMinutes: 15,
-      active: true,
+    await prisma.doctorSlot.create({
+      data: {
+        doctorId: BigInt(testDoctorId),
+        weekday: 4, // 2026-10-01 is Thursday
+        startTime: '11:00',
+        endTime: '12:00',
+        slotMinutes: 15,
+        active: true,
+      },
     });
 
     const res = await request(app.getHttpServer())

@@ -46,10 +46,6 @@ describe('InvoiceModule (e2e)', () => {
     patientService = app.get<PatientService>(PatientService);
     doctorService = app.get<DoctorService>(DoctorService);
 
-    invoiceService.clearMemory();
-    patientService.clearMemoryStore();
-    doctorService.clearMemoryStore();
-
     // Authenticate Admin
     const adminRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
       email: 'admin.test@medora.hospital',
@@ -305,8 +301,6 @@ describe('InvoiceModule (e2e)', () => {
 
   describe('Invoice Listing & Filtered Views', () => {
     beforeEach(async () => {
-      invoiceService.clearMemory();
-
       // Create 1 settled invoice: 1000 paid 1000
       const inv1 = await invoiceService.create({
         patient: Number(testPatientId),

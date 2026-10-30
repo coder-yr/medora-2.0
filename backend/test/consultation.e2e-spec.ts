@@ -5,14 +5,12 @@ import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { createValidationPipe } from '../src/common/pipes/validation.pipe';
 import { AppointmentService } from '../src/modules/appointment/appointment.service';
-import { ConsultationService } from '../src/modules/consultation/consultation.service';
 import { DoctorService } from '../src/modules/doctor/doctor.service';
 import { PatientService } from '../src/modules/patient/patient.service';
 
 describe('ConsultationModule (e2e)', () => {
   let app: INestApplication;
   let appointmentService: AppointmentService;
-  let consultationService: ConsultationService;
   let patientService: PatientService;
   let doctorService: DoctorService;
 
@@ -45,14 +43,8 @@ describe('ConsultationModule (e2e)', () => {
     await app.init();
 
     appointmentService = app.get<AppointmentService>(AppointmentService);
-    consultationService = app.get<ConsultationService>(ConsultationService);
     patientService = app.get<PatientService>(PatientService);
     doctorService = app.get<DoctorService>(DoctorService);
-
-    consultationService.clearMemory();
-    appointmentService.clearMemory();
-    patientService.clearMemoryStore();
-    doctorService.clearMemoryStore();
 
     // Authenticate Admin
     const adminRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({

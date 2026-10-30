@@ -5,26 +5,92 @@ import { DepartmentService } from './department.service';
 
 describe('DepartmentService (Legacy Business Rule Parity)', () => {
   let service: DepartmentService;
+  let deptsMap: Map<string, any>;
+  let docsMap: Map<string, any>;
+  let autoDeptId: bigint;
 
   const mockPrismaService = {
-    connected: false,
     department: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-      count: jest.fn(),
+      findMany: jest.fn().mockImplementation(async () => {
+        const arr = Array.from(deptsMap.values());
+        arr.sort((a, b) => a.name.localeCompare(b.name));
+        return arr;
+      }),
+      findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
+        return deptsMap.get(where.id.toString()) || null;
+      }),
+      findFirst: jest.fn().mockImplementation(async ({ where }: any) => {
+        const nameVal = where?.name?.equals?.toLowerCase();
+        for (const d of deptsMap.values()) {
+          if (where.NOT && d.id === where.NOT.id) continue;
+          if (d.name.toLowerCase() === nameVal) return d;
+        }
+        return null;
+      }),
+      create: jest.fn().mockImplementation(async ({ data }: any) => {
+        autoDeptId++;
+        const id = autoDeptId;
+        const record = {
+          id,
+          ...data,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        deptsMap.set(id.toString(), record);
+        return record;
+      }),
+      update: jest.fn().mockImplementation(async ({ where, data }: any) => {
+        const d = deptsMap.get(where.id.toString());
+        if (!d) throw new Error('Not found');
+        const updated = { ...d, ...data, updatedAt: new Date() };
+        deptsMap.set(where.id.toString(), updated);
+        return updated;
+      }),
+      delete: jest.fn().mockImplementation(async ({ where }: any) => {
+        deptsMap.delete(where.id.toString());
+        return { id: where.id };
+      }),
     },
     doctor: {
-      findMany: jest.fn(),
-      count: jest.fn(),
-      updateMany: jest.fn(),
+      findMany: jest.fn().mockImplementation(async () => {
+        return Array.from(docsMap.values()).map((doc) => ({ department: doc.department }));
+      }),
+      count: jest.fn().mockImplementation(async ({ where }: any) => {
+        let count = 0;
+        for (const doc of docsMap.values()) {
+          if (doc.department === where.department) count++;
+        }
+        return count;
+      }),
+      updateMany: jest.fn().mockImplementation(async ({ where, data }: any) => {
+        let count = 0;
+        for (const doc of docsMap.values()) {
+          if (doc.department === where.department) {
+            doc.department = data.department;
+            count++;
+          }
+        }
+        return { count };
+      }),
     },
-    $transaction: jest.fn(),
+    $transaction: jest.fn().mockImplementation(async (promises: any) => {
+      if (Array.isArray(promises)) {
+        return Promise.all(promises);
+      }
+      return promises(mockPrismaService);
+    }),
+  };
+
+  // Helper in test scope only to seed test doctors
+  const seedTestDoctor = (id: string, name: string, department: string | null) => {
+    docsMap.set(id, { id, name, department });
   };
 
   beforeEach(async () => {
+    deptsMap = new Map();
+    docsMap = new Map();
+    autoDeptId = 0n;
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DepartmentService,
@@ -36,7 +102,6 @@ describe('DepartmentService (Legacy Business Rule Parity)', () => {
     }).compile();
 
     service = module.get<DepartmentService>(DepartmentService);
-    service.clearMemoryStore();
   });
 
   it('Rule 1: adding a department with a valid name succeeds', async () => {
@@ -69,13 +134,12 @@ describe('DepartmentService (Legacy Business Rule Parity)', () => {
     await service.create({ name: 'Cardiology' });
     await service.create({ name: 'Dermatology' });
 
-    service.seedMemoryDoctor('101', 'Dr Heart', 'Cardiology');
-    service.seedMemoryDoctor('102', 'Dr Pulse', 'Cardiology');
-    service.seedMemoryDoctor('103', 'Dr Skin', 'Dermatology');
+    seedTestDoctor('101', 'Dr Heart', 'Cardiology');
+    seedTestDoctor('102', 'Dr Pulse', 'Cardiology');
+    seedTestDoctor('103', 'Dr Skin', 'Dermatology');
 
     const result = await service.findAll();
     expect(result.departments.length).toBe(3);
-    // Alphabetical order: Cardiology, Dermatology, Neurology
     expect(result.departments[0].name).toBe('Cardiology');
     expect(result.departments[0].doctorCount).toBe(2);
 
@@ -89,9 +153,9 @@ describe('DepartmentService (Legacy Business Rule Parity)', () => {
   it('Rule 5: unlisted departments used by doctors are identified', async () => {
     await service.create({ name: 'Cardiology' });
 
-    service.seedMemoryDoctor('201', 'Dr Heart', 'Cardiology');
-    service.seedMemoryDoctor('202', 'Dr Bone', 'Orthopaedics'); // Unlisted
-    service.seedMemoryDoctor('203', 'Dr Eye', 'Ophthalmology'); // Unlisted
+    seedTestDoctor('201', 'Dr Heart', 'Cardiology');
+    seedTestDoctor('202', 'Dr Bone', 'Orthopaedics');
+    seedTestDoctor('203', 'Dr Eye', 'Ophthalmology');
 
     const result = await service.findAll();
     expect(result.unlisted).toEqual(['Ophthalmology', 'Orthopaedics']);
@@ -99,15 +163,14 @@ describe('DepartmentService (Legacy Business Rule Parity)', () => {
 
   it('Rule 6: renaming a department cascades to doctors and reports moved records', async () => {
     const dept = await service.create({ name: 'Cardio' });
-    service.seedMemoryDoctor('301', 'Dr Heart', 'Cardio');
-    service.seedMemoryDoctor('302', 'Dr Pulse', 'Cardio');
+    seedTestDoctor('301', 'Dr Heart', 'Cardio');
+    seedTestDoctor('302', 'Dr Pulse', 'Cardio');
 
     const updateResult = await service.update(dept.id, { name: 'Cardiology' });
     expect(updateResult.department.name).toBe('Cardiology');
     expect(updateResult.movedDoctors).toBe(2);
     expect(updateResult.message).toContain('2 doctor record(s) moved with it');
 
-    // Verify doctors were updated in memory
     const list = await service.findAll();
     const cardiology = list.departments.find((d) => d.name === 'Cardiology');
     expect(cardiology?.doctorCount).toBe(2);
@@ -124,7 +187,7 @@ describe('DepartmentService (Legacy Business Rule Parity)', () => {
 
   it('Rule 8: a department with active doctors CANNOT be deleted', async () => {
     const dept = await service.create({ name: 'Radiology' });
-    service.seedMemoryDoctor('401', 'Dr Ray', 'Radiology');
+    seedTestDoctor('401', 'Dr Ray', 'Radiology');
 
     await expect(service.remove(dept.id)).rejects.toThrow(
       new BadRequestException(
@@ -144,22 +207,25 @@ describe('DepartmentService (Legacy Business Rule Parity)', () => {
 
   it('Rule 10: adopt auto-creates catalogue records for all unlisted doctor departments', async () => {
     await service.create({ name: 'Cardiology' });
-    service.seedMemoryDoctor('501', 'Dr Bone', 'Orthopaedics');
-    service.seedMemoryDoctor('502', 'Dr Brain', 'Neurology');
+    seedTestDoctor('501', 'Dr Bone', 'Orthopaedics');
+    seedTestDoctor('502', 'Dr Brain', 'Neurology');
 
     const adoptResult = await service.adopt();
     expect(adoptResult.adoptedCount).toBe(2);
     expect(adoptResult.adoptedNames).toEqual(['Neurology', 'Orthopaedics']);
 
-    // Now all doctor departments are listed
     const list = await service.findAll();
     expect(list.unlisted.length).toBe(0);
     expect(list.departments.length).toBe(3);
   });
 
   it('Rule 11: adopt when nothing is unlisted returns clean message', async () => {
-    const result = await service.adopt();
-    expect(result.adoptedCount).toBe(0);
-    expect(result.message).toContain('Nothing to adopt');
+    await service.create({ name: 'Cardiology' });
+    seedTestDoctor('601', 'Dr Heart', 'Cardiology');
+
+    const adoptResult = await service.adopt();
+    expect(adoptResult.adoptedCount).toBe(0);
+    expect(adoptResult.adoptedNames).toEqual([]);
+    expect(adoptResult.message).toContain('Nothing to adopt');
   });
 });

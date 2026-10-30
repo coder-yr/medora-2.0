@@ -31,66 +31,9 @@ const WEEKDAYS = [
   'Saturday',
 ];
 
-interface MemoryAppointment {
-  id: string;
-  patientId: string;
-  doctorId: string;
-  date: string;
-  timeSlot: string;
-  sTime: string;
-  eTime: string;
-  sTimeKey: string;
-  status: AppointmentStatus;
-  remarks: string;
-  mode: string;
-  videoRoom: string | null;
-  branchId: string | null;
-  bp: string | null;
-  pulse: string | null;
-  temperature: string | null;
-  weight: string | null;
-  visitType: string | null;
-  tokenNo: number | null;
-  queueNumber: number | null;
-  tokenNumber: string | null;
-  paymentId: string | null;
-  checkedInAt: Date | null;
-  consultStartedAt: Date | null;
-  calledInAt: Date | null;
-  checkedOutAt: Date | null;
-  completedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface MemorySlot {
-  id: string;
-  doctorId: string;
-  weekday: number;
-  startTime: string; // HH:mm
-  endTime: string; // HH:mm
-  slotMinutes: number;
-  active: boolean;
-}
-
-interface MemoryBlock {
-  id: string;
-  doctorId: string;
-  date: string; // YYYY-MM-DD
-  startTime: string | null;
-  endTime: string | null;
-  reason: string | null;
-}
-
 @Injectable()
 export class AppointmentService {
   private readonly logger = new Logger(AppointmentService.name);
-
-  // In-memory fallback stores for test isolation and offline resilience
-  private memoryAppointments: Map<string, MemoryAppointment> = new Map();
-  private memorySlots: Map<string, MemorySlot> = new Map();
-  private memoryBlocks: Map<string, MemoryBlock> = new Map();
-  private nextId = 1;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -100,19 +43,20 @@ export class AppointmentService {
 
   /**
    * Book a new appointment with transaction-level double booking and doctor availability guards.
+   * Employs PostgreSQL row-level locking (SELECT FOR UPDATE) on the doctor record.
    */
   async create(
     dto: CreateAppointmentDto,
     userId = '',
   ): Promise<AppointmentResponseDto> {
-    let patient: any;
+    let patient: { id: string; name: string };
     try {
       patient = await this.patientService.findById(dto.patient);
     } catch {
       throw new BadRequestException('Patient does not exist.');
     }
 
-    let doctor: any;
+    let doctor: { id: string; name: string };
     try {
       doctor = await this.doctorService.findById(dto.doctor);
     } catch {
@@ -135,122 +79,63 @@ export class AppointmentService {
     const isVideo = Boolean(dto.video);
     const videoRoom = isVideo ? this.generateVideoRoom() : null;
 
-    if (this.prisma.connected) {
-      try {
-        return await this.prisma.$transaction(async (tx) => {
-          // Lock doctor row to serialize concurrent bookings for the same doctor
-          await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(doctor.id)} FOR UPDATE`;
+    return await this.prisma.$transaction(async (tx) => {
+      // Lock doctor row to serialize concurrent bookings for the same doctor
+      await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(doctor.id)} FOR UPDATE`;
 
-          // Check doctor schedule availability
-          if (!['cancelled', 'no show', 'completed'].includes(status)) {
-            await this.assertDoctorBookable(
-              tx,
-              doctor.id,
-              dto.date,
-              startStr,
-              endStr,
-            );
-          }
-
-          // Check overlap with existing active bookings for this doctor
-          await this.assertNoClash(
-            tx,
-            doctor.id,
-            startStr,
-            endStr,
-            timeSlot,
-            null,
-          );
-
-          const created = await tx.appointment.create({
-            data: {
-              patientId: BigInt(patient.id),
-              doctorId: BigInt(doctor.id),
-              date: dto.date,
-              timeSlot,
-              sTime: startStr,
-              eTime: endStr,
-              sTimeKey,
-              status,
-              remarks: dto.remarks ?? '',
-              addDate: new Date().toISOString().split('T')[0],
-              registrationTime: new Date().toISOString(),
-              user: userId,
-              request: '',
-              bp: dto.b_p ?? null,
-              pulse: dto.pulse ?? null,
-              temperature: dto.temprature ?? null,
-              weight: dto.weight ?? null,
-              mode: isVideo ? 'video' : 'in_person',
-              videoRoom,
-              branchId: dto.branchId ? BigInt(dto.branchId) : null,
-              visitType: dto.visitType ?? 'first_visit',
-            },
-            include: {
-              patient: true,
-              doctor: true,
-            },
-          });
-
-          return this.formatAppointment(created);
-        });
-      } catch (err: any) {
-        if (err instanceof BadRequestException) {
-          throw err;
-        }
-        this.logger.warn(
-          `Prisma appointment create failed: ${err.message}. Using fallback.`,
+      // Check doctor schedule availability
+      if (!['cancelled', 'no show', 'completed'].includes(status)) {
+        await this.assertDoctorBookable(
+          tx,
+          doctor.id,
+          dto.date,
+          startStr,
+          endStr,
         );
       }
-    }
 
-    // In-memory fallback
-    if (!['cancelled', 'no show', 'completed'].includes(status)) {
-      this.assertDoctorBookableMemory(
+      // Check overlap with existing active bookings for this doctor
+      await this.assertNoClash(
+        tx,
         doctor.id,
-        dto.date,
         startStr,
         endStr,
+        timeSlot,
+        null,
       );
-    }
-    this.assertNoClashMemory(doctor.id, startStr, endStr, timeSlot, null);
 
-    const idStr = (this.nextId++).toString();
-    const memoryRecord: MemoryAppointment = {
-      id: idStr,
-      patientId: patient.id,
-      doctorId: doctor.id,
-      date: dto.date,
-      timeSlot,
-      sTime: startStr,
-      eTime: endStr,
-      sTimeKey,
-      status,
-      remarks: dto.remarks ?? '',
-      mode: isVideo ? 'video' : 'in_person',
-      videoRoom,
-      branchId: dto.branchId ? String(dto.branchId) : null,
-      bp: dto.b_p ?? null,
-      pulse: dto.pulse ?? null,
-      temperature: dto.temprature ?? null,
-      weight: dto.weight ?? null,
-      visitType: dto.visitType ?? 'first_visit',
-      tokenNo: null,
-      queueNumber: null,
-      tokenNumber: null,
-      paymentId: null,
-      checkedInAt: null,
-      consultStartedAt: null,
-      calledInAt: null,
-      checkedOutAt: null,
-      completedAt: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
+      const created = await tx.appointment.create({
+        data: {
+          patientId: BigInt(patient.id),
+          doctorId: BigInt(doctor.id),
+          date: dto.date,
+          timeSlot,
+          sTime: startStr,
+          eTime: endStr,
+          sTimeKey,
+          status,
+          remarks: dto.remarks ?? '',
+          addDate: new Date().toISOString().split('T')[0],
+          registrationTime: new Date().toISOString(),
+          user: userId,
+          request: '',
+          bp: dto.b_p ?? null,
+          pulse: dto.pulse ?? null,
+          temperature: dto.temprature ?? null,
+          weight: dto.weight ?? null,
+          mode: isVideo ? 'video' : 'in_person',
+          videoRoom,
+          branchId: dto.branchId ? BigInt(dto.branchId) : null,
+          visitType: dto.visitType ?? 'first_visit',
+        },
+        include: {
+          patient: true,
+          doctor: true,
+        },
+      });
 
-    this.memoryAppointments.set(idStr, memoryRecord);
-
-    return this.formatMemoryAppointment(memoryRecord, patient, doctor);
+      return this.formatAppointment(created);
+    });
   }
 
   /**
@@ -275,79 +160,36 @@ export class AppointmentService {
     const patientIdStr = query.patient ? String(query.patient) : undefined;
     const status = query.status?.trim();
 
-    if (this.prisma.connected) {
-      try {
-        const where: any = {};
-        if (targetDate) {
-          where.date = targetDate;
-        }
-        if (doctorIdStr) {
-          where.doctorId = BigInt(doctorIdStr);
-        }
-        if (patientIdStr) {
-          where.patientId = BigInt(patientIdStr);
-        }
-        if (status) {
-          where.status = status;
-        }
-
-        const [records, total] = await Promise.all([
-          this.prisma.appointment.findMany({
-            where,
-            skip,
-            take: limit,
-            orderBy: [{ sTime: 'asc' }, { id: 'asc' }],
-            include: {
-              patient: true,
-              doctor: true,
-            },
-          }),
-          this.prisma.appointment.count({ where }),
-        ]);
-
-        return {
-          data: records.map((r) => this.formatAppointment(r)),
-          total,
-          page,
-          limit,
-          totalPages: Math.ceil(total / limit) || 1,
-        };
-      } catch (err: any) {
-        this.logger.warn(`Prisma findAll appointments failed: ${err.message}.`);
-      }
-    }
-
-    // In-memory fallback
-    let matches = Array.from(this.memoryAppointments.values());
-
+    const where: Record<string, unknown> = {};
     if (targetDate) {
-      matches = matches.filter((a) => a.date === targetDate);
+      where.date = targetDate;
     }
     if (doctorIdStr) {
-      matches = matches.filter((a) => a.doctorId === doctorIdStr);
+      where.doctorId = BigInt(doctorIdStr);
     }
     if (patientIdStr) {
-      matches = matches.filter((a) => a.patientId === patientIdStr);
+      where.patientId = BigInt(patientIdStr);
     }
     if (status) {
-      matches = matches.filter((a) => a.status === status);
+      where.status = status;
     }
 
-    matches.sort((a, b) => a.sTime.localeCompare(b.sTime));
-
-    const total = matches.length;
-    const paged = matches.slice(skip, skip + limit);
-
-    const data = await Promise.all(
-      paged.map(async (m) => {
-        const p = await this.patientService.findById(m.patientId);
-        const d = await this.doctorService.findById(m.doctorId);
-        return this.formatMemoryAppointment(m, p, d);
+    const [records, total] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: [{ sTime: 'asc' }, { id: 'asc' }],
+        include: {
+          patient: true,
+          doctor: true,
+        },
       }),
-    );
+      this.prisma.appointment.count({ where }),
+    ]);
 
     return {
-      data,
+      data: records.map((r) => this.formatAppointment(r)),
       total,
       page,
       limit,
@@ -356,40 +198,28 @@ export class AppointmentService {
   }
 
   /**
-   * Find single appointment by ID.
+   * Find single appointment by numeric ID.
    */
   async findOne(idOrKey: string | number): Promise<AppointmentResponseDto> {
     const idStr = String(idOrKey);
 
-    if (this.prisma.connected) {
-      try {
-        const appointment = await this.prisma.appointment.findUnique({
-          where: { id: BigInt(idStr) },
-          include: {
-            patient: true,
-            doctor: true,
-          },
-        });
-        if (appointment) {
-          return this.formatAppointment(appointment);
-        }
-      } catch (err: any) {
-        this.logger.warn(`Prisma findUnique appointment failed: ${err.message}.`);
-      }
-    }
+    const record = await this.prisma.appointment.findUnique({
+      where: { id: BigInt(idStr) },
+      include: {
+        patient: true,
+        doctor: true,
+      },
+    });
 
-    const memory = this.memoryAppointments.get(idStr);
-    if (!memory) {
+    if (!record) {
       throw new NotFoundException(`Appointment #${idStr} not found.`);
     }
 
-    const p = await this.patientService.findById(memory.patientId);
-    const d = await this.doctorService.findById(memory.doctorId);
-    return this.formatMemoryAppointment(memory, p, d);
+    return this.formatAppointment(record);
   }
 
   /**
-   * Update appointment fields, rescheduling and status transitions.
+   * Update appointment details with validation and schedule guards.
    */
   async update(
     idOrKey: string | number,
@@ -401,7 +231,7 @@ export class AppointmentService {
     const patientId = dto.patient ? String(dto.patient) : existing.patientId;
     const doctorId = dto.doctor ? String(dto.doctor) : existing.doctorId;
     const date = dto.date ?? existing.date;
-    const status: AppointmentStatus = (dto.status as any) ?? existing.status;
+    const status: AppointmentStatus = dto.status ?? (existing.status as AppointmentStatus);
 
     if (!APPOINTMENT_STATUSES.includes(status)) {
       throw new BadRequestException(
@@ -419,106 +249,54 @@ export class AppointmentService {
     );
 
     const isVideo = dto.video !== undefined ? Boolean(dto.video) : existing.mode === 'video';
-    const videoRoom = isVideo
-      ? existing.videoRoom || this.generateVideoRoom()
-      : null;
+    const videoRoom = isVideo ? existing.videoRoom || this.generateVideoRoom() : null;
 
-    if (this.prisma.connected) {
-      try {
-        return await this.prisma.$transaction(async (tx) => {
-          await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(doctorId)} FOR UPDATE`;
+    return await this.prisma.$transaction(async (tx) => {
+      // Lock doctor row
+      await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(doctorId)} FOR UPDATE`;
 
-          if (!['cancelled', 'no show', 'completed'].includes(status)) {
-            await this.assertDoctorBookable(
-              tx,
-              doctorId,
-              date,
-              startStr,
-              endStr,
-            );
-          }
-
-          await this.assertNoClash(
-            tx,
-            doctorId,
-            startStr,
-            endStr,
-            timeSlot,
-            idStr,
-          );
-
-          const updated = await tx.appointment.update({
-            where: { id: BigInt(idStr) },
-            data: {
-              patientId: BigInt(patientId),
-              doctorId: BigInt(doctorId),
-              date,
-              timeSlot,
-              sTime: startStr,
-              eTime: endStr,
-              sTimeKey,
-              status,
-              remarks: dto.remarks !== undefined ? dto.remarks : existing.remarks,
-              bp: dto.b_p !== undefined ? dto.b_p : existing.bp,
-              pulse: dto.pulse !== undefined ? dto.pulse : existing.pulse,
-              temperature:
-                dto.temprature !== undefined
-                  ? dto.temprature
-                  : existing.temperature,
-              weight: dto.weight !== undefined ? dto.weight : existing.weight,
-              mode: isVideo ? 'video' : 'in_person',
-              videoRoom,
-              branchId: dto.branchId ? BigInt(dto.branchId) : undefined,
-              visitType: dto.visitType ?? existing.visitType,
-            },
-            include: {
-              patient: true,
-              doctor: true,
-            },
-          });
-
-          return this.formatAppointment(updated);
-        });
-      } catch (err: any) {
-        if (err instanceof BadRequestException) {
-          throw err;
-        }
-        this.logger.warn(`Prisma update appointment failed: ${err.message}.`);
+      if (!['cancelled', 'no show', 'completed'].includes(status)) {
+        await this.assertDoctorBookable(tx, doctorId, date, startStr, endStr);
       }
-    }
 
-    // In-memory update
-    if (!['cancelled', 'no show', 'completed'].includes(status)) {
-      this.assertDoctorBookableMemory(doctorId, date, startStr, endStr);
-    }
-    this.assertNoClashMemory(doctorId, startStr, endStr, timeSlot, idStr);
+      await this.assertNoClash(
+        tx,
+        doctorId,
+        startStr,
+        endStr,
+        timeSlot,
+        idStr,
+      );
 
-    const memory = this.memoryAppointments.get(idStr);
-    if (!memory) {
-      throw new NotFoundException(`Appointment #${idStr} not found.`);
-    }
+      const updated = await tx.appointment.update({
+        where: { id: BigInt(idStr) },
+        data: {
+          patientId: BigInt(patientId),
+          doctorId: BigInt(doctorId),
+          date,
+          timeSlot,
+          sTime: startStr,
+          eTime: endStr,
+          sTimeKey,
+          status,
+          remarks: dto.remarks !== undefined ? dto.remarks : undefined,
+          bp: dto.b_p !== undefined ? dto.b_p : undefined,
+          pulse: dto.pulse !== undefined ? dto.pulse : undefined,
+          temperature: dto.temprature !== undefined ? dto.temprature : undefined,
+          weight: dto.weight !== undefined ? dto.weight : undefined,
+          mode: isVideo ? 'video' : 'in_person',
+          videoRoom,
+          branchId: dto.branchId ? BigInt(dto.branchId) : undefined,
+          visitType: dto.visitType ?? existing.visitType,
+        },
+        include: {
+          patient: true,
+          doctor: true,
+        },
+      });
 
-    memory.patientId = patientId;
-    memory.doctorId = doctorId;
-    memory.date = date;
-    memory.timeSlot = timeSlot;
-    memory.sTime = startStr;
-    memory.eTime = endStr;
-    memory.sTimeKey = sTimeKey;
-    memory.status = status;
-    if (dto.remarks !== undefined) memory.remarks = dto.remarks ?? '';
-    if (dto.b_p !== undefined) memory.bp = dto.b_p ?? null;
-    if (dto.pulse !== undefined) memory.pulse = dto.pulse ?? null;
-    if (dto.temprature !== undefined) memory.temperature = dto.temprature ?? null;
-    if (dto.weight !== undefined) memory.weight = dto.weight ?? null;
-    memory.mode = isVideo ? 'video' : 'in_person';
-    memory.videoRoom = videoRoom;
-    if (dto.visitType !== undefined) memory.visitType = dto.visitType ?? null;
-    memory.updatedAt = new Date();
-
-    const p = await this.patientService.findById(patientId);
-    const d = await this.doctorService.findById(doctorId);
-    return this.formatMemoryAppointment(memory, p, d);
+      return this.formatAppointment(updated);
+    });
   }
 
   /**
@@ -528,20 +306,10 @@ export class AppointmentService {
     const idStr = String(idOrKey);
     const existing = await this.findOne(idStr);
 
-    if (this.prisma.connected) {
-      try {
-        await this.prisma.appointment.delete({
-          where: { id: BigInt(idStr) },
-        });
-        return {
-          message: `Appointment #${idStr} on ${existing.date} removed.`,
-        };
-      } catch (err: any) {
-        this.logger.warn(`Prisma delete appointment failed: ${err.message}.`);
-      }
-    }
+    await this.prisma.appointment.delete({
+      where: { id: BigInt(idStr) },
+    });
 
-    this.memoryAppointments.delete(idStr);
     return {
       message: `Appointment #${idStr} on ${existing.date} removed.`,
     };
@@ -559,102 +327,40 @@ export class AppointmentService {
     const weekday = day.getDay(); // 0=Sunday .. 6=Saturday
 
     // 1. Get weekly doctor slots
-    let slots: MemorySlot[] = [];
-    if (this.prisma.connected) {
-      try {
-        const dbSlots = await this.prisma.doctorSlot.findMany({
-          where: {
-            doctorId: BigInt(docIdStr),
-            weekday,
-            active: true,
-          },
-          orderBy: { startTime: 'asc' },
-        });
-        slots = dbSlots.map((s) => ({
-          id: s.id.toString(),
-          doctorId: s.doctorId.toString(),
-          weekday: s.weekday,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          slotMinutes: s.slotMinutes,
-          active: s.active,
-        }));
-      } catch (err: any) {
-        this.logger.warn(`Prisma freeSlots lookup failed: ${err.message}.`);
-      }
-    }
+    const dbSlots = await this.prisma.doctorSlot.findMany({
+      where: {
+        doctorId: BigInt(docIdStr),
+        weekday,
+        active: true,
+      },
+      orderBy: { startTime: 'asc' },
+    });
 
-    if (slots.length === 0) {
-      slots = Array.from(this.memorySlots.values()).filter(
-        (s) => s.doctorId === docIdStr && s.weekday === weekday && s.active,
-      );
-    }
-
-    if (slots.length === 0) {
+    if (dbSlots.length === 0) {
       return [];
     }
 
     // 2. Get booked appointments for that doctor on that date (not cancelled or no show)
-    let bookedTimes: { sTime: string; eTime: string }[] = [];
-    if (this.prisma.connected) {
-      try {
-        const bookings = await this.prisma.appointment.findMany({
-          where: {
-            doctorId: BigInt(docIdStr),
-            date,
-            status: { notIn: ['cancelled', 'no show'] },
-          },
-          select: { sTime: true, eTime: true },
-        });
-        bookedTimes = bookings;
-      } catch (err: any) {
-        this.logger.warn(`Prisma booked times lookup failed: ${err.message}.`);
-      }
-    }
-
-    if (bookedTimes.length === 0) {
-      bookedTimes = Array.from(this.memoryAppointments.values())
-        .filter(
-          (a) =>
-            a.doctorId === docIdStr &&
-            a.date === date &&
-            !['cancelled', 'no show'].includes(a.status),
-        )
-        .map((a) => ({ sTime: a.sTime, eTime: a.eTime }));
-    }
+    const bookings = await this.prisma.appointment.findMany({
+      where: {
+        doctorId: BigInt(docIdStr),
+        date,
+        status: { notIn: ['cancelled', 'no show'] },
+      },
+      select: { sTime: true, eTime: true },
+    });
 
     // 3. Get blocks on this date
-    let blocks: MemoryBlock[] = [];
-    if (this.prisma.connected) {
-      try {
-        const dbBlocks = await this.prisma.slotBlock.findMany({
-          where: {
-            doctorId: BigInt(docIdStr),
-            date: new Date(date),
-          },
-        });
-        blocks = dbBlocks.map((b) => ({
-          id: b.id.toString(),
-          doctorId: b.doctorId.toString(),
-          date,
-          startTime: b.startTime,
-          endTime: b.endTime,
-          reason: b.reason,
-        }));
-      } catch (err: any) {
-        this.logger.warn(`Prisma slotBlock lookup failed: ${err.message}.`);
-      }
-    }
-
-    if (blocks.length === 0) {
-      blocks = Array.from(this.memoryBlocks.values()).filter(
-        (b) => b.doctorId === docIdStr && b.date === date,
-      );
-    }
+    const dbBlocks = await this.prisma.slotBlock.findMany({
+      where: {
+        doctorId: BigInt(docIdStr),
+        date: new Date(date),
+      },
+    });
 
     const freeSlots: FreeSlotDto[] = [];
 
-    for (const slot of slots) {
+    for (const slot of dbSlots) {
       let currentMinutes = this.timeToMinutes(slot.startTime);
       const stopMinutes = this.timeToMinutes(slot.endTime);
 
@@ -666,12 +372,12 @@ export class AppointmentService {
         const fullEnd = `${date} ${slotEndStr}:00`;
 
         // Check if overlaps with any booked appointment
-        const isBooked = bookedTimes.some(
+        const isBooked = bookings.some(
           (b) => b.sTime < fullEnd && b.eTime > fullStart,
         );
 
         // Check if overlaps with any slot block
-        const isBlocked = blocks.some((b) => {
+        const isBlocked = dbBlocks.some((b) => {
           if (!b.startTime || !b.endTime) return true; // whole day
           const blockStart = `${date} ${b.startTime}:00`;
           const blockEnd = `${date} ${b.endTime}:00`;
@@ -721,27 +427,6 @@ export class AppointmentService {
     }
   }
 
-  private assertNoClashMemory(
-    doctorId: string,
-    startStr: string,
-    endStr: string,
-    timeSlot: string,
-    ignoreId: string | null,
-  ): void {
-    for (const [id, a] of this.memoryAppointments.entries()) {
-      if (ignoreId && id === ignoreId) continue;
-      if (a.doctorId !== doctorId) continue;
-      if (['cancelled', 'no show'].includes(a.status)) continue;
-
-      // Overlap: existing.s_time < new.e_time AND existing.e_time > new.s_time
-      if (a.sTime < endStr && a.eTime > startStr) {
-        throw new BadRequestException(
-          `That doctor is already booked ${a.timeSlot || timeSlot} with another patient.`,
-        );
-      }
-    }
-  }
-
   private async assertDoctorBookable(
     tx: any,
     doctorId: string | number,
@@ -787,7 +472,7 @@ export class AppointmentService {
 
     const dayOfWeek = new Date(date).getDay();
     const weekdayName = WEEKDAYS[dayOfWeek];
-    const daySlots = allSlots.filter((s: any) => s.weekday === dayOfWeek);
+    const daySlots = allSlots.filter((s: { weekday: number }) => s.weekday === dayOfWeek);
 
     if (daySlots.length === 0) {
       throw new BadRequestException(
@@ -799,70 +484,13 @@ export class AppointmentService {
     const endTimeOnly = endStr.substring(11, 16);
 
     const fitsInSlot = daySlots.some(
-      (s: any) => startTimeOnly >= s.startTime && endTimeOnly <= s.endTime,
+      (s: { startTime: string; endTime: string }) =>
+        startTimeOnly >= s.startTime && endTimeOnly <= s.endTime,
     );
 
     if (!fitsInSlot) {
       const hours = daySlots
-        .map((s: any) => `${s.startTime}-${s.endTime}`)
-        .join(', ');
-      throw new BadRequestException(
-        `Outside the doctor's clinic hours on ${weekdayName} (${hours}).`,
-      );
-    }
-  }
-
-  private assertDoctorBookableMemory(
-    doctorId: string,
-    date: string,
-    startStr: string,
-    endStr: string,
-  ): void {
-    // 1. Check blocks
-    for (const b of this.memoryBlocks.values()) {
-      if (b.doctorId === doctorId && b.date === date) {
-        if (!b.startTime || !b.endTime) {
-          throw new BadRequestException(
-            `The doctor is not available then${b.reason ? ' (' + b.reason + ')' : ''}.`,
-          );
-        }
-        const bStart = `${date} ${b.startTime}:00`;
-        const bEnd = `${date} ${b.endTime}:00`;
-        if (startStr < bEnd && endStr > bStart) {
-          throw new BadRequestException(
-            `The doctor is not available then${b.reason ? ' (' + b.reason + ')' : ''}.`,
-          );
-        }
-      }
-    }
-
-    // 2. Check slots
-    const allSlots = Array.from(this.memorySlots.values()).filter(
-      (s) => s.doctorId === doctorId && s.active,
-    );
-    if (allSlots.length === 0) {
-      return;
-    }
-
-    const dayOfWeek = new Date(date).getDay();
-    const weekdayName = WEEKDAYS[dayOfWeek];
-    const daySlots = allSlots.filter((s) => s.weekday === dayOfWeek);
-
-    if (daySlots.length === 0) {
-      throw new BadRequestException(
-        `The doctor has no clinic on ${weekdayName}s.`,
-      );
-    }
-
-    const startTimeOnly = startStr.substring(11, 16);
-    const endTimeOnly = endStr.substring(11, 16);
-
-    const fits = daySlots.some(
-      (s) => startTimeOnly >= s.startTime && endTimeOnly <= s.endTime,
-    );
-    if (!fits) {
-      const hours = daySlots
-        .map((s) => `${s.startTime}-${s.endTime}`)
+        .map((s: { startTime: string; endTime: string }) => `${s.startTime}-${s.endTime}`)
         .join(', ');
       throw new BadRequestException(
         `Outside the doctor's clinic hours on ${weekdayName} (${hours}).`,
@@ -961,85 +589,5 @@ export class AppointmentService {
       createdAt: app.createdAt ? app.createdAt.toISOString() : null,
       updatedAt: app.updatedAt ? app.updatedAt.toISOString() : null,
     };
-  }
-
-  private formatMemoryAppointment(
-    m: MemoryAppointment,
-    patient?: any,
-    doctor?: any,
-  ): AppointmentResponseDto {
-    const videoUrl =
-      m.videoRoom && m.mode === 'video'
-        ? `https://meet.jit.si/${encodeURIComponent(m.videoRoom)}`
-        : null;
-
-    return {
-      id: m.id,
-      patientId: m.patientId,
-      doctorId: m.doctorId,
-      date: m.date,
-      timeSlot: m.timeSlot,
-      sTime: m.sTime,
-      eTime: m.eTime,
-      sTimeKey: m.sTimeKey,
-      status: m.status,
-      remarks: m.remarks || null,
-      mode: m.mode,
-      videoRoom: m.videoRoom,
-      videoUrl,
-      branchId: m.branchId,
-      bp: m.bp,
-      pulse: m.pulse,
-      temperature: m.temperature,
-      weight: m.weight,
-      visitType: m.visitType,
-      patient: patient
-        ? {
-            id: patient.id,
-            patientId: patient.patientId || '',
-            name: patient.name,
-            phone: patient.phone || null,
-          }
-        : undefined,
-      doctor: doctor
-        ? {
-            id: doctor.id,
-            name: doctor.name,
-            department: doctor.department || null,
-          }
-        : undefined,
-      checkedInAt: m.checkedInAt ? m.checkedInAt.toISOString() : null,
-      consultStartedAt: m.consultStartedAt ? m.consultStartedAt.toISOString() : null,
-      calledInAt: m.calledInAt ? m.calledInAt.toISOString() : null,
-      checkedOutAt: m.checkedOutAt ? m.checkedOutAt.toISOString() : null,
-      completedAt: m.completedAt ? m.completedAt.toISOString() : null,
-      createdAt: m.createdAt.toISOString(),
-      updatedAt: m.updatedAt.toISOString(),
-    };
-  }
-
-  // --- Test Helpers ---
-
-  /** Add in-memory slots for testing */
-  addTestSlot(slot: Omit<MemorySlot, 'id'>): MemorySlot {
-    const id = (this.nextId++).toString();
-    const record: MemorySlot = { id, ...slot };
-    this.memorySlots.set(id, record);
-    return record;
-  }
-
-  /** Add in-memory block for testing */
-  addTestBlock(block: Omit<MemoryBlock, 'id'>): MemoryBlock {
-    const id = (this.nextId++).toString();
-    const record: MemoryBlock = { id, ...block };
-    this.memoryBlocks.set(id, record);
-    return record;
-  }
-
-  /** Clear in-memory state for test isolation */
-  clearMemory(): void {
-    this.memoryAppointments.clear();
-    this.memorySlots.clear();
-    this.memoryBlocks.clear();
   }
 }

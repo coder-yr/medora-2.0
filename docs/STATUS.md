@@ -2,9 +2,9 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 10: Invoicing and Billing Domain Migration (`InvoiceModule`)**
+- **Current Phase**: **Phase 10.5: Backend Stabilization & Security Remediation**
 - **Status**: **COMPLETED**
-- **Date**: 2026-10-28
+- **Date**: 2026-10-30
 - **Approved Target Stack**:
   - **Frontend**: React + TypeScript + Vite
   - **Backend**: NestJS + TypeScript (trusted business logic boundary)
@@ -29,7 +29,8 @@
 | **Phase 7** | Clinical Staff Register (3rd Module) | `DoctorModule` (doctor register, only name required, email uniqueness without blank clash, appointment deletion protection, upcoming load tracking, department suggestion merge, optional staff login linking, RBAC), commit `2b94b19` | **COMPLETED** |
 | **Phase 8** | Outpatient Scheduling & Visits (4th Module) | `AppointmentModule` (double-booking overlap protection, transaction locks, doctor clinic hours & slot blocks, free slots calculator, day view, vitals recording, Jitsi video visits, RBAC), commit `eb0ed18` | **COMPLETED** |
 | **Phase 9** | Clinical Consultations & Encounters (5th Module) | `ConsultationModule` (outpatient consultation notes, Naegele obstetric math, history carry-forward, vitals sync, note templates, printable summaries, completed note immutability, RBAC), commit `1b09259` | **COMPLETED** |
-| **Phase 10** | Invoicing & Billing Domain Migration (6th Module) | `InvoiceModule` (patient invoicing, multi-item breakdown, server calculations, installment payments, pessimistic row lock, overpayment rejection, deletion guards, doctor share calculations, RBAC) | **COMPLETED** |
+| **Phase 10** | Invoicing & Billing Domain Migration (6th Module) | `InvoiceModule` (patient invoicing, multi-item breakdown, server calculations, installment payments, pessimistic row lock, overpayment rejection, deletion guards, doctor share calculations, RBAC), commit `ee05734` | **COMPLETED** |
+| **Phase 10.5** | Backend Stabilization & Security Remediation | Backdoor removal, Argon2id + legacy bcrypt upgrade, session management (refresh token rotation, reuse detection), Helmet headers, login throttling, removal of all fake in-memory stores, real PostgreSQL row locking concurrency tests (`SELECT FOR UPDATE`), 100% clean CI lockfile, >= 80% coverage across all 6 services (`docs/security-hardening-report.md`) | **COMPLETED** |
 
 ---
 

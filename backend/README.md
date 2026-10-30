@@ -55,11 +55,17 @@ The backend is fully functional in an offline, zero-credential development and t
 2. **Environment Validation**:
    At application bootstrap, `validateEnv()` strictly inspects environment parameters (`NODE_ENV`, `PORT`, `DATABASE_URL`, `DIRECT_URL`, `JWT_SECRET`). If an invalid variable is supplied, startup aborts with a sanitized error that **never logs secrets or credentials**.
 
-3. **Development Staff Credentials (Offline Simulation)**:
-   In `development` or `test` mode, when no live PostgreSQL instance is available, staff authentication can be tested using simulated accounts:
-   - **Administrator**: `admin.test@medora.hospital` (Password: `StrongPassword123!`) — Possesses all 97 permissions.
-   - **Doctor**: `doctor.test@medora.hospital` (Password: `StrongPassword123!`) — Possesses clinical permissions (`patient_view`, `prescription_add`, etc.).
-   - **Receptionist**: `receptionist.test@medora.hospital` (Password: `StrongPassword123!`) — Possesses front-desk permissions (`appointment_add`, `invoice_add`, etc.).
+3. **Development Staff Credentials & Seeding**:
+   Authentication is verified against real stored password hashes in PostgreSQL (Argon2id or legacy bcrypt with transparent upgrade). To populate the database with staff test accounts:
+   ```bash
+   npx tsx prisma/seed.ts
+   ```
+   Seeded accounts (Password for test staff: `ValidPassword123!`):
+   - **Administrator**: `admin.test@medora.hospital` — Possesses all 97 permissions.
+   - **Doctor**: `doctor.test@medora.hospital` — Possesses clinical permissions (`patient_view`, `prescription_add`, etc.).
+   - **Receptionist**: `receptionist.test@medora.hospital` — Possesses front-desk permissions (`appointment_add`, `invoice_add`, etc.).
+   - **Legacy Admin**: `admin@example.com` (Legacy bcrypt hash, password `123456`).
+   - **Legacy Doctor**: `banuna@mail.com` (Legacy bcrypt hash, password `12345678`).
 
 ---
 
@@ -75,12 +81,16 @@ The backend is fully functional in an offline, zero-credential development and t
 | **Formatting** | `npm run format` | Auto-formats code with Prettier |
 | **Prisma Validation** | `npm run prisma:validate` | Validates `prisma/schema.prisma` against Prisma 7 CLI |
 | **Prisma Generation** | `npm run prisma:generate` | Generates typed `@prisma/client` |
+| **Prisma Seed** | `npx tsx prisma/seed.ts` | Seeds staff test accounts and legacy test users |
 
 ---
 
-## 6. Authentication Identity Provider Boundary
+## 6. Authentication & Session Management
 
-As documented in `docs/06-open-questions.md`:
-- **Current Architecture**: NestJS issues and signs its own cryptographically secure JWTs (`JwtService`), extracting permissions and role claims on every request.
-- **Supabase Auth Bridge**: `AuthService.validateSupabaseToken()` is prepared to ingest and verify external Supabase Auth tokens if project ownership approves Supabase Auth as the primary IdP.
-- **Owner Decision Tracking**: Detailed in `docs/06-open-questions.md` Question 2.
+As documented in `docs/security-hardening-report.md` and `docs/06-open-questions.md`:
+- **Password Hashing**: Industry-standard Argon2id for all newly hashed passwords, with backward-compatible verification for legacy Laravel bcrypt (`$2y$`) hashes and transparent automatic rehash on successful login.
+- **Short-Lived Access Tokens**: Signed JWTs with a 15-minute (900s) lifespan containing user UUID, role, and granular permissions.
+- **Opaque Refresh Tokens**: Stored only as SHA-256 hashes in the `user_session` table with automatic rotation upon `/api/v1/auth/refresh`.
+- **Reuse Detection**: If a revoked or previously rotated refresh token is presented, the entire session family (`familyId`) is instantly revoked to prevent token replay attacks.
+- **Rate Limiting & Protection**: Login attempts are rate-limited via `@nestjs/throttler` (5 attempts per minute per IP), with Helmet HTTP security headers enabled by default.
+

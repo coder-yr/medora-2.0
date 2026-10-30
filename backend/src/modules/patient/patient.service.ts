@@ -1,18 +1,19 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Patient } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePatientDto } from './dto/create-patient.dto';
-import { PaginatedPatientsDto, PatientResponseDto } from './dto/patient-response.dto';
 import { PatientQueryDto } from './dto/patient-query.dto';
+import { PaginatedPatientsDto, PatientResponseDto } from './dto/patient-response.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
 
 @Injectable()
 export class PatientService {
   private readonly logger = new Logger(PatientService.name);
-
-  // In-memory fallback repository for offline test and local standalone development
-  private memoryPatients: Map<string, any> = new Map();
-  private memoryIdCounter = 0;
-  private memoryMaxMrnIssued = 0;
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -58,53 +59,38 @@ export class PatientService {
 
   /**
    * Generates the next atomic sequential 6-digit patient ID.
-   * Derived from a database-managed sequence or monotonic counter,
-   * guaranteeing that deleting a record (including the highest-numbered)
-   * never reuses an issued MR number, persisting durability across restarts.
+   * Derived from a PostgreSQL database sequence, guaranteeing durability across restarts
+   * and ensuring that deleting records (including the highest-numbered) never reuses an MRN.
    */
   async nextPatientId(): Promise<string> {
-    if (this.prisma.connected) {
-      try {
-        // In PostgreSQL, maintain sequence durability across restarts and deletions
-        await this.prisma.$executeRaw`
-          CREATE SEQUENCE IF NOT EXISTS patient_mrn_seq START WITH 1;
-        `;
+    await this.prisma.$executeRaw`
+      CREATE SEQUENCE IF NOT EXISTS patient_mrn_seq START WITH 1;
+    `;
 
-        // Align sequence with highest existing patient ID if needed
-        const maxResult: any = await this.prisma.$queryRaw`
-          SELECT COALESCE(MAX(NULLIF(regexp_replace(patient_id, '\\D', '', 'g'), '')::bigint), 0) AS max_id 
-          FROM patient
-        `;
-        const maxId = Number(maxResult[0]?.max_id || 0);
+    // Align sequence with highest existing patient ID if needed
+    const maxResult = await this.prisma.$queryRaw<Array<{ max_id: bigint | number | string }>>`
+      SELECT COALESCE(MAX(NULLIF(regexp_replace(patient_id, '\\D', '', 'g'), '')::bigint), 0) AS max_id 
+      FROM patient
+    `;
+    const maxId = Number(maxResult[0]?.max_id || 0);
 
-        const nextValResult: any = await this.prisma.$queryRaw`
-          SELECT nextval('patient_mrn_seq') AS next_val
-        `;
-        let seqVal = Number(nextValResult[0]?.next_val || 1);
+    const nextValResult = await this.prisma.$queryRaw<Array<{ next_val: bigint | number | string }>>`
+      SELECT nextval('patient_mrn_seq') AS next_val
+    `;
+    let seqVal = Number(nextValResult[0]?.next_val || 1);
 
-        if (seqVal <= maxId) {
-          await this.prisma.$executeRaw`
-            SELECT setval('patient_mrn_seq', ${maxId} + 1, false)
-          `;
-          seqVal = maxId + 1;
-        }
-
-        this.memoryMaxMrnIssued = Math.max(this.memoryMaxMrnIssued, seqVal);
-        return seqVal.toString().padStart(6, '0');
-      } catch (err: any) {
-        this.logger.warn(
-          `Failed to query next patientId from database sequence: ${err.message}. Using fallback.`,
-        );
-      }
+    if (seqVal <= maxId) {
+      await this.prisma.$executeRaw`
+        SELECT setval('patient_mrn_seq', ${maxId} + 1, false)
+      `;
+      seqVal = maxId + 1;
     }
 
-    // In-memory / offline standalone fallback (monotonic, non-decrementing)
-    this.memoryMaxMrnIssued++;
-    return this.memoryMaxMrnIssued.toString().padStart(6, '0');
+    return seqVal.toString().padStart(6, '0');
   }
 
   /**
-   * List patients with single-box search and pagination.
+   * List patients with single-box search and pagination directly from PostgreSQL.
    */
   async findAll(query: PatientQueryDto): Promise<PaginatedPatientsDto> {
     const page = Math.max(1, query.page || 1);
@@ -112,67 +98,36 @@ export class PatientService {
     const skip = (page - 1) * limit;
     const term = (query.q || '').trim();
 
-    if (this.prisma.connected) {
-      try {
-        const whereClause = term
-          ? {
-              OR: [
-                { name: { contains: term, mode: 'insensitive' as const } },
-                { patientId: { contains: term, mode: 'insensitive' as const } },
-                { cnic: { contains: term, mode: 'insensitive' as const } },
-                { oldMrn: { contains: term, mode: 'insensitive' as const } },
-                { phone: { contains: term, mode: 'insensitive' as const } },
-                { email: { contains: term, mode: 'insensitive' as const } },
-              ],
-            }
-          : {};
+    const whereClause = term
+      ? {
+          OR: [
+            { name: { contains: term, mode: 'insensitive' as const } },
+            { patientId: { contains: term, mode: 'insensitive' as const } },
+            { cnic: { contains: term, mode: 'insensitive' as const } },
+            { oldMrn: { contains: term, mode: 'insensitive' as const } },
+            { phone: { contains: term, mode: 'insensitive' as const } },
+            { email: { contains: term, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
 
-        const [items, total] = await Promise.all([
-          this.prisma.patient.findMany({
-            where: whereClause,
-            skip,
-            take: limit,
-            orderBy: { id: 'desc' },
-          }),
-          this.prisma.patient.count({ where: whereClause }),
-        ]);
-
-        return {
-          items: items.map((p) => this.mapToDto(p)),
-          meta: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit) || 1,
-          },
-        };
-      } catch (err: any) {
-        this.logger.warn(
-          `Prisma patient query failed: ${err.message}. Falling back to memory store.`,
-        );
-      }
-    }
-
-    // Offline / in-memory search
-    const all = Array.from(this.memoryPatients.values());
-    const filtered = term
-      ? all.filter((p) => {
-          const s =
-            `${p.name} ${p.patientId} ${p.cnic || ''} ${p.oldMrn || ''} ${p.phone || ''} ${p.email || ''}`.toLowerCase();
-          return s.includes(term.toLowerCase());
-        })
-      : all;
-
-    filtered.sort((a, b) => Number(b.id) - Number(a.id));
-    const paginated = filtered.slice(skip, skip + limit);
+    const [items, total] = await Promise.all([
+      this.prisma.patient.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { id: 'desc' },
+      }),
+      this.prisma.patient.count({ where: whereClause }),
+    ]);
 
     return {
-      items: paginated.map((p) => this.mapToDto(p)),
+      items: items.map((p) => this.mapToDto(p)),
       meta: {
-        total: filtered.length,
+        total,
         page,
         limit,
-        totalPages: Math.ceil(filtered.length / limit) || 1,
+        totalPages: Math.ceil(total / limit) || 1,
       },
     };
   }
@@ -182,44 +137,31 @@ export class PatientService {
    */
   async findById(idOrPatientId: string | number): Promise<PatientResponseDto> {
     const searchKey = String(idOrPatientId).trim();
+    const isNumeric = /^\d+$/.test(searchKey);
 
-    if (this.prisma.connected) {
-      try {
-        const isNumeric = /^\d+$/.test(searchKey);
-        let patient = null;
+    let patient: Patient | null = null;
 
-        if (isNumeric) {
-          patient = await this.prisma.patient.findFirst({
-            where: {
-              OR: [{ id: BigInt(searchKey) }, { patientId: searchKey }],
-            },
-          });
-        } else {
-          patient = await this.prisma.patient.findFirst({
-            where: { patientId: searchKey },
-          });
-        }
-
-        if (patient) {
-          return this.mapToDto(patient);
-        }
-      } catch (err: any) {
-        this.logger.warn(`Database lookup failed: ${err.message}`);
-      }
+    if (isNumeric) {
+      patient = await this.prisma.patient.findFirst({
+        where: {
+          OR: [{ id: BigInt(searchKey) }, { patientId: searchKey }],
+        },
+      });
+    } else {
+      patient = await this.prisma.patient.findFirst({
+        where: { patientId: searchKey },
+      });
     }
 
-    // In-memory fallback lookup
-    for (const p of this.memoryPatients.values()) {
-      if (String(p.id) === searchKey || p.patientId === searchKey) {
-        return this.mapToDto(p);
-      }
+    if (!patient) {
+      throw new NotFoundException(`Patient with ID "${searchKey}" not found`);
     }
 
-    throw new NotFoundException(`Patient with ID "${searchKey}" not found`);
+    return this.mapToDto(patient);
   }
 
   /**
-   * Register a new patient with sequential ID and derived age.
+   * Register a new patient with sequential ID and derived age in PostgreSQL.
    */
   async create(dto: CreatePatientDto, howAdded = 'front desk'): Promise<PatientResponseDto> {
     if (!dto.name || dto.name.trim() === '') {
@@ -233,60 +175,39 @@ export class PatientService {
     const addDate = now.toISOString().slice(0, 10);
     const registrationTime = now.toISOString();
 
-    const recordData = {
-      name: dto.name.trim(),
-      patientId,
-      fatherName: dto.fatherName?.trim() || null,
-      email: dto.email?.trim() || null,
-      phone: dto.phone?.trim() || null,
-      address: dto.address?.trim() || null,
-      birthdate: dto.birthdate?.trim() || null,
-      age,
-      sex: dto.sex || null,
-      bloodGroup: dto.bloodGroup || null,
-      attendingDoctor: dto.attendingDoctor?.trim() || null,
-      patientTypeId: dto.patientTypeId ? BigInt(dto.patientTypeId) : null,
-      cnic,
-      guardianRelation: dto.guardianRelation?.trim() || null,
-      guardianMrn: dto.guardianMrn?.trim() || null,
-      mlc: Boolean(dto.mlc),
-      oldMrn: dto.oldMrn?.trim() || null,
-      employeeNo: dto.employeeNo?.trim() || null,
-      altPhone: dto.altPhone?.trim() || null,
-      city: dto.city?.trim() || null,
-      branchId: dto.branchId ? BigInt(dto.branchId) : null,
-      imageUrl: dto.photoData ? 'patients/webcam_capture.jpg' : null,
-      addDate,
-      registrationTime,
-      ionUserId: '',
-      howAdded,
-    };
+    const created = await this.prisma.patient.create({
+      data: {
+        name: dto.name.trim(),
+        patientId,
+        fatherName: dto.fatherName?.trim() || null,
+        email: dto.email?.trim() || null,
+        phone: dto.phone?.trim() || null,
+        address: dto.address?.trim() || null,
+        birthdate: dto.birthdate?.trim() || null,
+        age,
+        sex: dto.sex || null,
+        bloodGroup: dto.bloodGroup || null,
+        attendingDoctor: dto.attendingDoctor?.trim() || null,
+        patientTypeId: dto.patientTypeId ? BigInt(dto.patientTypeId) : null,
+        cnic,
+        guardianRelation: dto.guardianRelation?.trim() || null,
+        guardianMrn: dto.guardianMrn?.trim() || null,
+        mlc: Boolean(dto.mlc),
+        oldMrn: dto.oldMrn?.trim() || null,
+        employeeNo: dto.employeeNo?.trim() || null,
+        altPhone: dto.altPhone?.trim() || null,
+        city: dto.city?.trim() || null,
+        branchId: dto.branchId ? BigInt(dto.branchId) : null,
+        imageUrl: dto.photoData ? 'patients/webcam_capture.jpg' : null,
+        addDate,
+        registrationTime,
+        ionUserId: '',
+        howAdded,
+      },
+    });
 
-    if (this.prisma.connected) {
-      try {
-        const created = await this.prisma.patient.create({
-          data: recordData,
-        });
-        this.logger.log(`Patient registered: ${created.patientId} - ${created.name}`);
-        return this.mapToDto(created);
-      } catch (err: any) {
-        this.logger.warn(`Failed to insert patient in database: ${err.message}. Saving to memory.`);
-      }
-    }
-
-    // In-memory store
-    this.memoryIdCounter++;
-    const id = BigInt(this.memoryIdCounter);
-    const inMemoryRecord = {
-      ...recordData,
-      id,
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.memoryPatients.set(id.toString(), inMemoryRecord);
-    this.logger.log(`Patient registered in memory: ${patientId} - ${dto.name}`);
-
-    return this.mapToDto(inMemoryRecord);
+    this.logger.log(`Patient registered: ${created.patientId} - ${created.name}`);
+    return this.mapToDto(created);
   }
 
   /**
@@ -294,7 +215,7 @@ export class PatientService {
    */
   async update(idOrPatientId: string | number, dto: UpdatePatientDto): Promise<PatientResponseDto> {
     const existing = await this.findById(idOrPatientId);
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (dto.name !== undefined) updateData.name = dto.name.trim();
     if (dto.fatherName !== undefined) updateData.fatherName = dto.fatherName?.trim() || null;
@@ -324,74 +245,47 @@ export class PatientService {
 
     if (dto.birthdate !== undefined) {
       updateData.birthdate = dto.birthdate?.trim() || null;
-      updateData.age = this.deriveAge(updateData.birthdate);
+      updateData.age = this.deriveAge(updateData.birthdate as string);
     }
 
-    if (this.prisma.connected) {
-      try {
-        const updated = await this.prisma.patient.update({
-          where: { id: BigInt(existing.id) },
-          data: updateData,
-        });
-        return this.mapToDto(updated);
-      } catch (err: any) {
-        this.logger.warn(`Failed to update patient in database: ${err.message}`);
-      }
-    }
+    const updated = await this.prisma.patient.update({
+      where: { id: BigInt(existing.id) },
+      data: updateData,
+    });
 
-    // In-memory update
-    const memRecord = this.memoryPatients.get(existing.id);
-    if (memRecord) {
-      Object.assign(memRecord, updateData, { updatedAt: new Date() });
-      return this.mapToDto(memRecord);
-    }
-
-    throw new NotFoundException(`Patient ${idOrPatientId} not found`);
+    return this.mapToDto(updated);
   }
 
   /**
-   * Delete a patient record.
+   * Delete a patient record from PostgreSQL with active appointment constraint guard.
    */
   async remove(idOrPatientId: string | number): Promise<{ message: string }> {
     const existing = await this.findById(idOrPatientId);
     const label = `${existing.patientId} ${existing.name}`;
 
-    if (this.prisma.connected) {
-      const appointments = await this.prisma.appointment.findFirst({
-        where: { patientId: BigInt(existing.id) },
-      });
-      if (appointments) {
-        throw new BadRequestException(`${label} has appointments on file, so the record stays.`);
-      }
-
-      try {
-        await this.prisma.patient.delete({
-          where: { id: BigInt(existing.id) },
-        });
-        return { message: `Deleted patient ${label}.` };
-      } catch (err: any) {
-        this.logger.warn(`Database deletion failed: ${err.message}`);
-        throw new BadRequestException(`Could not delete patient ${label}: ${err.message}`);
-      }
+    const appointments = await this.prisma.appointment.findFirst({
+      where: { patientId: BigInt(existing.id) },
+    });
+    if (appointments) {
+      throw new BadRequestException(`${label} has appointments on file, so the record stays.`);
     }
 
-    this.memoryPatients.delete(existing.id);
-    return { message: `Deleted patient ${label}.` };
+    try {
+      await this.prisma.patient.delete({
+        where: { id: BigInt(existing.id) },
+      });
+      return { message: `Deleted patient ${label}.` };
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Database deletion failed: ${message}`);
+      throw new BadRequestException(`Could not delete patient ${label}: ${message}`);
+    }
   }
 
   /**
-   * Clear in-memory state (useful for test isolation).
+   * Converts a Prisma record to a typed PatientResponseDto.
    */
-  clearMemoryStore(): void {
-    this.memoryPatients.clear();
-    this.memoryIdCounter = 0;
-    this.memoryMaxMrnIssued = 0;
-  }
-
-  /**
-   * Converts a Prisma/raw record to a typed PatientResponseDto.
-   */
-  private mapToDto(p: any): PatientResponseDto {
+  private mapToDto(p: Patient): PatientResponseDto {
     return {
       id: p.id ? p.id.toString() : '',
       patientId: p.patientId || '',

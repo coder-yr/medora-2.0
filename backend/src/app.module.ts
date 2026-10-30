@@ -1,6 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './common/config/configuration';
 import { validateEnv } from './common/config/env.validation';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -26,6 +27,12 @@ import { PrismaModule } from './modules/prisma/prisma.module';
       validate: validateEnv,
       envFilePath: ['.env', '.env.local'],
     }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000,
+        limit: 100, // 100 requests per minute general rate limit
+      },
+    ]),
     PrismaModule,
     AuthModule,
     HealthModule,
@@ -37,6 +44,10 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     InvoiceModule,
   ],
   providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,

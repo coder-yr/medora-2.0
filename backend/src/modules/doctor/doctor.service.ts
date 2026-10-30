@@ -1,5 +1,11 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import * as crypto from 'crypto';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import type { Doctor } from '@prisma/client';
+import * as argon2 from 'argon2';
 import { DepartmentService } from '../department/department.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateDoctorDto } from './dto/create-doctor.dto';
@@ -11,83 +17,31 @@ import { UpdateDoctorDto } from './dto/update-doctor.dto';
 export class DoctorService {
   private readonly logger = new Logger(DoctorService.name);
 
-  // In-memory fallback repository for offline test and local standalone development
-  private memoryDoctors: Map<string, any> = new Map();
-  private memoryAppointments: Map<string, any> = new Map();
-  private memoryUsers: Map<string, any> = new Map();
-  private memoryIdCounter = 0;
-  private memoryApptIdCounter = 0;
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly departmentService: DepartmentService,
   ) {}
 
   /**
-   * Helper to seed appointments for testing deletion protection.
-   */
-  seedMemoryAppointment(doctorId: string, status = 'scheduled', date?: string): string {
-    this.memoryApptIdCounter++;
-    const id = this.memoryApptIdCounter.toString();
-    const apptDate = date || new Date().toISOString().slice(0, 10);
-    this.memoryAppointments.set(id, {
-      id,
-      doctorId,
-      status,
-      date: apptDate,
-    });
-    return id;
-  }
-
-  /**
-   * Clear in-memory state for test isolation.
-   */
-  clearMemoryStore(): void {
-    this.memoryDoctors.clear();
-    this.memoryAppointments.clear();
-    this.memoryUsers.clear();
-    this.memoryIdCounter = 0;
-    this.memoryApptIdCounter = 0;
-  }
-
-  /**
-   * Get merged department suggestion list.
+   * Get merged department suggestion list from database.
    */
   async getDepartmentSuggestions(): Promise<string[]> {
-    if (this.prisma.connected) {
-      try {
-        const [listedDepts, docDepts] = await Promise.all([
-          this.prisma.department.findMany({ select: { name: true } }),
-          this.prisma.doctor.findMany({
-            where: { department: { not: null } },
-            select: { department: true },
-          }),
-        ]);
+    const [listedDepts, docDepts] = await Promise.all([
+      this.prisma.department.findMany({ select: { name: true } }),
+      this.prisma.doctor.findMany({
+        where: { department: { not: null } },
+        select: { department: true },
+      }),
+    ]);
 
-        const set = new Set<string>();
-        for (const d of listedDepts) {
-          if (d.name?.trim()) set.add(d.name.trim());
-        }
-        for (const doc of docDepts) {
-          if (doc.department?.trim()) set.add(doc.department.trim());
-        }
-
-        return Array.from(set).sort((a, b) => a.localeCompare(b));
-      } catch (err: any) {
-        this.logger.warn(
-          `Failed to fetch suggestions from DB: ${err.message}. Falling back to memory.`,
-        );
-      }
+    const set = new Set<string>();
+    for (const d of listedDepts) {
+      if (d.name?.trim()) set.add(d.name.trim());
+    }
+    for (const doc of docDepts) {
+      if (doc.department?.trim()) set.add(doc.department.trim());
     }
 
-    // In-memory suggestion
-    const listRes = await this.departmentService.findAll();
-    const set = new Set<string>(listRes.departments.map((d) => d.name));
-    for (const doc of this.memoryDoctors.values()) {
-      if (doc.department?.trim()) {
-        set.add(doc.department.trim());
-      }
-    }
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
@@ -101,88 +55,51 @@ export class DoctorService {
     const term = (query.q || '').trim();
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    if (this.prisma.connected) {
-      try {
-        const whereClause = term
-          ? {
-              OR: [
-                { name: { contains: term, mode: 'insensitive' as const } },
-                { department: { contains: term, mode: 'insensitive' as const } },
-                { phone: { contains: term, mode: 'insensitive' as const } },
-                { email: { contains: term, mode: 'insensitive' as const } },
-              ],
-            }
-          : {};
+    const whereClause = term
+      ? {
+          OR: [
+            { name: { contains: term, mode: 'insensitive' as const } },
+            { department: { contains: term, mode: 'insensitive' as const } },
+            { phone: { contains: term, mode: 'insensitive' as const } },
+            { email: { contains: term, mode: 'insensitive' as const } },
+          ],
+        }
+      : {};
 
-        const [doctors, total] = await Promise.all([
-          this.prisma.doctor.findMany({
-            where: whereClause,
-            skip,
-            take: limit,
-            orderBy: { name: 'asc' },
-          }),
-          this.prisma.doctor.count({ where: whereClause }),
-        ]);
+    const [doctors, total] = await Promise.all([
+      this.prisma.doctor.findMany({
+        where: whereClause,
+        skip,
+        take: limit,
+        orderBy: { name: 'asc' },
+      }),
+      this.prisma.doctor.count({ where: whereClause }),
+    ]);
 
-        // Upcoming appointments per doctor: date >= today and status not in ('cancelled', 'no show')
-        const doctorIds = doctors.map((d) => d.id);
-        const upcomingCounts = await Promise.all(
-          doctorIds.map(async (docId) => {
-            const count = await this.prisma.appointment.count({
-              where: {
-                doctorId: docId,
-                date: { gte: todayStr },
-                status: { notIn: ['cancelled', 'no show'] },
-              },
-            });
-            return { docId, count };
-          }),
-        );
-
-        const countMap = new Map(upcomingCounts.map((u) => [u.docId.toString(), u.count]));
-
-        return {
-          items: doctors.map((d) => this.mapToDto(d, countMap.get(d.id.toString()) || 0)),
-          meta: {
-            total,
-            page,
-            limit,
-            totalPages: Math.ceil(total / limit) || 1,
+    // Upcoming appointments per doctor: date >= today and status not in ('cancelled', 'no show')
+    const doctorIds = doctors.map((d) => d.id);
+    const upcomingCounts = await Promise.all(
+      doctorIds.map(async (docId) => {
+        const count = await this.prisma.appointment.count({
+          where: {
+            doctorId: docId,
+            date: { gte: todayStr },
+            status: { notIn: ['cancelled', 'no show'] },
           },
-        };
-      } catch (err: any) {
-        this.logger.warn(`Prisma doctor search failed: ${err.message}. Falling back to memory.`);
-      }
-    }
+        });
+        return { docId, count };
+      }),
+    );
 
-    // In-memory list
-    const all = Array.from(this.memoryDoctors.values());
-    const filtered = term
-      ? all.filter((d) => {
-          const s =
-            `${d.name} ${d.department || ''} ${d.phone || ''} ${d.email || ''}`.toLowerCase();
-          return s.includes(term.toLowerCase());
-        })
-      : all;
-
-    filtered.sort((a, b) => a.name.localeCompare(b.name));
-    const paginated = filtered.slice(skip, skip + limit);
+    const countMap = new Map(upcomingCounts.map((u) => [u.docId.toString(), u.count]));
 
     return {
-      items: paginated.map((d) => {
-        const upcoming = Array.from(this.memoryAppointments.values()).filter(
-          (a) =>
-            a.doctorId === d.id.toString() &&
-            a.date >= todayStr &&
-            !['cancelled', 'no show'].includes(a.status),
-        ).length;
-        return this.mapToDto(d, upcoming);
-      }),
+      items: doctors.map((d) => this.mapToDto(d, countMap.get(d.id.toString()) || 0)),
       meta: {
-        total: filtered.length,
+        total,
         page,
         limit,
-        totalPages: Math.ceil(filtered.length / limit) || 1,
+        totalPages: Math.ceil(total / limit) || 1,
       },
     };
   }
@@ -194,45 +111,27 @@ export class DoctorService {
     const searchId = String(id).trim();
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    if (this.prisma.connected) {
-      try {
-        const doctor = await this.prisma.doctor.findUnique({
-          where: { id: BigInt(searchId) },
-        });
+    const doctor = await this.prisma.doctor.findUnique({
+      where: { id: BigInt(searchId) },
+    });
 
-        if (doctor) {
-          const upcoming = await this.prisma.appointment.count({
-            where: {
-              doctorId: doctor.id,
-              date: { gte: todayStr },
-              status: { notIn: ['cancelled', 'no show'] },
-            },
-          });
-          return this.mapToDto(doctor, upcoming);
-        }
-      } catch (err: any) {
-        this.logger.warn(
-          `Prisma findUnique doctor failed: ${err.message}. Falling back to memory.`,
-        );
-      }
+    if (!doctor) {
+      throw new NotFoundException(`Doctor with ID "${searchId}" not found`);
     }
 
-    const mem = this.memoryDoctors.get(searchId);
-    if (mem) {
-      const upcoming = Array.from(this.memoryAppointments.values()).filter(
-        (a) =>
-          a.doctorId === mem.id.toString() &&
-          a.date >= todayStr &&
-          !['cancelled', 'no show'].includes(a.status),
-      ).length;
-      return this.mapToDto(mem, upcoming);
-    }
+    const upcoming = await this.prisma.appointment.count({
+      where: {
+        doctorId: doctor.id,
+        date: { gte: todayStr },
+        status: { notIn: ['cancelled', 'no show'] },
+      },
+    });
 
-    throw new NotFoundException(`Doctor with ID "${searchId}" not found`);
+    return this.mapToDto(doctor, upcoming);
   }
 
   /**
-   * Create a new doctor record with optional login account.
+   * Create a new doctor record with optional staff login account.
    */
   async create(dto: CreateDoctorDto): Promise<DoctorResponseDto> {
     const name = dto.name?.trim();
@@ -244,28 +143,11 @@ export class DoctorService {
 
     // Check email uniqueness if email is given (blank emails do not clash)
     if (email) {
-      if (this.prisma.connected) {
-        try {
-          const clash = await this.prisma.doctor.findFirst({
-            where: { email: { equals: email, mode: 'insensitive' } },
-          });
-          if (clash) {
-            throw new BadRequestException(
-              'Another doctor is already on file with that email address.',
-            );
-          }
-        } catch (err: any) {
-          if (err instanceof BadRequestException) throw err;
-          this.logger.warn(`Prisma email clash check failed: ${err.message}`);
-        }
-      }
-
-      for (const d of this.memoryDoctors.values()) {
-        if (d.email && d.email.toLowerCase() === email.toLowerCase()) {
-          throw new BadRequestException(
-            'Another doctor is already on file with that email address.',
-          );
-        }
+      const clash = await this.prisma.doctor.findFirst({
+        where: { email: { equals: email, mode: 'insensitive' } },
+      });
+      if (clash) {
+        throw new BadRequestException('Another doctor is already on file with that email address.');
       }
     }
 
@@ -275,54 +157,32 @@ export class DoctorService {
 
     if (dto.loginUsername) {
       const username = dto.loginUsername.trim();
-      if (this.prisma.connected) {
-        try {
-          const userClash = await this.prisma.user.findUnique({
-            where: { login: username },
-          });
-          if (userClash) {
-            throw new BadRequestException('That username is already taken.');
-          }
-
-          const [first, ...rest] = name.split(' ');
-          const last = rest.join(' ') || '-';
-          const hashedPassword = crypto
-            .createHash('sha256')
-            .update(dto.loginPassword || 'DoctorPassword123!')
-            .digest('hex');
-
-          const newUser = await this.prisma.user.create({
-            data: {
-              login: username,
-              password: hashedPassword,
-              firstName: first.slice(0, 20),
-              lastName: last.slice(0, 20),
-              email: email || '',
-              group: 'Doctor',
-              description: `Doctor login for ${name}`.slice(0, 200),
-            },
-          });
-          ionUserId = newUser.id.toString();
-          loginUsername = username;
-        } catch (err: any) {
-          if (err instanceof BadRequestException) throw err;
-          this.logger.warn(`Failed to create doctor login: ${err.message}`);
-        }
-      } else {
-        for (const u of this.memoryUsers.values()) {
-          if (u.login.toLowerCase() === username.toLowerCase()) {
-            throw new BadRequestException('That username is already taken.');
-          }
-        }
-        const userId = (this.memoryUsers.size + 1).toString();
-        this.memoryUsers.set(userId, {
-          id: userId,
-          login: username,
-          group: 'Doctor',
-        });
-        ionUserId = userId;
-        loginUsername = username;
+      const userClash = await this.prisma.user.findUnique({
+        where: { login: username },
+      });
+      if (userClash) {
+        throw new BadRequestException('That username is already taken.');
       }
+
+      const [first, ...rest] = name.split(' ');
+      const last = rest.join(' ') || '-';
+      const hashedPassword = await argon2.hash(dto.loginPassword || 'DoctorPassword123!', {
+        type: argon2.argon2id,
+      });
+
+      const newUser = await this.prisma.user.create({
+        data: {
+          login: username,
+          password: hashedPassword,
+          firstName: first.slice(0, 20),
+          lastName: last.slice(0, 20),
+          email: email || '',
+          group: 'Doctor',
+          description: `Doctor login for ${name}`.slice(0, 200),
+        },
+      });
+      ionUserId = newUser.id.toString();
+      loginUsername = username;
     }
 
     const doctorData = {
@@ -340,44 +200,11 @@ export class DoctorService {
       y: '',
     };
 
-    if (this.prisma.connected) {
-      try {
-        const created = await this.prisma.doctor.create({
-          data: doctorData,
-        });
+    const created = await this.prisma.doctor.create({
+      data: doctorData,
+    });
 
-        // Also update memory representation in departmentService for usage counts
-        this.departmentService.seedMemoryDoctor(
-          created.id.toString(),
-          created.name,
-          created.department,
-        );
-
-        return this.mapToDto(created, 0, loginUsername);
-      } catch (err: any) {
-        this.logger.warn(`Failed to persist doctor in database: ${err.message}. Saving to memory.`);
-      }
-    }
-
-    // In-memory store
-    this.memoryIdCounter++;
-    const now = new Date();
-    const inMemRecord = {
-      ...doctorData,
-      id: BigInt(this.memoryIdCounter),
-      createdAt: now,
-      updatedAt: now,
-    };
-    this.memoryDoctors.set(inMemRecord.id.toString(), inMemRecord);
-
-    // Keep department usage counts in sync
-    this.departmentService.seedMemoryDoctor(
-      inMemRecord.id.toString(),
-      inMemRecord.name,
-      inMemRecord.department,
-    );
-
-    return this.mapToDto(inMemRecord, 0, loginUsername);
+    return this.mapToDto(created, 0, loginUsername);
   }
 
   /**
@@ -385,7 +212,7 @@ export class DoctorService {
    */
   async update(id: string | number, dto: UpdateDoctorDto): Promise<DoctorResponseDto> {
     const existing = await this.findById(id);
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (dto.name !== undefined) {
       const name = dto.name.trim();
@@ -398,35 +225,16 @@ export class DoctorService {
     if (dto.email !== undefined) {
       const email = dto.email ? dto.email.trim() : null;
       if (email) {
-        if (this.prisma.connected) {
-          try {
-            const clash = await this.prisma.doctor.findFirst({
-              where: {
-                email: { equals: email, mode: 'insensitive' },
-                NOT: { id: BigInt(existing.id) },
-              },
-            });
-            if (clash) {
-              throw new BadRequestException(
-                'Another doctor is already on file with that email address.',
-              );
-            }
-          } catch (err: any) {
-            if (err instanceof BadRequestException) throw err;
-            this.logger.warn(`Prisma email clash check failed: ${err.message}`);
-          }
-        }
-
-        for (const d of this.memoryDoctors.values()) {
-          if (
-            d.email &&
-            d.email.toLowerCase() === email.toLowerCase() &&
-            d.id.toString() !== existing.id
-          ) {
-            throw new BadRequestException(
-              'Another doctor is already on file with that email address.',
-            );
-          }
+        const clash = await this.prisma.doctor.findFirst({
+          where: {
+            email: { equals: email, mode: 'insensitive' },
+            NOT: { id: BigInt(existing.id) },
+          },
+        });
+        if (clash) {
+          throw new BadRequestException(
+            'Another doctor is already on file with that email address.',
+          );
         }
       }
       updateData.email = email;
@@ -441,38 +249,12 @@ export class DoctorService {
       updateData.branchId = dto.branchId ? BigInt(dto.branchId) : null;
     }
 
-    if (this.prisma.connected) {
-      try {
-        const updated = await this.prisma.doctor.update({
-          where: { id: BigInt(existing.id) },
-          data: updateData,
-        });
+    const updated = await this.prisma.doctor.update({
+      where: { id: BigInt(existing.id) },
+      data: updateData,
+    });
 
-        // Sync department service memory
-        this.departmentService.seedMemoryDoctor(
-          updated.id.toString(),
-          updated.name,
-          updated.department,
-        );
-
-        return this.mapToDto(updated, existing.upcomingAppointments);
-      } catch (err: any) {
-        this.logger.warn(`Failed to update doctor in database: ${err.message}. Using memory.`);
-      }
-    }
-
-    // In-memory update
-    const memRecord = this.memoryDoctors.get(existing.id);
-    Object.assign(memRecord, updateData, { updatedAt: new Date() });
-
-    // Sync department service memory
-    this.departmentService.seedMemoryDoctor(
-      memRecord.id.toString(),
-      memRecord.name,
-      memRecord.department,
-    );
-
-    return this.mapToDto(memRecord, existing.upcomingAppointments);
+    return this.mapToDto(updated, existing.upcomingAppointments);
   }
 
   /**
@@ -482,35 +264,9 @@ export class DoctorService {
   async remove(id: string | number): Promise<{ message: string }> {
     const existing = await this.findById(id);
 
-    if (this.prisma.connected) {
-      try {
-        const hasAppointments = await this.prisma.appointment.findFirst({
-          where: { doctorId: BigInt(existing.id) },
-        });
-
-        if (hasAppointments) {
-          throw new BadRequestException(
-            `${existing.name} has appointments on file, so the record stays.`,
-          );
-        }
-
-        await this.prisma.doctor.delete({
-          where: { id: BigInt(existing.id) },
-        });
-
-        this.departmentService.seedMemoryDoctor(existing.id, existing.name, null);
-
-        return { message: `Removed ${existing.name}.` };
-      } catch (err: any) {
-        if (err instanceof BadRequestException) throw err;
-        this.logger.warn(`Failed to delete doctor in DB: ${err.message}. Using memory.`);
-      }
-    }
-
-    // In-memory delete check
-    const hasAppointments = Array.from(this.memoryAppointments.values()).some(
-      (a) => a.doctorId === existing.id,
-    );
+    const hasAppointments = await this.prisma.appointment.findFirst({
+      where: { doctorId: BigInt(existing.id) },
+    });
 
     if (hasAppointments) {
       throw new BadRequestException(
@@ -518,17 +274,18 @@ export class DoctorService {
       );
     }
 
-    this.memoryDoctors.delete(existing.id);
-    this.departmentService.seedMemoryDoctor(existing.id, existing.name, null);
+    await this.prisma.doctor.delete({
+      where: { id: BigInt(existing.id) },
+    });
 
     return { message: `Removed ${existing.name}.` };
   }
 
   /**
-   * Map raw database or memory record to typed DoctorResponseDto.
+   * Map raw database record to typed DoctorResponseDto.
    */
   private mapToDto(
-    d: any,
+    d: Doctor,
     upcomingAppointments = 0,
     loginUsername: string | null = null,
   ): DoctorResponseDto {

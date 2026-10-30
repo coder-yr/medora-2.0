@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { createValidationPipe } from './common/pipes/validation.pipe';
 
@@ -16,6 +17,10 @@ async function bootstrap() {
   const apiPrefix = configService.get<string>('api.prefix') || 'api';
   const apiVersion = configService.get<string>('api.version') || 'v1';
   const corsOrigin = configService.get<string>('api.corsOrigin') || 'http://localhost:5173';
+  const isProd = configService.get<string>('environment') === 'production';
+
+  // Security Headers: Helmet
+  app.use(helmet());
 
   // Global versioned route prefix: e.g. /api/v1
   const globalPrefix = `${apiPrefix}/${apiVersion}`;
@@ -24,9 +29,19 @@ async function bootstrap() {
   // Global strict request validation
   app.useGlobalPipes(createValidationPipe());
 
-  // CORS security configuration
+  // CORS security configuration - enforce non-wildcard in production
+  if (isProd && (corsOrigin === '*' || corsOrigin.includes('*'))) {
+    throw new Error(
+      '[Security] Wildcard CORS origin (*) is strictly forbidden in production environments',
+    );
+  }
+
+  const allowedOrigins = corsOrigin.includes(',')
+    ? corsOrigin.split(',').map((origin) => origin.trim())
+    : corsOrigin;
+
   app.enableCors({
-    origin: corsOrigin.includes(',') ? corsOrigin.split(',') : corsOrigin,
+    origin: allowedOrigins,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id', 'x-request-id'],

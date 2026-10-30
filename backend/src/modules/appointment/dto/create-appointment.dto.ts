@@ -74,7 +74,7 @@ export class CreateAppointmentDto {
     default: 'scheduled',
   })
   @IsOptional()
-  @IsIn(APPOINTMENT_STATUSES as any, {
+  @IsIn([...APPOINTMENT_STATUSES], {
     message: `Status must be one of: ${APPOINTMENT_STATUSES.join(', ')}`,
   })
   status?: AppointmentStatus;

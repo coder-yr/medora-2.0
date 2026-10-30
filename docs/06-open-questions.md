@@ -256,3 +256,24 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [ ] **Option A (Recommended)**: Retain manual billing workflow by default, with UI shortcuts to populate invoice charges from completed appointment/consultation services.
   - [ ] **Option B**: Enforce automated invoice creation upon consultation completion.
 
+---
+
+## 13. Phase 10.5 Security Hardening & Session Decisions
+
+### 26. Authentication & Password Migration Architecture (Resolved)
+- **Status**: **RESOLVED in Phase 10.5**
+- **Decision Implemented**:
+  - Strict database password verification against stored hashes.
+  - Argon2id is the primary hashing standard for new passwords and accounts.
+  - Legacy `$2y$` bcrypt hashes are verified with runtime transparent upgrade: upon successful legacy login, password is automatically re-hashed with Argon2id and updated in PostgreSQL.
+  - Development backdoor completely eliminated. Uniform 401 response prevents email enumeration.
+
+### 27. Token Expiry & Session Family Invalidation
+- **Status**: **RESOLVED in Phase 10.5**
+- **Decision Implemented**:
+  - Access tokens expire after 15 minutes (900s).
+  - Refresh tokens stored as SHA-256 hashes in `user_session` table with 7-day expiration.
+  - Automatic rotation on every refresh request.
+  - Family-based reuse detection: if an already-rotated/revoked token is submitted, the entire session family (`family_id`) is instantly revoked.
+
+

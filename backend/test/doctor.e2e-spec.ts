@@ -4,11 +4,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { createValidationPipe } from '../src/common/pipes/validation.pipe';
-import { DoctorService } from '../src/modules/doctor/doctor.service';
+import { PrismaService } from '../src/modules/prisma/prisma.service';
 
 describe('DoctorModule (e2e)', () => {
   let app: INestApplication;
-  let doctorService: DoctorService;
+  let prisma: PrismaService;
   let adminToken: string;
   let receptionistToken: string;
   let doctorToken: string;
@@ -34,8 +34,7 @@ describe('DoctorModule (e2e)', () => {
     app.useGlobalPipes(createValidationPipe());
     await app.init();
 
-    doctorService = app.get<DoctorService>(DoctorService);
-    doctorService.clearMemoryStore();
+    prisma = app.get<PrismaService>(PrismaService);
 
     // Authenticate Admin (has all permissions including doctor_add, doctor_update, doctor_delete)
     const adminRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
@@ -167,7 +166,17 @@ describe('DoctorModule (e2e)', () => {
 
   it('9. Rejects deleting doctor when appointments exist on file', async () => {
     // Seed an appointment for this doctor
-    doctorService.seedMemoryAppointment(createdDoctorId, 'scheduled');
+    await prisma.appointment.create({
+      data: {
+        doctorId: BigInt(createdDoctorId),
+        patientId: BigInt(1),
+        date: '2026-10-30',
+        sTime: '2026-10-30 10:00:00',
+        eTime: '2026-10-30 10:30:00',
+        timeSlot: '10:00 - 10:30',
+        status: 'scheduled',
+      },
+    });
 
     const res = await request(app.getHttpServer())
       .delete(`/api/v1/doctors/${createdDoctorId}`)

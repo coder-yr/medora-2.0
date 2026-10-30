@@ -1,4 +1,6 @@
 import 'reflect-metadata';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL =
@@ -11,3 +13,4 @@ process.env.JWT_SECRET =
   process.env.JWT_SECRET || 'local-test-jwt-secret-minimum-32-characters-required';
 process.env.API_PREFIX = 'api';
 process.env.API_VERSION = 'v1';
+

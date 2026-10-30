@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { DepartmentService } from '../department/department.service';
+import { Prisma } from '@prisma/client';
 import { DoctorService } from '../doctor/doctor.service';
 import { PatientService } from '../patient/patient.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -8,73 +8,361 @@ import { InvoiceService } from './invoice.service';
 
 describe('InvoiceService (Legacy Parity & Financial Rules)', () => {
   let service: InvoiceService;
-  let patientService: PatientService;
-  let doctorService: DoctorService;
 
   let patient1: any;
   let doctor1: any;
 
+  // In-test simulated DB storage
+  let paymentsStore: any[] = [];
+  let itemsStore: any[] = [];
+  let receiptsStore: any[] = [];
+  let nextPaymentId = 1;
+  let nextItemId = 1;
+  let nextReceiptId = 1;
+
+  const mockPrisma: any = {
+    payment: {
+      create: jest.fn(async ({ data }: any) => {
+        const id = BigInt(nextPaymentId++);
+        const rec = {
+          id,
+          uuid: `inv-${id}`,
+          patientId: data.patientId,
+          doctor: data.doctor ?? null,
+          referringDoctor: data.referringDoctor ?? null,
+          hospitalBranchId: data.hospitalBranchId ?? null,
+          date: data.date,
+          dateString: data.dateString || data.date,
+          amount: new Prisma.Decimal(data.amount || 0),
+          discount: new Prisma.Decimal(data.discount || 0),
+          vat: new Prisma.Decimal(data.vat || 0),
+          grossTotal: new Prisma.Decimal(data.grossTotal || 0),
+          amountReceived: new Prisma.Decimal(0),
+          status: data.status || 'unpaid',
+          remarks: data.remarks ?? null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        if (data.items?.create) {
+          for (const it of data.items.create) {
+            const itemId = BigInt(nextItemId++);
+            itemsStore.push({
+              id: itemId,
+              paymentId: id,
+              paymentCategoryId: it.paymentCategoryId ? BigInt(it.paymentCategoryId) : null,
+              doctorId: it.doctorId ? BigInt(it.doctorId) : null,
+              name: it.name,
+              quantity: it.quantity,
+              unitPrice: new Prisma.Decimal(it.unitPrice),
+              lineTotal: new Prisma.Decimal(it.lineTotal),
+            });
+          }
+        }
+
+        paymentsStore.push(rec);
+
+        return {
+          ...rec,
+          patient: {
+            id: rec.patientId,
+            patientId: 'MRN-001',
+            name: 'Tariq Mehmood',
+            phone: '+923001112233',
+          },
+          doctor: rec.doctor
+            ? {
+                id: rec.doctor,
+                name: 'Dr. Shahida Raza',
+                department: 'General Medicine',
+              }
+            : null,
+          items: itemsStore.filter((i) => i.paymentId === id),
+          payments: receiptsStore.filter((r) => r.paymentId === id),
+          doctorShares: [],
+        };
+      }),
+
+      findUnique: jest.fn(async ({ where }: any) => {
+        const id = BigInt(where.id);
+        const rec = paymentsStore.find((p) => p.id === id);
+        if (!rec) return null;
+        return {
+          ...rec,
+          patient: {
+            id: rec.patientId,
+            patientId: 'MRN-001',
+            name: 'Tariq Mehmood',
+            phone: '+923001112233',
+          },
+          doctor: rec.doctor
+            ? {
+                id: rec.doctor,
+                name: 'Dr. Shahida Raza',
+                department: 'General Medicine',
+              }
+            : null,
+          items: itemsStore.filter((i) => i.paymentId === id),
+          payments: receiptsStore.filter((r) => r.paymentId === id),
+          doctorShares: [],
+        };
+      }),
+
+      findMany: jest.fn(async ({ where, skip = 0, take = 50 }: any) => {
+        let list = [...paymentsStore];
+        if (where?.status?.in) {
+          list = list.filter((p) => where.status.in.includes(p.status));
+        } else if (where?.status) {
+          list = list.filter((p) => p.status === where.status);
+        }
+        const slice = list.slice(skip, skip + take);
+        return slice.map((rec) => ({
+          ...rec,
+          patient: {
+            id: rec.patientId,
+            patientId: 'MRN-001',
+            name: 'Tariq Mehmood',
+            phone: '+923001112233',
+          },
+          doctor: rec.doctor
+            ? {
+                id: rec.doctor,
+                name: 'Dr. Shahida Raza',
+                department: 'General Medicine',
+              }
+            : null,
+          items: itemsStore.filter((i) => i.paymentId === rec.id),
+          payments: receiptsStore.filter((r) => r.paymentId === rec.id),
+          doctorShares: [],
+        }));
+      }),
+
+      count: jest.fn(async ({ where }: any) => {
+        let list = [...paymentsStore];
+        if (where?.status?.in) {
+          list = list.filter((p) => where.status.in.includes(p.status));
+        } else if (where?.status) {
+          list = list.filter((p) => p.status === where.status);
+        }
+        return list.length;
+      }),
+
+      aggregate: jest.fn(async ({ where }: any) => {
+        let list = [...paymentsStore];
+        if (where?.status?.in) {
+          list = list.filter((p) => where.status.in.includes(p.status));
+        } else if (where?.status) {
+          list = list.filter((p) => p.status === where.status);
+        }
+
+        const totalGross = list.reduce(
+          (sum, p) => sum + Number(p.grossTotal),
+          0,
+        );
+        const totalReceived = list.reduce(
+          (sum, p) => sum + Number(p.amountReceived),
+          0,
+        );
+
+        return {
+          _sum: {
+            grossTotal: new Prisma.Decimal(totalGross),
+            amountReceived: new Prisma.Decimal(totalReceived),
+          },
+        };
+      }),
+
+      update: jest.fn(async ({ where, data }: any) => {
+        const id = BigInt(where.id);
+        const idx = paymentsStore.findIndex((p) => p.id === id);
+        if (idx === -1) throw new NotFoundException('Not found');
+
+        const cur = paymentsStore[idx];
+        const updated = {
+          ...cur,
+          ...data,
+          updatedAt: new Date(),
+        };
+        paymentsStore[idx] = updated;
+
+        return {
+          ...updated,
+          patient: {
+            id: updated.patientId,
+            patientId: 'MRN-001',
+            name: 'Tariq Mehmood',
+            phone: '+923001112233',
+          },
+          doctor: updated.doctor
+            ? {
+                id: updated.doctor,
+                name: 'Dr. Shahida Raza',
+                department: 'General Medicine',
+              }
+            : null,
+          items: itemsStore.filter((i) => i.paymentId === id),
+          payments: receiptsStore.filter((r) => r.paymentId === id),
+          doctorShares: [],
+        };
+      }),
+
+      delete: jest.fn(async ({ where }: any) => {
+        const id = BigInt(where.id);
+        paymentsStore = paymentsStore.filter((p) => p.id !== id);
+        return {};
+      }),
+      findUniqueOrThrow: jest.fn(async ({ where }: any) => {
+        const id = BigInt(where.id);
+        const rec = paymentsStore.find((p) => p.id === id);
+        if (!rec) throw new NotFoundException('Not found');
+        return {
+          ...rec,
+          patient: {
+            id: rec.patientId,
+            patientId: 'MRN-001',
+            name: 'Tariq Mehmood',
+            phone: '+923001112233',
+          },
+          doctor: rec.doctor
+            ? {
+                id: rec.doctor,
+                name: 'Dr. Shahida Raza',
+                department: 'General Medicine',
+              }
+            : null,
+          items: itemsStore.filter((i) => i.paymentId === id),
+          payments: receiptsStore.filter((r) => r.paymentId === id),
+          doctorShares: [],
+        };
+      }),
+    },
+
+    invoiceItem: {
+      create: jest.fn(async ({ data }: any) => {
+        const id = BigInt(nextItemId++);
+        const it = {
+          id,
+          paymentId: BigInt(data.paymentId),
+          paymentCategoryId: data.paymentCategoryId ? BigInt(data.paymentCategoryId) : null,
+          doctorId: data.doctorId ? BigInt(data.doctorId) : null,
+          name: data.name,
+          quantity: data.quantity,
+          unitPrice: new Prisma.Decimal(data.unitPrice),
+          lineTotal: new Prisma.Decimal(data.lineTotal),
+        };
+        itemsStore.push(it);
+        return it;
+      }),
+      deleteMany: jest.fn(async ({ where }: any) => {
+        const id = BigInt(where.paymentId);
+        itemsStore = itemsStore.filter((i) => i.paymentId !== id);
+        return { count: 1 };
+      }),
+    },
+
+    invoicePayment: {
+      create: jest.fn(async ({ data }: any) => {
+        const id = BigInt(nextReceiptId++);
+        const receipt = {
+          id,
+          paymentId: BigInt(data.paymentId),
+          amount: new Prisma.Decimal(data.amount),
+          method: data.method || 'Cash',
+          reference: data.reference ?? null,
+          paidAt: data.paidAt || new Date().toISOString().split('T')[0],
+          receivedBy: data.receivedBy ? BigInt(data.receivedBy) : null,
+          createdAt: new Date(),
+        };
+        receiptsStore.push(receipt);
+        return receipt;
+      }),
+      findMany: jest.fn(async ({ where }: any) => {
+        const pid = BigInt(where.paymentId);
+        return receiptsStore.filter((r) => r.paymentId === pid);
+      }),
+    },
+
+    doctorShare: {
+      deleteMany: jest.fn(async () => ({ count: 0 })),
+    },
+
+    $queryRaw: jest.fn(async (sqlObj: any) => {
+      const idArg = sqlObj?.values?.[0];
+      const id = idArg !== undefined ? BigInt(idArg) : paymentsStore[0]?.id;
+      const target = paymentsStore.find((p) => p.id === id);
+      if (target) {
+        return [{ id: target.id, gross_total: target.grossTotal.toString() }];
+      }
+      return [];
+    }),
+
+    $transaction: jest.fn(async (cb: any) => {
+      return cb(mockPrisma);
+    }),
+  };
+
+  const mockPatientService = {
+    findById: jest.fn(async (id: any) => {
+      if (String(id) === String(patient1.id)) {
+        return patient1;
+      }
+      return null;
+    }),
+  };
+
+  const mockDoctorService = {
+    findById: jest.fn(async (id: any) => {
+      if (String(id) === String(doctor1.id)) {
+        return doctor1;
+      }
+      return null;
+    }),
+  };
+
   beforeEach(async () => {
+    paymentsStore = [];
+    itemsStore = [];
+    receiptsStore = [];
+    nextPaymentId = 1;
+    nextItemId = 1;
+    nextReceiptId = 1;
+
+    patient1 = {
+      id: '1',
+      name: 'Tariq Mehmood',
+      patientId: 'MRN-001',
+      phone: '+923001112233',
+      sex: 'male',
+      address: 'House 14, F-8/2, Islamabad',
+    };
+
+    doctor1 = {
+      id: '1',
+      name: 'Dr. Shahida Raza',
+      email: 'shahida@example.com',
+      department: 'General Medicine',
+      phone: '+923004445566',
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         InvoiceService,
-        PatientService,
-        DepartmentService,
-        DoctorService,
+        {
+          provide: PatientService,
+          useValue: mockPatientService,
+        },
+        {
+          provide: DoctorService,
+          useValue: mockDoctorService,
+        },
         {
           provide: PrismaService,
-          useValue: {
-            connected: false,
-            payment: {
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              findUnique: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-              delete: jest.fn(),
-            },
-            invoiceItem: {
-              findMany: jest.fn(),
-              create: jest.fn(),
-              deleteMany: jest.fn(),
-            },
-            invoicePayment: {
-              findMany: jest.fn(),
-              create: jest.fn(),
-            },
-            doctorShare: {
-              findMany: jest.fn(),
-              deleteMany: jest.fn(),
-            },
-            $transaction: jest.fn(),
-            $queryRaw: jest.fn(),
-          },
+          useValue: mockPrisma,
         },
       ],
     }).compile();
 
     service = module.get<InvoiceService>(InvoiceService);
-    patientService = module.get<PatientService>(PatientService);
-    doctorService = module.get<DoctorService>(DoctorService);
-
-    service.clearMemory();
-    patientService.clearMemoryStore();
-    doctorService.clearMemoryStore();
-
-    // Create test patient and doctor in-memory
-    patient1 = await patientService.create({
-      name: 'Tariq Mehmood',
-      phone: '+923001112233',
-      sex: 'male',
-      address: 'House 14, F-8/2, Islamabad',
-    });
-
-    doctor1 = await doctorService.create({
-      name: 'Dr. Shahida Raza',
-      email: 'shahida@example.com',
-      department: 'General Medicine',
-      phone: '+923004445566',
-    });
   });
 
   describe('Invoice Creation & Server Calculations', () => {

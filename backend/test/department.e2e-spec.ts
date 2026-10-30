@@ -4,11 +4,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { createValidationPipe } from '../src/common/pipes/validation.pipe';
-import { DepartmentService } from '../src/modules/department/department.service';
+import { PrismaService } from '../src/modules/prisma/prisma.service';
 
 describe('DepartmentModule (e2e)', () => {
   let app: INestApplication;
-  let departmentService: DepartmentService;
+  let prisma: PrismaService;
   let adminToken: string;
   let receptionistToken: string;
   let createdDeptId: string;
@@ -33,8 +33,7 @@ describe('DepartmentModule (e2e)', () => {
     app.useGlobalPipes(createValidationPipe());
     await app.init();
 
-    departmentService = app.get<DepartmentService>(DepartmentService);
-    departmentService.clearMemoryStore();
+    prisma = app.get<PrismaService>(PrismaService);
 
     // Authenticate Admin (has all permissions including department_add, department_update, department_delete)
     const adminRes = await request(app.getHttpServer()).post('/api/v1/auth/login').send({
@@ -106,8 +105,8 @@ describe('DepartmentModule (e2e)', () => {
   });
 
   it('6. Lists departments with doctor usage counts and unlisted specialties', async () => {
-    departmentService.seedMemoryDoctor('doc-1', 'Dr Heart', 'Cardiology');
-    departmentService.seedMemoryDoctor('doc-2', 'Dr Skin', 'Dermatology'); // Unlisted
+    await prisma.doctor.create({ data: { name: 'Dr Heart', department: 'Cardiology' } });
+    await prisma.doctor.create({ data: { name: 'Dr Skin', department: 'Dermatology' } }); // Unlisted
 
     const res = await request(app.getHttpServer())
       .get('/api/v1/departments')

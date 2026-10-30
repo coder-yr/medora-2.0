@@ -43,8 +43,31 @@ model User {
   branch             HospitalBranch?   @relation(fields: [branchId], references: [id])
   shiftCloses        ShiftClose[]
   reportedRadiologies RadiologyOrder[] @relation("ReportedRadiology")
+  sessions           UserSession[]
 
   @@map("users")
+}
+
+model UserSession {
+  id               BigInt    @id @default(autoincrement())
+  uuid             String    @unique @default(uuid())
+  userId           BigInt    @map("user_id")
+  refreshTokenHash String    @map("refresh_token_hash") @db.VarChar(255)
+  familyId         String    @map("family_id") @db.VarChar(100)
+  isRevoked        Boolean   @default(false) @map("is_revoked")
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz
+  userAgent        String?   @map("user_agent") @db.VarChar(255)
+  ipAddress        String?   @map("ip_address") @db.VarChar(50)
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+  @@index([familyId])
+  @@map("user_sessions")
 }
 
 model Permission {

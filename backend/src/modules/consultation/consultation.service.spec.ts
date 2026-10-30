@@ -13,11 +13,288 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
   let doctorService: DoctorService;
   let appointmentService: AppointmentService;
 
+  let patientsMap: Map<string, any>;
+  let doctorsMap: Map<string, any>;
+  let appointmentsMap: Map<string, any>;
+  let consultationsMap: Map<string, any>;
+  let templatesMap: Map<string, any>;
+
+  let autoPatientId: bigint;
+  let autoDoctorId: bigint;
+  let autoApptId: bigint;
+  let autoConsultId: bigint;
+  let autoTemplateId: bigint;
+
   let patient1: any;
   let doctor1: any;
   let appointment1: any;
 
+  const createMockPrisma = () => {
+    const txMock = {
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      consultation: {
+        findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
+          if (where.appointmentId) {
+            for (const c of consultationsMap.values()) {
+              if (c.appointmentId === where.appointmentId) {
+                const patient = patientsMap.get(c.patientId.toString());
+                const doctor = c.doctorId ? doctorsMap.get(c.doctorId.toString()) : null;
+                const appointment = appointmentsMap.get(c.appointmentId.toString());
+                return { ...c, patient, doctor, appointment };
+              }
+            }
+          }
+          if (where.id) {
+            const c = consultationsMap.get(where.id.toString());
+            if (!c) return null;
+            const patient = patientsMap.get(c.patientId.toString());
+            const doctor = c.doctorId ? doctorsMap.get(c.doctorId.toString()) : null;
+            const appointment = c.appointmentId ? appointmentsMap.get(c.appointmentId.toString()) : null;
+            return { ...c, patient, doctor, appointment };
+          }
+          return null;
+        }),
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          autoConsultId++;
+          const id = autoConsultId;
+          const patient = patientsMap.get(data.patientId.toString());
+          const doctor = data.doctorId ? doctorsMap.get(data.doctorId.toString()) : null;
+          const appointment = data.appointmentId ? appointmentsMap.get(data.appointmentId.toString()) : null;
+          const record = {
+            id,
+            ...data,
+            patient,
+            doctor,
+            appointment,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          consultationsMap.set(id.toString(), record);
+          return record;
+        }),
+        update: jest.fn().mockImplementation(async ({ where, data }: any) => {
+          const c = consultationsMap.get(where.id.toString());
+          if (!c) throw new Error('Not found');
+          const patient = patientsMap.get(c.patientId.toString());
+          const doctor = c.doctorId ? doctorsMap.get(c.doctorId.toString()) : null;
+          const appointment = c.appointmentId ? appointmentsMap.get(c.appointmentId.toString()) : null;
+          const updated = {
+            ...c,
+            ...data,
+            patient,
+            doctor,
+            appointment,
+            updatedAt: new Date(),
+          };
+          consultationsMap.set(where.id.toString(), updated);
+          return updated;
+        }),
+      },
+      appointment: {
+        update: jest.fn().mockImplementation(async ({ where, data }: any) => {
+          const a = appointmentsMap.get(where.id.toString());
+          if (!a) throw new Error('Not found');
+          const updated = { ...a, ...data, updatedAt: new Date() };
+          appointmentsMap.set(where.id.toString(), updated);
+          return updated;
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          autoApptId++;
+          const id = autoApptId;
+          const patient = patientsMap.get(data.patientId.toString());
+          const doctor = doctorsMap.get(data.doctorId.toString());
+          const record = { id, ...data, patient, doctor, createdAt: new Date(), updatedAt: new Date() };
+          appointmentsMap.set(id.toString(), record);
+          return record;
+        }),
+      },
+      consultTemplate: {
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          autoTemplateId++;
+          const id = autoTemplateId;
+          const record = { id, ...data, createdAt: new Date(), updatedAt: new Date() };
+          templatesMap.set(id.toString(), record);
+          return record;
+        }),
+      },
+      doctorSlot: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      slotBlock: {
+        findFirst: jest.fn().mockResolvedValue(null),
+      },
+    };
+
+    return {
+      $transaction: jest.fn().mockImplementation(async (cb: any) => cb(txMock)),
+      $executeRaw: jest.fn().mockResolvedValue(1),
+      $queryRaw: jest.fn().mockImplementation(async (strings: TemplateStringsArray) => {
+        const text = strings.join('');
+        if (text.includes('MAX')) return [{ max_id: 0 }];
+        if (text.includes('nextval')) return [{ next_val: 1 }];
+        return [];
+      }),
+      consultation: {
+        findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
+          if (where.appointmentId) {
+            for (const c of consultationsMap.values()) {
+              if (c.appointmentId === where.appointmentId) {
+                const patient = patientsMap.get(c.patientId.toString());
+                const doctor = c.doctorId ? doctorsMap.get(c.doctorId.toString()) : null;
+                const appointment = appointmentsMap.get(c.appointmentId.toString());
+                return { ...c, patient, doctor, appointment };
+              }
+            }
+          }
+          if (where.id) {
+            const c = consultationsMap.get(where.id.toString());
+            if (!c) return null;
+            const patient = patientsMap.get(c.patientId.toString());
+            const doctor = c.doctorId ? doctorsMap.get(c.doctorId.toString()) : null;
+            const appointment = c.appointmentId ? appointmentsMap.get(c.appointmentId.toString()) : null;
+            return { ...c, patient, doctor, appointment };
+          }
+          return null;
+        }),
+        findFirst: jest.fn().mockImplementation(async ({ where }: any) => {
+          const all = Array.from(consultationsMap.values()).filter(
+            (c) => c.patientId === where.patientId,
+          );
+          all.sort((a, b) => (b.date > a.date ? 1 : -1));
+          return all[0] || null;
+        }),
+        findMany: jest.fn().mockImplementation(async ({ where, skip = 0, take = 50 }: any) => {
+          let list = Array.from(consultationsMap.values());
+          if (where?.patientId) list = list.filter((c) => c.patientId === where.patientId);
+          if (where?.NOT?.id) list = list.filter((c) => c.id !== where.NOT.id);
+          if (where?.date) {
+            const dStr = where.date instanceof Date ? where.date.toISOString().split('T')[0] : String(where.date);
+            list = list.filter((c) => {
+              const cDate = c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date);
+              return cDate === dStr;
+            });
+          }
+          list.sort((a, b) => (b.date > a.date ? 1 : -1));
+          return list.slice(skip, skip + take).map((c) => ({
+            ...c,
+            patient: patientsMap.get(c.patientId.toString()),
+            doctor: c.doctorId ? doctorsMap.get(c.doctorId.toString()) : null,
+            appointment: c.appointmentId ? appointmentsMap.get(c.appointmentId.toString()) : null,
+          }));
+        }),
+        count: jest.fn().mockImplementation(async ({ where }: any) => {
+          let list = Array.from(consultationsMap.values());
+          if (where?.date) {
+            const dStr = where.date instanceof Date ? where.date.toISOString().split('T')[0] : String(where.date);
+            list = list.filter((c) => {
+              const cDate = c.date instanceof Date ? c.date.toISOString().split('T')[0] : String(c.date);
+              return cDate === dStr;
+            });
+          }
+          return list.length;
+        }),
+      },
+      consultTemplate: {
+        findMany: jest.fn().mockImplementation(async () => {
+          return Array.from(templatesMap.values());
+        }),
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          autoTemplateId++;
+          const id = autoTemplateId;
+          const record = { id, ...data, createdAt: new Date(), updatedAt: new Date() };
+          templatesMap.set(id.toString(), record);
+          return record;
+        }),
+        delete: jest.fn().mockImplementation(async ({ where }: any) => {
+          templatesMap.delete(where.id.toString());
+          return { id: where.id };
+        }),
+      },
+      appointment: {
+        findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
+          const a = appointmentsMap.get(where.id.toString());
+          if (!a) return null;
+          const patient = patientsMap.get(a.patientId.toString());
+          const doctor = doctorsMap.get(a.doctorId.toString());
+          return { ...a, patient, doctor };
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+        delete: jest.fn().mockResolvedValue({ id: 1n }),
+      },
+      patient: {
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          autoPatientId++;
+          const id = autoPatientId;
+          const record = { id, ...data, createdAt: new Date(), updatedAt: new Date() };
+          patientsMap.set(id.toString(), record);
+          return record;
+        }),
+        findFirst: jest.fn().mockImplementation(async ({ where }: any) => {
+          if (where.patientId) {
+            for (const p of patientsMap.values()) {
+              if (p.patientId === where.patientId) return p;
+            }
+          }
+          if (where.OR) {
+            for (const cond of where.OR) {
+              if (cond.id) {
+                const p = patientsMap.get(cond.id.toString());
+                if (p) return p;
+              }
+            }
+          }
+          return null;
+        }),
+      },
+      doctor: {
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          autoDoctorId++;
+          const id = autoDoctorId;
+          const record = { id, ...data, createdAt: new Date(), updatedAt: new Date() };
+          doctorsMap.set(id.toString(), record);
+          return record;
+        }),
+        findUnique: jest.fn().mockImplementation(async ({ where }: any) => {
+          return doctorsMap.get(where.id.toString()) || null;
+        }),
+        findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([]),
+        count: jest.fn().mockResolvedValue(0),
+      },
+      department: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      doctorSlot: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      slotBlock: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      user: {
+        findUnique: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockResolvedValue({ id: 999n }),
+      },
+    };
+  };
+
   beforeEach(async () => {
+    patientsMap = new Map();
+    doctorsMap = new Map();
+    appointmentsMap = new Map();
+    consultationsMap = new Map();
+    templatesMap = new Map();
+
+    autoPatientId = 0n;
+    autoDoctorId = 0n;
+    autoApptId = 0n;
+    autoConsultId = 0n;
+    autoTemplateId = 0n;
+
+    const mockPrisma = createMockPrisma();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ConsultationService,
@@ -27,34 +304,7 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
         DoctorService,
         {
           provide: PrismaService,
-          useValue: {
-            connected: false,
-            consultation: {
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              findUnique: jest.fn(),
-              create: jest.fn(),
-              update: jest.fn(),
-            },
-            consultTemplate: {
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              create: jest.fn(),
-              delete: jest.fn(),
-            },
-            appointment: {
-              findFirst: jest.fn(),
-              findMany: jest.fn(),
-              findUnique: jest.fn(),
-              update: jest.fn(),
-            },
-            patient: {
-              findFirst: jest.fn(),
-            },
-            doctor: {
-              findFirst: jest.fn(),
-            },
-          },
+          useValue: mockPrisma,
         },
       ],
     }).compile();
@@ -63,11 +313,6 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
     patientService = module.get<PatientService>(PatientService);
     doctorService = module.get<DoctorService>(DoctorService);
     appointmentService = module.get<AppointmentService>(AppointmentService);
-
-    service.clearMemory();
-    appointmentService.clearMemory();
-    patientService.clearMemoryStore();
-    doctorService.clearMemoryStore();
 
     patient1 = await patientService.create({
       name: 'Jane Doe',
@@ -245,7 +490,7 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
 
       expect(template.id).toBeDefined();
       expect(template.name).toBe('General Review of Systems');
-      expect(template.fields.plan).toBe('Continue current medication regimen');
+      expect((template.fields as any).plan).toBe('Continue current medication regimen');
 
       const list = await service.listTemplates(doctor1.id);
       expect(list.length).toBeGreaterThanOrEqual(1);
