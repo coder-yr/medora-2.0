@@ -2,7 +2,7 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 11.2: Prisma Migration Baseline & Database Change Management**
+- **Current Phase**: **Phase 12: Medicine & Pharmacy Catalogue Migration**
 - **Status**: **COMPLETED**
 - **Date**: 2026-10-31
 - **Approved Target Stack**:
@@ -32,8 +32,9 @@
 | **Phase 10** | Invoicing & Billing Domain Migration (6th Module) | `InvoiceModule` (patient invoicing, multi-item breakdown, server calculations, installment payments, pessimistic row lock, overpayment rejection, deletion guards, doctor share calculations, RBAC), commit `ee05734` | **COMPLETED** |
 | **Phase 10.5** | Backend Stabilization & Security Remediation | Backdoor removal, Argon2id + legacy bcrypt upgrade, session management (refresh token rotation, reuse detection), Helmet headers, login throttling, removal of all fake in-memory stores, real PostgreSQL row locking concurrency tests (`SELECT FOR UPDATE`), 100% clean CI lockfile, >= 80% coverage across all 6 services (`docs/security-hardening-report.md`), commit `e39efd1` | **COMPLETED** |
 | **Phase 11** | Prescription Domain & Frontend Clinical Screen (7th Module) | `PrescriptionModule` (catalog search, relational items, legacy summary sync, atomic transactions, RBAC), React 19 + TypeScript + Vite clinical prescription hub (role switcher, live auto-complete, dosage shortcuts, summary preview, print modal), Prisma migration to Supabase PostgreSQL, 100% unit and E2E pass rate, commit `f07c760` | **COMPLETED** |
-| **Phase 11.1** | Prescription SQLite Schema Verification & Hardening | Authentic PRAGMA audit of SQLite `prescription`, `prescription_medicine`, `medicine`, `patient`, `doctor`, column-by-column reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), `medicine_id` index alignment, PostgreSQL runtime audit, migration-history gap documentation, frontend persona switcher production security hardening (Vite tree-shaking verified) | **COMPLETED** |
-| **Phase 11.2** | Prisma Migration Baseline & Database Change Management | Baseline migration (`0_init/migration.sql`), `migration_lock.toml` (`postgresql`), verified zero drift against live Supabase PostgreSQL, official baseline resolution (`prisma migrate resolve --applied 0_init`), clean disposable PostgreSQL schema replication test, database migration runbook ([`docs/database-migration-runbook.md`](database-migration-runbook.md)), and documentation discrepancy reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)) | **COMPLETED** |
+| **Phase 11.1** | Prescription SQLite Schema Verification & Hardening | Authentic PRAGMA audit of SQLite `prescription`, `prescription_medicine`, `medicine`, `patient`, `doctor`, column-by-column reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), `medicine_id` index alignment, PostgreSQL runtime audit, migration-history gap documentation, frontend persona switcher production security hardening (Vite tree-shaking verified), commit `b430ff9` | **COMPLETED** |
+| **Phase 11.2** | Prisma Migration Baseline & Database Change Management | Baseline migration (`0_init/migration.sql`), `migration_lock.toml` (`postgresql`), verified zero drift against live Supabase PostgreSQL, official baseline resolution (`prisma migrate resolve --applied 0_init`), clean disposable PostgreSQL schema replication test, database migration runbook ([`docs/database-migration-runbook.md`](database-migration-runbook.md)), and documentation discrepancy reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), commit `64e7949` | **COMPLETED** |
+| **Phase 12** | Medicine & Pharmacy Catalogue Migration (8th Module) | `MedicineModule` (modernized medicine master catalogue, category/manufacturer/dosage/unit/supplier CRUD, normalized foreign keys, pack format reconciliation, duplicate prevention, prescription deletion guards, soft deactivation, doctor view permissions), React 19 catalogue management dashboard (formulary table, category/manufacturer filters, stock indicators, detail & add/edit modals, supporting entity management), Supabase migration `20261031120000_phase_12_medicine_catalogue`, [`docs/medicine-catalogue-mapping.md`](medicine-catalogue-mapping.md) | **COMPLETED** |
 
 ---
 
@@ -89,9 +90,28 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 5. Next Module Readiness
+## 5. Phase 12 Domain Migration Summary: Medicine & Pharmacy Catalogue
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, and `PrescriptionModule` fully migrated and backed by a reproducible Prisma migration baseline on Supabase PostgreSQL:
-- **`PharmacyModule` / `InventoryModule`**: Medicine catalog management, stock purchases, batch tracking, expiry monitoring, and dispensing against issued prescriptions.
-- **`LaboratoristModule` / `DiagnosticModule`**: Lab test orders linked to outpatient consultations and clinical diagnostic reports.
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Selected Domain** | **`MedicineModule`** (Medicine Master Catalogue & Pharmacy Metadata) & **Frontend Catalogue Dashboard** | Core hospital medicine master data, category hierarchy, manufacturer directory, dosage forms, measurement units, and supplier registry |
+| **Target Database Mapping** | Modernized `medicine` model with normalized foreign keys (`category_id`, `manufacturer_id`, `dosage_form_id`, `measurement_unit_id`, `supplier_id`), `box` package format reconciled to `VARCHAR(100)`, dual price semantics (`price` hospital cost vs `s_price` retail), and supporting normalized entities (`medicine_category`, `manufacturer`, `dosage_form`, `measurement_unit`, `supplier`) | `backend/prisma/migrations/20261031120000_phase_12_medicine_catalogue/migration.sql`, verified on disposable PostgreSQL schema, applied to Supabase PostgreSQL |
+| **Legacy Source Parity** | `legacy/app/Http/Controllers/MedicineController.php`, `legacy/app/Models/Medicine.php`, `legacy/app/Models/MedicineCategory.php`, `legacy/resources/views/app/medicines/` | Complete 12-field legacy mapping documented in [`docs/medicine-catalogue-mapping.md`](medicine-catalogue-mapping.md) |
+| **Backend Endpoints** | `GET /api/v1/medicines`<br>`GET /api/v1/medicines/:id`<br>`POST /api/v1/medicines`<br>`PUT /api/v1/medicines/:id`<br>`DELETE /api/v1/medicines/:id`<br>`PATCH /api/v1/medicines/:id/toggle-active`<br>`GET /api/v1/medicines/search`<br>`GET /api/v1/medicines/meta/categories`<br>`POST /api/v1/medicines/meta/categories`<br>`DELETE /api/v1/medicines/meta/categories/:id`<br>`GET /api/v1/medicines/meta/manufacturers`<br>`POST /api/v1/medicines/meta/manufacturers`<br>`DELETE /api/v1/medicines/meta/manufacturers/:id`<br>`GET /api/v1/medicines/meta/dosage-forms`<br>`POST /api/v1/medicines/meta/dosage-forms`<br>`DELETE /api/v1/medicines/meta/dosage-forms/:id`<br>`GET /api/v1/medicines/meta/measurement-units`<br>`POST /api/v1/medicines/meta/measurement-units`<br>`DELETE /api/v1/medicines/meta/measurement-units/:id`<br>`GET /api/v1/medicines/meta/suppliers`<br>`POST /api/v1/medicines/meta/suppliers`<br>`PUT /api/v1/medicines/meta/suppliers/:id`<br>`DELETE /api/v1/medicines/meta/suppliers/:id` | Full OpenAPI Swagger documented endpoints with granular RBAC permissions |
+| **Frontend Deliverables** | React 19 + TypeScript + Vite modern medicine catalogue suite in `frontend/src/components/MedicineCatalogue.tsx` | Formulary inventory KPIs (Total, In Stock, Out of Stock, Categories), live 300ms debounced search across brand/generic/strength, multi-criteria filters (category, manufacturer, status), tabular overview with status indicators, clinical detail modal, Add/Edit formulation modal with validation, and category/supporting entity CRUD management with inline deletion guards |
+| **Business Rules & Data Integrity** | 1. Duplicate prevention: Rejects medicines with matching brand name and pack size/strength (`409 Conflict`)<br>2. Prescription snapshot immutability: Updates to catalogue brand/generic names never mutate historical `prescription_medicine` snapshot names<br>3. Deletion guards: Hard deletion is strictly blocked (`400 Bad Request`) if referenced by clinical prescriptions or pharmacy sale items; soft deactivation (`PATCH /:id/toggle-active`) supported instead<br>4. Category deletion guards: Blocks category deletion (`400 Bad Request`) while medicines remain mapped<br>5. Doctor prescribing permission: Granted `HospitalPermission.MEDICINE_VIEW` to `Doctor` persona so physicians can search and select formulary drugs | `MedicineService` unit test suite (25 unit tests) & PostgreSQL E2E suite (18 integration tests) |
+| **Authorization & Security** | Granular RBAC (`medicine_view`, `medicine_add`, `medicine_update`, `medicine_delete`) | Pharmacist & Admin authorized for management; Doctor authorized for read/autocomplete (`medicine_view`); unauthenticated or unauthorized operations rejected (401/403) |
+| **Unit Test Coverage** | **16 suites passed, 147 tests passed** (25 new tests in `medicine.service.spec.ts`) | `npm test` (Exit code 0) |
+| **E2E Integration Tests**| **10 suites passed, 107 tests passed** across all modules against live Supabase PostgreSQL (18 new tests in `medicine.e2e-spec.ts`) | `npm run test:e2e` (Exit code 0) |
+| **Linting & Code Quality**| **ESLint 9 + Prettier + Strict TypeScript** | Backend: `npm run lint` (0 errors), `npx tsc --noEmit` (0 errors)<br>Frontend: `npm run lint` (0 errors), `tsc -b && vite build` (0 errors) |
+| **Production Builds** | Backend: `npm run build` (Exit code 0)<br>Frontend: `npm run build` (Exit code 0, 1.48s) | Ready for containerization |
+| **Legacy Source Integrity**| **100% Preserved** | `legacy/` 0 modifications; unstaged `app/Models/SMS.php` artifact strictly preserved |
+
+---
+
+## 6. Next Module Readiness
+
+With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, and `MedicineModule` fully migrated and verified on Supabase PostgreSQL:
+- **`Phase 13: Pharmacy Inventory & Dispensing Operations`**: Stock purchases, multi-batch tracking, expiry date monitoring, batch allocation, POS dispensing against outpatient prescriptions, inventory adjustment logs, and financial integration with `InvoiceModule`.
+- **`Phase 14: Laboratory & Diagnostic Module`**: Lab test catalogues, specimen collection, outpatient diagnostic orders, and formal pathology/radiology report generation.
 

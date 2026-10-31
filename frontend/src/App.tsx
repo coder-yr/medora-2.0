@@ -12,6 +12,8 @@ import {
   Stethoscope
 } from 'lucide-react';
 
+import { MedicineCatalogue } from './components/MedicineCatalogue';
+
 interface MedicineItem {
   medicineId?: number | null;
   name: string;
@@ -48,6 +50,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
+  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines'>('medicines');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -55,7 +58,7 @@ export function App() {
 
   // Auth & Token simulation (Development only)
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
-  const [userRole, setUserRole] = useState<'Doctor' | 'Admin'>('Doctor');
+  const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Pharmacist'>('Admin');
 
   // Form state
   const [patientId, setPatientId] = useState('1');
@@ -90,14 +93,17 @@ export function App() {
     }
   }, [userRole]);
 
-  const loginAs = async (role: 'Doctor' | 'Admin') => {
+  const loginAs = async (role: 'Doctor' | 'Admin' | 'Pharmacist') => {
     if (!isDev) {
       // In production, authentication is handled through the dedicated login screen
       return;
     }
 
     try {
-      const email = role === 'Doctor' ? 'doctor.test@medora.hospital' : 'admin.test@medora.hospital';
+      let email = 'admin.test@medora.hospital';
+      if (role === 'Doctor') email = 'doctor.test@medora.hospital';
+      if (role === 'Pharmacist') email = 'pharmacist.test@medora.hospital';
+
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -278,6 +284,7 @@ export function App() {
                 onChange={(e) => setUserRole(e.target.value as any)}
               >
                 <option value="Doctor">Doctor (Prescribe/View)</option>
+                <option value="Pharmacist">Pharmacist (Catalogue/Stock)</option>
                 <option value="Admin">Administrator (All Permissions)</option>
               </select>
             </div>
@@ -289,6 +296,24 @@ export function App() {
           )}
         </div>
       </header>
+
+      {/* Module Switcher Navigation */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }} className="no-print">
+        <button
+          className={`btn ${activeModule === 'medicines' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('medicines')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <Pill size={18} /> Medicine & Pharmacy Catalogue
+        </button>
+        <button
+          className={`btn ${activeModule === 'prescriptions' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('prescriptions')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <Stethoscope size={18} /> Outpatient Prescriptions
+        </button>
+      </div>
 
       {/* Notifications */}
       {notification && (
@@ -313,8 +338,19 @@ export function App() {
         </div>
       )}
 
-      {/* Main Grid */}
-      <div className="main-grid no-print">
+      {/* Medicine Catalogue View */}
+      {activeModule === 'medicines' && (
+        <MedicineCatalogue
+          apiBaseUrl={API_BASE_URL}
+          token={token}
+          userRole={userRole}
+          onNotification={(type, message) => setNotification({ type, message })}
+        />
+      )}
+
+      {/* Outpatient Prescriptions Grid */}
+      {activeModule === 'prescriptions' && (
+        <div className="main-grid no-print">
         {/* Prescription Authoring Form */}
         <section className="card">
           <h2 className="card-title">
@@ -565,6 +601,7 @@ export function App() {
           )}
         </section>
       </div>
+      )}
 
       {/* Printable Clinical Slip Modal */}
       {selectedPrescription && (

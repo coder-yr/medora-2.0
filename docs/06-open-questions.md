@@ -319,6 +319,39 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [ ] **Option A (Recommended)**: Enforce `NOT NULL` on `date` and populate legacy nulls with creation date or fallback epoch.
   - [ ] **Option B**: Alter schema to allow nullable `date` on `prescription`.
 
+---
+
+## 16. Phase 12 Medicine Catalogue & Pharmacy Master Data
+
+### 33. Normalization and Data Type of Legacy Column `box`
+- **Evidence**: In legacy SQLite and Laravel (`MedicineController.php`), `box` is a `varchar(100)` field representing pack size or packaging description (e.g. "10x10 Tablets", "1 Bottle 120ml", "1 Vial"). The legacy system validated `'box' => 'nullable|string|max:100'` and enforced duplicate prevention across `name` and `box`. However, during initial Phase 3 discovery, `box` was tentatively typed as `Decimal(10,2)` in `schema.prisma`.
+- **Recommendation**: Alter `medicine.box` to `VARCHAR(100)` to accurately hold pack descriptions and strengths, while normalizing structured `dosage_form_id`, `strength`, and `unit_id` alongside it for fine-grained clinical prescribing.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Convert `box` to `VARCHAR(100)` to preserve legacy packaging text while introducing structured dosage forms and strength units.
+  - [ ] **Option B**: Strictly migrate all pack descriptions into structured dosage form and strength entities, dropping `box`.
+
+### 34. Dual Price Semantics: Cost Price (`price`) vs. Sale Price (`s_price`)
+- **Evidence**: Legacy Laravel `DemoDataSeeder` and `form.blade.php` explicitly label `price` as "Cost price" (what the hospital paid to acquire the drug) and `s_price` as "Sale price" (what the patient is charged). Initial schema discovery labeled `price` as selling price.
+- **Recommendation**: Clarify both fields: maintain `price` as hospital acquisition cost (default `0.00`), and `s_price` as standard patient retail dispensing price.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Explicitly document and maintain `price` as purchase/cost price and `s_price` as patient retail price.
+  - [ ] **Option B**: Rename columns to `cost_price` and `sale_price` via database migration.
+
+### 35. Catalogue On-Hand Quantity vs. Phase 13 Batch/Lot Inventory Tracking
+- **Evidence**: Legacy Laravel tracked stock as a single integer column `medicine.quantity`, which was decremented directly upon dispensing (`$medicine->decrement('quantity', $n)`). Phase 13 will introduce full pharmacy inventory management with lot numbers, supplier purchase invoices, and batch-level expiry tracking.
+- **Recommendation**: Retain `medicine.quantity` in Phase 12 with `@default(0)` as a cached total on-hand quantity for backwards compatibility and instant UI display, while preparing normalized supplier references for Phase 13 inventory intake.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Retain `quantity` as total on-hand balance and sync it with batch transactions in Phase 13.
+  - [ ] **Option B**: Deprecate `quantity` immediately and require all stock lookups to calculate sum of active batches.
+
+### 36. Formularies Referenced in Prescriptions: Deletion Blocking vs. Deactivation
+- **Evidence**: In `legacy/app/Http/Controllers/MedicineController.php`, if `PrescriptionMedicine::where('medicine_id', $medicine->id)->exists()`, deletion is blocked with `"<name> has been prescribed, so it stays in the catalogue."`
+- **Recommendation**: Enforce this deletion guard in Medora 2.0 `MedicineService`. If a drug has historical prescriptions, reject `DELETE` with `400 Bad Request` and advise the user to deactivate the drug (`is_active = false`), which removes it from new prescription autocomplete while preserving historical records.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Block hard deletion of prescribed medicines and support soft deactivation.
+  - [ ] **Option B**: Support soft deletion (`deleted_at`) across all catalogue tables.
+
+
 
 
 

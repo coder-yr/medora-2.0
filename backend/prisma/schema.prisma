@@ -672,9 +672,12 @@ model RadiologyOrder {
 // =============================================================================
 
 model MedicineCategory {
-  id          BigInt   @id @default(autoincrement())
-  category    String   @db.VarChar(100)
-  description String?  @db.Text
+  id          BigInt    @id @default(autoincrement())
+  category    String    @db.VarChar(100)
+  description String?   @db.Text
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   medicines Medicine[]
@@ -682,27 +685,108 @@ model MedicineCategory {
   @@map("medicine_category")
 }
 
+model Manufacturer {
+  id           BigInt    @id @default(autoincrement())
+  name         String    @unique @db.VarChar(100)
+  country      String?   @db.VarChar(100)
+  contactEmail String?   @map("contact_email") @db.VarChar(100)
+  contactPhone String?   @map("contact_phone") @db.VarChar(50)
+  address      String?   @db.Text
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  medicines Medicine[]
+
+  @@map("manufacturer")
+}
+
+model DosageForm {
+  id          BigInt    @id @default(autoincrement())
+  name        String    @unique @db.VarChar(50) // e.g. Tablet, Capsule, Syrup, Injection, Ointment, Drops
+  description String?   @db.VarChar(255)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  medicines Medicine[]
+
+  @@map("dosage_form")
+}
+
+model MeasurementUnit {
+  id        BigInt    @id @default(autoincrement())
+  name      String    @unique @db.VarChar(50) // e.g. Milligram, Milliliter, Gram, Microgram, International Unit
+  symbol    String    @db.VarChar(20)         // e.g. mg, ml, g, mcg, IU
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  medicines Medicine[]
+
+  @@map("measurement_unit")
+}
+
+model Supplier {
+  id            BigInt    @id @default(autoincrement())
+  name          String    @db.VarChar(100)
+  contactPerson String?   @map("contact_person") @db.VarChar(100)
+  email         String?   @db.VarChar(100)
+  phone         String?   @db.VarChar(50)
+  address       String?   @db.Text
+  isActive      Boolean   @default(true) @map("is_active")
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  medicines Medicine[]
+
+  @@map("supplier")
+}
+
 model Medicine {
   id             BigInt    @id @default(autoincrement())
   name           String    @db.VarChar(100)
   categoryId     BigInt?   @map("category")
-  price          Decimal   @db.Decimal(10, 2) // Selling price
-  box            Decimal?  @db.Decimal(10, 2) // Cost price
-  sPrice         Decimal?  @map("s_price") @db.Decimal(10, 2)
+  price          Decimal?  @default(0.00) @db.Decimal(10, 2) // Purchase / cost price
+  box            String?   @db.VarChar(100) // Packaging / pack size format (e.g. 10x10 Tablets)
+  sPrice         Decimal?  @map("s_price") @db.Decimal(10, 2) // Selling price
   quantity       Int       @default(0) // Inventory quantity on hand
   generic        String?   @db.VarChar(100)
-  company        String?   @db.VarChar(100)
+  company        String?   @db.VarChar(100) // Legacy company / manufacturer string
   effects        String?   @db.Text
   expiryDate     String?   @map("e_date") @db.VarChar(50)
+  isActive       Boolean   @default(true) @map("is_active")
+
+  // Normalized relations
+  manufacturerId BigInt?   @map("manufacturer_id")
+  dosageFormId   BigInt?   @map("dosage_form_id")
+  strength       String?   @db.VarChar(50)
+  unitId         BigInt?   @map("unit_id")
+  supplierId     BigInt?   @map("supplier_id")
+
   createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   category             MedicineCategory?      @relation(fields: [categoryId], references: [id])
+  manufacturer         Manufacturer?          @relation(fields: [manufacturerId], references: [id])
+  dosageForm           DosageForm?            @relation(fields: [dosageFormId], references: [id])
+  measurementUnit      MeasurementUnit?       @relation(fields: [unitId], references: [id])
+  supplier             Supplier?              @relation(fields: [supplierId], references: [id])
   prescriptionMedicines PrescriptionMedicine[]
   pharmacySaleItems    PharmacySaleItem[]
 
   @@index([categoryId])
+  @@index([manufacturerId])
+  @@index([dosageFormId])
+  @@index([unitId])
+  @@index([supplierId])
+  @@index([name])
+  @@index([generic])
   @@map("medicine")
 }
 

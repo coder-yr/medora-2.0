@@ -140,6 +140,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.DIAGNOSTIC_REPORT_VIEW,
     HospitalPermission.DOCTOR_VIEW,
     HospitalPermission.DOCTOR_COMMISSION,
+    HospitalPermission.MEDICINE_VIEW,
     HospitalPermission.TELEMEDICINE_VIEW,
     HospitalPermission.TELEMEDICINE_SCHEDULE,
   ],

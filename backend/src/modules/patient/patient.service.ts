@@ -67,10 +67,11 @@ export class PatientService {
       CREATE SEQUENCE IF NOT EXISTS patient_mrn_seq START WITH 1;
     `;
 
-    // Align sequence with highest existing patient ID if needed
+    // Align sequence with highest existing 6-digit patient ID if needed
     const maxResult = await this.prisma.$queryRaw<Array<{ max_id: bigint | number | string }>>`
-      SELECT COALESCE(MAX(NULLIF(regexp_replace(patient_id, '\\D', '', 'g'), '')::bigint), 0) AS max_id 
+      SELECT COALESCE(MAX(patient_id::bigint), 0) AS max_id 
       FROM patient
+      WHERE patient_id ~ '^[0-9]{1,6}$'
     `;
     const maxId = Number(maxResult[0]?.max_id || 0);
 
