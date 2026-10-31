@@ -2,7 +2,7 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 12: Medicine & Pharmacy Catalogue Migration**
+- **Current Phase**: **Phase 13: Pharmacy & Inventory Management System**
 - **Status**: **COMPLETED**
 - **Date**: 2026-10-31
 - **Approved Target Stack**:
@@ -34,7 +34,8 @@
 | **Phase 11** | Prescription Domain & Frontend Clinical Screen (7th Module) | `PrescriptionModule` (catalog search, relational items, legacy summary sync, atomic transactions, RBAC), React 19 + TypeScript + Vite clinical prescription hub (role switcher, live auto-complete, dosage shortcuts, summary preview, print modal), Prisma migration to Supabase PostgreSQL, 100% unit and E2E pass rate, commit `f07c760` | **COMPLETED** |
 | **Phase 11.1** | Prescription SQLite Schema Verification & Hardening | Authentic PRAGMA audit of SQLite `prescription`, `prescription_medicine`, `medicine`, `patient`, `doctor`, column-by-column reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), `medicine_id` index alignment, PostgreSQL runtime audit, migration-history gap documentation, frontend persona switcher production security hardening (Vite tree-shaking verified), commit `b430ff9` | **COMPLETED** |
 | **Phase 11.2** | Prisma Migration Baseline & Database Change Management | Baseline migration (`0_init/migration.sql`), `migration_lock.toml` (`postgresql`), verified zero drift against live Supabase PostgreSQL, official baseline resolution (`prisma migrate resolve --applied 0_init`), clean disposable PostgreSQL schema replication test, database migration runbook ([`docs/database-migration-runbook.md`](database-migration-runbook.md)), and documentation discrepancy reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), commit `64e7949` | **COMPLETED** |
-| **Phase 12** | Medicine & Pharmacy Catalogue Migration (8th Module) | `MedicineModule` (modernized medicine master catalogue, category/manufacturer/dosage/unit/supplier CRUD, normalized foreign keys, pack format reconciliation, duplicate prevention, prescription deletion guards, soft deactivation, doctor view permissions), React 19 catalogue management dashboard (formulary table, category/manufacturer filters, stock indicators, detail & add/edit modals, supporting entity management), Supabase migration `20261031120000_phase_12_medicine_catalogue`, [`docs/medicine-catalogue-mapping.md`](medicine-catalogue-mapping.md) | **COMPLETED** |
+| **Phase 12** | Medicine & Pharmacy Catalogue Migration (8th Module) | `MedicineModule` (modernized medicine master catalogue, category/manufacturer/dosage/unit/supplier CRUD, normalized foreign keys, pack format reconciliation, duplicate prevention, prescription deletion guards, soft deactivation, doctor view permissions), React 19 catalogue management dashboard, Supabase migration `20261031120000_phase_12_medicine_catalogue`, [`docs/medicine-catalogue-mapping.md`](medicine-catalogue-mapping.md) | **COMPLETED** |
+| **Phase 13** | Pharmacy & Inventory Management System (9th Module) | `PharmacyModule` (batch inventory, immutable ledger audit, procurement PO/GRN, FEFO auto-allocation, concurrency-safe row-locked dispensing, partial dispensing, patient/supplier returns, physical count adjustments, unified `InvoiceModule` billing), React 19 pharmacy workspace with receipt printing, Supabase migration `20261031140000_phase_13_pharmacy_inventory`, [`docs/pharmacy-inventory-mapping.md`](pharmacy-inventory-mapping.md) | **COMPLETED** |
 
 ---
 
@@ -109,9 +110,29 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 6. Next Module Readiness
+## 6. Phase 13 Domain Migration Summary: Pharmacy & Inventory Management System
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, and `MedicineModule` fully migrated and verified on Supabase PostgreSQL:
-- **`Phase 13: Pharmacy Inventory & Dispensing Operations`**: Stock purchases, multi-batch tracking, expiry date monitoring, batch allocation, POS dispensing against outpatient prescriptions, inventory adjustment logs, and financial integration with `InvoiceModule`.
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Selected Domain** | **`PharmacyModule`** (Pharmacy Inventory, Batch Tracking, Dispensing & POS Billing) & **Frontend Pharmacy Workspace** | Complete batch-level inventory tracking, procurement PO/GRN receiving, FEFO allocation engine, concurrency-safe row-locked dispensing, partial prescription fulfillment, returns with condition triage, physical count adjustments, and financial billing integration |
+| **Target Database Mapping** | 12 new relational models in `backend/prisma/schema.prisma`: `medicine_batch`, `stock_movement`, `purchase_order`, `purchase_order_item`, `goods_receipt`, `goods_receipt_item`, `pharmacy_dispensation`, `pharmacy_dispensation_item`, `stock_adjustment`, `stock_adjustment_item`, `pharmacy_return`, `pharmacy_return_item`, plus `prescription_medicine.dispensed_quantity` tracking field | `backend/prisma/migrations/20261031140000_phase_13_pharmacy_inventory/migration.sql`, verified on disposable PostgreSQL schema, applied to Supabase PostgreSQL |
+| **Legacy Source Parity** | `legacy/app/Http/Controllers/PharmacyController.php`, `legacy/app/Models/Pharmacy.php`, `legacy/app/Models/PharmacyPayment.php`, `legacy/app/Models/PharmacySaleItem.php`, `legacy/app/Models/Purchase.php`, `legacy/resources/views/app/pharmacies/` | Complete parity documented in [`docs/pharmacy-inventory-mapping.md`](pharmacy-inventory-mapping.md) |
+| **Backend Endpoints** | `GET /api/v1/pharmacy/dashboard`<br>`GET /api/v1/pharmacy/batches`<br>`POST /api/v1/pharmacy/batches`<br>`GET /api/v1/pharmacy/batches/:id`<br>`GET /api/v1/pharmacy/purchases/orders`<br>`POST /api/v1/pharmacy/purchases/orders`<br>`POST /api/v1/pharmacy/purchases/receipts`<br>`POST /api/v1/pharmacy/dispensations/allocate`<br>`POST /api/v1/pharmacy/dispensations`<br>`GET /api/v1/pharmacy/dispensations`<br>`GET /api/v1/pharmacy/dispensations/:id`<br>`POST /api/v1/pharmacy/adjustments`<br>`GET /api/v1/pharmacy/adjustments`<br>`POST /api/v1/pharmacy/returns`<br>`GET /api/v1/pharmacy/returns`<br>`GET /api/v1/pharmacy/reports/stock-ledger`<br>`GET /api/v1/pharmacy/reports/valuation`<br>`GET /api/v1/pharmacy/reports/expiring`<br>`GET /api/v1/pharmacy/reports/low-stock` | Full OpenAPI Swagger documented endpoints with granular RBAC permissions |
+| **Frontend Deliverables** | React 19 + TypeScript + Vite comprehensive pharmacy workspace in `frontend/src/components/PharmacyWorkspace.tsx` | Pharmacy KPIs (Stock Valuation, Batches, Expiring 30d, Low Stock, Dispensed Orders), real-time FEFO dispensing terminal with Rx auto-population, stock batch intake modal, purchase order and goods receipt processing, patient/supplier returns triage, physical count adjustments with auto-diff calculation, print-friendly clinical dispensing receipts, and live valuation/movement ledger tables |
+| **Business Rules & Data Integrity** | 1. **Authoritative Batch Balances**: `MedicineBatch.current_quantity` is the authoritative source; legacy `medicine.quantity` is atomically synced as the active unexpired batch sum<br>2. **Pessimistic Row-Level Locking**: Concurrent dispensing transactions acquire `SELECT ... FOR UPDATE` row locks, preventing race conditions or overselling<br>3. **FEFO Allocation Engine**: Automatically selects and sorts batches by earliest expiry date; rejects expired batches (`expiry_date <= now()`)<br>4. **Partial Dispensing & Regimen Safety**: Tracks `PrescriptionMedicine.dispensed_quantity`; prevents alterations to physician regimens; marks prescription state `'dispensed'` when fulfilled<br>5. **Unified Financial Integration**: Creates `Payment` records in `InvoiceModule` with category `'PHARMACY'` without duplicate financial tables<br>6. **Quality Condition Triage on Returns**: Returns marked `DAMAGED` or `EXPIRED` trigger write-off movements without restocking saleable inventory; `GOOD_CONDITION` returns increment active batch balance<br>7. **Immutable Audit Ledger**: Every inventory balance delta generates an immutable `StockMovement` entry | `PharmacyService` unit test suite (10 unit tests) & PostgreSQL E2E suite (12 integration tests) |
+| **Authorization & Security** | Granular RBAC (`pharmacy_view`, `pharmacy_purchase`, `pharmacy_receive`, `pharmacy_dispense`, `pharmacy_return`, `pharmacy_adjust`, `pharmacy_approve_adjustment`, `pharmacy_reports`) | Pharmacist & Admin authorized for management; Doctor/Receptionist restricted (403); unauthenticated operations rejected (401) |
+| **Unit Test Coverage** | **17 suites passed, 157 tests passed** (10 new tests in `pharmacy.service.spec.ts`) | `npm test` (Exit code 0) |
+| **E2E Integration Tests**| **11 suites passed, 119 tests passed** across all modules against live Supabase PostgreSQL (12 new tests in `pharmacy.e2e-spec.ts` including concurrency stress test) | `npm run test:e2e` (Exit code 0) |
+| **Linting & Code Quality**| **ESLint 9 + Prettier + Strict TypeScript** | Backend: `npm run lint` (0 errors), `npx tsc --noEmit` (0 errors)<br>Frontend: `npm run lint` (0 errors), `tsc -b && vite build` (0 errors) |
+| **Production Builds** | Backend: `npm run build` (Exit code 0)<br>Frontend: `npm run build` (Exit code 0, 1.48s) | Ready for containerization |
+| **Legacy Source Integrity**| **100% Preserved** | `legacy/` 0 modifications; unstaged `app/Models/SMS.php` artifact strictly preserved |
+
+---
+
+## 7. Next Module Readiness
+
+With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, and `PharmacyModule` fully migrated and verified on Supabase PostgreSQL:
 - **`Phase 14: Laboratory & Diagnostic Module`**: Lab test catalogues, specimen collection, outpatient diagnostic orders, and formal pathology/radiology report generation.
+- **`Phase 15: Inpatient & Bed Management System`**: Ward/bed admission, bed transfers, inpatient nurse charting, and discharge summaries.
+
 

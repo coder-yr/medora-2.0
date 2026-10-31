@@ -59,6 +59,14 @@ export enum HospitalPermission {
   PHARMACY_SALE = 'pharmacy_sale',
   PHARMACY_STOCK_VIEW = 'pharmacy_stock_view',
   VIEW_PHARMACY_REPORTS = 'view_pharmacy_reports',
+  PHARMACY_VIEW = 'pharmacy_view',
+  PHARMACY_PURCHASE = 'pharmacy_purchase',
+  PHARMACY_RECEIVE = 'pharmacy_receive',
+  PHARMACY_DISPENSE = 'pharmacy_dispense',
+  PHARMACY_RETURN = 'pharmacy_return',
+  PHARMACY_ADJUST = 'pharmacy_adjust',
+  PHARMACY_APPROVE_ADJUSTMENT = 'pharmacy_approve_adjustment',
+  PHARMACY_REPORTS = 'pharmacy_reports',
 
   // Staff & Departments
   DOCTOR_VIEW = 'doctor_view',
@@ -211,6 +219,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.PHARMACY_SALE,
     HospitalPermission.PHARMACY_STOCK_VIEW,
     HospitalPermission.VIEW_PHARMACY_REPORTS,
+    HospitalPermission.PHARMACY_VIEW,
+    HospitalPermission.PHARMACY_PURCHASE,
+    HospitalPermission.PHARMACY_RECEIVE,
+    HospitalPermission.PHARMACY_DISPENSE,
+    HospitalPermission.PHARMACY_RETURN,
+    HospitalPermission.PHARMACY_ADJUST,
+    HospitalPermission.PHARMACY_REPORTS,
     HospitalPermission.PRESCRIPTION_VIEW,
   ],
   Laboratorist: [

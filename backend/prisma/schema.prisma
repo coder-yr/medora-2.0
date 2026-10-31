@@ -199,6 +199,7 @@ model Patient {
   radiologyOrders  RadiologyOrder[]
   invoices         Payment[]
   patientDeposits  PatientDeposit[]
+  pharmacyDispensations PharmacyDispensation[]
 
   @@index([patientTypeId])
   @@index([branchId])
@@ -332,6 +333,7 @@ model Doctor {
   radiologyOrders RadiologyOrder[]
   doctorShares    DoctorShare[]
   invoiceItems    InvoiceItem[]
+  pharmacyDispensations PharmacyDispensation[]
 
   @@index([email])
   @@index([department])
@@ -528,6 +530,7 @@ model Prescription {
   patient   Patient                @relation(fields: [patientId], references: [id])
   doctor    Doctor                 @relation(fields: [doctorId], references: [id])
   medicines PrescriptionMedicine[]
+  dispensations PharmacyDispensation[]
 
   @@index([patientId])
   @@index([doctorId])
@@ -542,10 +545,12 @@ model PrescriptionMedicine {
   dosage         String? @db.VarChar(100)
   duration       String? @db.VarChar(100)
   instructions   String? @db.VarChar(500)
+  dispensedQuantity Int   @default(0) @map("dispensed_quantity")
 
   // Relations
   prescription Prescription @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
   medicine     Medicine?    @relation(fields: [medicineId], references: [id])
+  dispensationItems PharmacyDispensationItem[]
 
   @@index([prescriptionId])
   @@index([medicineId])
@@ -742,7 +747,11 @@ model Supplier {
   updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  medicines Medicine[]
+  medicines      Medicine[]
+  batches        MedicineBatch[]
+  purchaseOrders PurchaseOrder[]
+  goodsReceipts  GoodsReceipt[]
+  returns        PharmacyReturn[]
 
   @@map("supplier")
 }
@@ -772,13 +781,20 @@ model Medicine {
   updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  category             MedicineCategory?      @relation(fields: [categoryId], references: [id])
-  manufacturer         Manufacturer?          @relation(fields: [manufacturerId], references: [id])
-  dosageForm           DosageForm?            @relation(fields: [dosageFormId], references: [id])
-  measurementUnit      MeasurementUnit?       @relation(fields: [unitId], references: [id])
-  supplier             Supplier?              @relation(fields: [supplierId], references: [id])
+  category             MedicineCategory?          @relation(fields: [categoryId], references: [id])
+  manufacturer         Manufacturer?              @relation(fields: [manufacturerId], references: [id])
+  dosageForm           DosageForm?                @relation(fields: [dosageFormId], references: [id])
+  measurementUnit      MeasurementUnit?           @relation(fields: [unitId], references: [id])
+  supplier             Supplier?                  @relation(fields: [supplierId], references: [id])
   prescriptionMedicines PrescriptionMedicine[]
   pharmacySaleItems    PharmacySaleItem[]
+  batches              MedicineBatch[]
+  stockMovements       StockMovement[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  goodsReceiptItems    GoodsReceiptItem[]
+  dispensationItems    PharmacyDispensationItem[]
+  adjustmentItems      StockAdjustmentItem[]
+  returnItems          PharmacyReturnItem[]
 
   @@index([categoryId])
   @@index([manufacturerId])
@@ -826,6 +842,311 @@ model PharmacySaleItem {
 
   @@index([pharmacyPaymentId])
   @@map("pharmacy_sale_item")
+}
+
+// =============================================================================
+// 7.1. BATCH INVENTORY, MOVEMENTS, PURCHASING & DISPENSING
+// =============================================================================
+
+model MedicineBatch {
+  id              BigInt    @id @default(autoincrement())
+  medicineId      BigInt    @map("medicine_id")
+  batchNumber     String    @map("batch_number") @db.VarChar(100)
+  mfgDate         String?   @map("mfg_date") @db.VarChar(50)
+  expiryDate      DateTime  @map("expiry_date") @db.Date
+  costPrice       Decimal   @map("cost_price") @db.Decimal(10, 2)
+  sellingPrice    Decimal?  @map("selling_price") @db.Decimal(10, 2)
+  initialQuantity Int       @map("initial_quantity")
+  currentQuantity Int       @map("current_quantity")
+  supplierId      BigInt?   @map("supplier_id")
+  status          String    @default("ACTIVE") @db.VarChar(30) // ACTIVE, QUARANTINE, DEPLETED, EXPIRED, RECALLED
+  notes           String?   @db.Text
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  medicine              Medicine                  @relation(fields: [medicineId], references: [id])
+  supplier              Supplier?                 @relation(fields: [supplierId], references: [id])
+  stockMovements        StockMovement[]
+  goodsReceiptItems     GoodsReceiptItem[]
+  dispensationItems     PharmacyDispensationItem[]
+  adjustmentItems       StockAdjustmentItem[]
+  returnItems           PharmacyReturnItem[]
+
+  @@unique([medicineId, batchNumber])
+  @@index([medicineId])
+  @@index([expiryDate])
+  @@index([status])
+  @@index([supplierId])
+  @@map("medicine_batch")
+}
+
+model StockMovement {
+  id            BigInt    @id @default(autoincrement())
+  medicineId    BigInt    @map("medicine_id")
+  batchId       BigInt?   @map("batch_id")
+  movementType  String    @map("movement_type") @db.VarChar(50) // PURCHASE_RECEIPT, DISPENSING, CUSTOMER_RETURN, SUPPLIER_RETURN, STOCK_ADJUSTMENT_IN, STOCK_ADJUSTMENT_OUT, EXPIRED_WRITE_OFF, DAMAGED_WRITE_OFF
+  quantity      Int       // positive or negative
+  balanceAfter  Int       @map("balance_after")
+  unitCost      Decimal?  @map("unit_cost") @db.Decimal(10, 2)
+  referenceType String?   @map("reference_type") @db.VarChar(50) // GOODS_RECEIPT, DISPENSATION, ADJUSTMENT, RETURN, INITIAL
+  referenceId   BigInt?   @map("reference_id")
+  performedBy   BigInt?   @map("performed_by")
+  reason        String?   @db.Text
+  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  medicine Medicine       @relation(fields: [medicineId], references: [id])
+  batch    MedicineBatch? @relation(fields: [batchId], references: [id])
+
+  @@index([medicineId])
+  @@index([batchId])
+  @@index([movementType])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("stock_movement")
+}
+
+model PurchaseOrder {
+  id           BigInt              @id @default(autoincrement())
+  poNumber     String              @unique @map("po_number") @db.VarChar(50)
+  supplierId   BigInt              @map("supplier_id")
+  orderDate    String              @map("order_date") @db.VarChar(50)
+  expectedDate String?             @map("expected_date") @db.VarChar(50)
+  totalAmount  Decimal             @default(0.00) @map("total_amount") @db.Decimal(12, 2)
+  status       String              @default("ORDERED") @db.VarChar(30) // DRAFT, ORDERED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
+  notes        String?             @db.Text
+  createdById  BigInt?             @map("created_by_id")
+  createdAt    DateTime?           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime?           @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  items        PurchaseOrderItem[]
+  goodsReceipts GoodsReceipt[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_order")
+}
+
+model PurchaseOrderItem {
+  id               BigInt              @id @default(autoincrement())
+  purchaseOrderId  BigInt              @map("purchase_order_id")
+  medicineId       BigInt              @map("medicine_id")
+  quantityOrdered  Int                 @map("quantity_ordered")
+  quantityReceived Int                 @default(0) @map("quantity_received")
+  unitCost         Decimal             @map("unit_cost") @db.Decimal(10, 2)
+  lineTotal        Decimal             @map("line_total") @db.Decimal(12, 2)
+
+  // Relations
+  purchaseOrder    PurchaseOrder       @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  medicine         Medicine            @relation(fields: [medicineId], references: [id])
+  receiptItems     GoodsReceiptItem[]
+
+  @@index([purchaseOrderId])
+  @@index([medicineId])
+  @@map("purchase_order_item")
+}
+
+model GoodsReceipt {
+  id                    BigInt             @id @default(autoincrement())
+  receiptNumber         String             @unique @map("receipt_number") @db.VarChar(50)
+  purchaseOrderId       BigInt?            @map("purchase_order_id")
+  supplierId            BigInt             @map("supplier_id")
+  receiptDate           String             @map("receipt_date") @db.VarChar(50)
+  supplierInvoiceNumber String?            @map("supplier_invoice_number") @db.VarChar(100)
+  totalAmount           Decimal            @default(0.00) @map("total_amount") @db.Decimal(12, 2)
+  notes                 String?            @db.Text
+  receivedById          BigInt?            @map("received_by_id")
+  createdAt             DateTime?          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  purchaseOrder         PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  supplier              Supplier           @relation(fields: [supplierId], references: [id])
+  items                 GoodsReceiptItem[]
+
+  @@index([purchaseOrderId])
+  @@index([supplierId])
+  @@map("goods_receipt")
+}
+
+model GoodsReceiptItem {
+  id                  BigInt             @id @default(autoincrement())
+  goodsReceiptId      BigInt             @map("goods_receipt_id")
+  purchaseOrderItemId BigInt?            @map("purchase_order_item_id")
+  medicineId          BigInt             @map("medicine_id")
+  batchId             BigInt?            @map("batch_id")
+  batchNumber         String             @map("batch_number") @db.VarChar(100)
+  mfgDate             String?            @map("mfg_date") @db.VarChar(50)
+  expiryDate          DateTime           @map("expiry_date") @db.Date
+  quantityReceived    Int                @map("quantity_received")
+  unitCost            Decimal            @map("unit_cost") @db.Decimal(10, 2)
+  sellingPrice        Decimal?           @map("selling_price") @db.Decimal(10, 2)
+  lineTotal           Decimal            @map("line_total") @db.Decimal(12, 2)
+
+  // Relations
+  goodsReceipt        GoodsReceipt       @relation(fields: [goodsReceiptId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id])
+  medicine            Medicine           @relation(fields: [medicineId], references: [id])
+  batch               MedicineBatch?     @relation(fields: [batchId], references: [id])
+
+  @@index([goodsReceiptId])
+  @@index([medicineId])
+  @@index([batchId])
+  @@map("goods_receipt_item")
+}
+
+model PharmacyDispensation {
+  id                 BigInt                     @id @default(autoincrement())
+  dispensationNumber String                     @unique @map("dispensation_number") @db.VarChar(50)
+  prescriptionId     BigInt?                    @map("prescription_id")
+  patientId          BigInt?                    @map("patient_id")
+  doctorId           BigInt?                    @map("doctor_id")
+  patientName        String?                    @map("patient_name") @db.VarChar(100)
+  dispenseDate       String                     @map("dispense_date") @db.VarChar(50)
+  subtotal           Decimal                    @default(0.00) @db.Decimal(12, 2)
+  discount           Decimal                    @default(0.00) @db.Decimal(12, 2)
+  tax                Decimal                    @default(0.00) @db.Decimal(12, 2)
+  totalAmount        Decimal                    @default(0.00) @map("total_amount") @db.Decimal(12, 2)
+  status             String                     @default("COMPLETED") @db.VarChar(30) // COMPLETED, RETURNED, CANCELLED
+  invoiceId          BigInt?                    @map("invoice_id")
+  dispensedById      BigInt?                    @map("dispensed_by_id")
+  notes              String?                    @db.Text
+  createdAt          DateTime?                  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime?                  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  prescription       Prescription?              @relation(fields: [prescriptionId], references: [id])
+  patient            Patient?                   @relation(fields: [patientId], references: [id])
+  doctor             Doctor?                    @relation(fields: [doctorId], references: [id])
+  invoice            Payment?                   @relation(fields: [invoiceId], references: [id])
+  items              PharmacyDispensationItem[]
+  returns            PharmacyReturn[]
+
+  @@index([prescriptionId])
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([invoiceId])
+  @@index([dispenseDate])
+  @@map("pharmacy_dispensation")
+}
+
+model PharmacyDispensationItem {
+  id                     BigInt                @id @default(autoincrement())
+  dispensationId         BigInt                @map("dispensation_id")
+  prescriptionMedicineId BigInt?               @map("prescription_medicine_id")
+  medicineId             BigInt?               @map("medicine_id")
+  batchId                BigInt?               @map("batch_id")
+  medicineName           String                @map("medicine_name") @db.VarChar(200)
+  batchNumber            String?               @map("batch_number") @db.VarChar(100)
+  quantity               Int
+  unitPrice              Decimal               @map("unit_price") @db.Decimal(10, 2)
+  totalPrice             Decimal               @map("total_price") @db.Decimal(10, 2)
+  returnedQuantity       Int                   @default(0) @map("returned_quantity")
+
+  // Relations
+  dispensation           PharmacyDispensation  @relation(fields: [dispensationId], references: [id], onDelete: Cascade)
+  prescriptionMedicine   PrescriptionMedicine? @relation(fields: [prescriptionMedicineId], references: [id])
+  medicine               Medicine?             @relation(fields: [medicineId], references: [id])
+  batch                  MedicineBatch?        @relation(fields: [batchId], references: [id])
+  returnItems            PharmacyReturnItem[]
+
+  @@index([dispensationId])
+  @@index([prescriptionMedicineId])
+  @@index([medicineId])
+  @@index([batchId])
+  @@map("pharmacy_dispensation_item")
+}
+
+model StockAdjustment {
+  id               BigInt                @id @default(autoincrement())
+  adjustmentNumber String                @unique @map("adjustment_number") @db.VarChar(50)
+  adjustmentDate   String                @map("adjustment_date") @db.VarChar(50)
+  reason           String                @db.VarChar(100) // PHYSICAL_COUNT, DAMAGED, EXPIRED, AUDIT_CORRECTION, OTHER
+  status           String                @default("APPROVED") @db.VarChar(30) // PENDING, APPROVED, REJECTED
+  adjustedById     BigInt?               @map("adjusted_by_id")
+  approvedById     BigInt?               @map("approved_by_id")
+  notes            String?               @db.Text
+  createdAt        DateTime?             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime?             @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  items            StockAdjustmentItem[]
+
+  @@index([adjustmentDate])
+  @@index([status])
+  @@map("stock_adjustment")
+}
+
+model StockAdjustmentItem {
+  id               BigInt          @id @default(autoincrement())
+  adjustmentId     BigInt          @map("adjustment_id")
+  medicineId       BigInt          @map("medicine_id")
+  batchId          BigInt          @map("batch_id")
+  systemQuantity   Int             @map("system_quantity")
+  physicalQuantity Int             @map("physical_quantity")
+  difference       Int             // physical - system (can be positive or negative)
+  unitCost         Decimal?        @map("unit_cost") @db.Decimal(10, 2)
+
+  // Relations
+  adjustment       StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  medicine         Medicine        @relation(fields: [medicineId], references: [id])
+  batch            MedicineBatch   @relation(fields: [batchId], references: [id])
+
+  @@index([adjustmentId])
+  @@index([medicineId])
+  @@index([batchId])
+  @@map("stock_adjustment_item")
+}
+
+model PharmacyReturn {
+  id                 BigInt                @id @default(autoincrement())
+  returnNumber       String                @unique @map("return_number") @db.VarChar(50)
+  returnType         String                @map("return_type") @db.VarChar(30) // PATIENT_RETURN, SUPPLIER_RETURN
+  dispensationId     BigInt?               @map("dispensation_id")
+  supplierId         BigInt?               @map("supplier_id")
+  returnDate         String                @map("return_date") @db.VarChar(50)
+  reason             String                @db.Text
+  totalRefund        Decimal               @default(0.00) @map("total_refund") @db.Decimal(12, 2)
+  restockToInventory Boolean               @default(true) @map("restock_to_inventory")
+  processedById      BigInt?               @map("processed_by_id")
+  createdAt          DateTime?             @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  dispensation       PharmacyDispensation? @relation(fields: [dispensationId], references: [id])
+  supplier           Supplier?             @relation(fields: [supplierId], references: [id])
+  items              PharmacyReturnItem[]
+
+  @@index([dispensationId])
+  @@index([supplierId])
+  @@index([returnType])
+  @@map("pharmacy_return")
+}
+
+model PharmacyReturnItem {
+  id                 BigInt                    @id @default(autoincrement())
+  returnId           BigInt                    @map("return_id")
+  dispensationItemId BigInt?                   @map("dispensation_item_id")
+  medicineId         BigInt                    @map("medicine_id")
+  batchId            BigInt                    @map("batch_id")
+  quantity           Int
+  unitPrice          Decimal                   @map("unit_price") @db.Decimal(10, 2)
+  totalRefund        Decimal                   @map("total_refund") @db.Decimal(12, 2)
+  condition          String                    @default("SALEABLE") @db.VarChar(30) // SALEABLE, DAMAGED, EXPIRED
+
+  // Relations
+  return             PharmacyReturn            @relation(fields: [returnId], references: [id], onDelete: Cascade)
+  dispensationItem   PharmacyDispensationItem? @relation(fields: [dispensationItemId], references: [id])
+  medicine           Medicine                  @relation(fields: [medicineId], references: [id])
+  batch              MedicineBatch             @relation(fields: [batchId], references: [id])
+
+  @@index([returnId])
+  @@index([dispensationItemId])
+  @@index([medicineId])
+  @@index([batchId])
+  @@map("pharmacy_return_item")
 }
 
 // =============================================================================
@@ -906,6 +1227,7 @@ model Payment {
   payments        InvoicePayment[]
   doctorShares    DoctorShare[]
   radiologyOrders RadiologyOrder[]
+  pharmacyDispensations PharmacyDispensation[]
 
   @@index([patientId])
   @@index([status])

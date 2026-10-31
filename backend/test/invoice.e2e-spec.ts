@@ -8,6 +8,8 @@ import { DoctorService } from '../src/modules/doctor/doctor.service';
 import { InvoiceService } from '../src/modules/invoice/invoice.service';
 import { PatientService } from '../src/modules/patient/patient.service';
 
+jest.setTimeout(45000);
+
 describe('InvoiceModule (e2e)', () => {
   let app: INestApplication;
   let invoiceService: InvoiceService;

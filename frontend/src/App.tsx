@@ -9,10 +9,12 @@ import {
   CheckCircle,
   AlertCircle,
   Shield,
-  Stethoscope
+  Stethoscope,
+  Boxes,
 } from 'lucide-react';
 
 import { MedicineCatalogue } from './components/MedicineCatalogue';
+import { PharmacyWorkspace } from './components/PharmacyWorkspace';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -50,7 +52,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines'>('medicines');
+  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines' | 'pharmacy'>('pharmacy');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -300,6 +302,13 @@ export function App() {
       {/* Module Switcher Navigation */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20 }} className="no-print">
         <button
+          className={`btn ${activeModule === 'pharmacy' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('pharmacy')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <Boxes size={18} /> Pharmacy & Inventory System
+        </button>
+        <button
           className={`btn ${activeModule === 'medicines' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('medicines')}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
@@ -336,6 +345,16 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* Pharmacy & Inventory Management View */}
+      {activeModule === 'pharmacy' && (
+        <PharmacyWorkspace
+          apiBaseUrl={API_BASE_URL}
+          token={token}
+          userRole={userRole}
+          onNotification={(type, message) => setNotification({ type, message })}
+        />
       )}
 
       {/* Medicine Catalogue View */}

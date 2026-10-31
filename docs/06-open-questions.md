@@ -351,6 +351,38 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [ ] **Option A (Recommended)**: Block hard deletion of prescribed medicines and support soft deactivation.
   - [ ] **Option B**: Support soft deletion (`deleted_at`) across all catalogue tables.
 
+---
+
+## 17. Phase 13 Pharmacy & Inventory Management System
+
+### 37. Authoritative Inventory Balance Strategy & Legacy Stock Transition
+- **Evidence**: Legacy Laravel tracked stock purely via a single mutable integer column `medicine.quantity`. Medora 2.0 introduces multi-batch inventory (`medicine_batch`) and an immutable movement ledger (`stock_movement`).
+- **Implementation**: `MedicineBatch.current_quantity` is the authoritative physical balance. `Medicine.quantity` is retained as a cached summary on the formulation header, atomically synchronized in the same PostgreSQL transaction during all receipts, dispensations, adjustments, and returns. This maintains 100% backward compatibility for legacy queries while guaranteeing that ledger movements explain all balance changes.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Authoritative batch-level balances with atomic synchronization to `Medicine.quantity` and an append-only stock movement ledger.
+  - [ ] **Option B**: Pure event-sourcing calculation where batch balances are derived strictly on-the-fly by summing `stock_movement` records without maintaining `current_quantity`.
+
+### 38. Batch Selection Strategy & Override Policy
+- **Evidence**: Clinical pharmacology best practice requires FEFO (First Expiry, First Out) to minimize medication spoilage and prevent administering expired drugs.
+- **Implementation**: Automated dispensing default allocates stock from the earliest-expiring active batch (`expiry_date ASC`) with unexpired shelf life (`expiry_date > CURRENT_DATE`). Pharmacists can manually select an alternate batch if clinical or packaging constraints require it, provided the selected batch is active and unexpired.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Automated FEFO default with optional pharmacist batch selection override for active, unexpired lots.
+  - [ ] **Option B**: Strict mandatory FEFO with zero manual override capability.
+
+### 39. Dispensing Billing Contract: Direct Invoice Integration
+- **Evidence**: In legacy Laravel, `PharmacyPayment` acted as an isolated billing table parallel to `Payment` (hospital invoices), leading to bifurcated financial reporting.
+- **Implementation**: Medora 2.0 links `PharmacyDispensation` to `Payment` (Invoice) via a foreign key `invoice_id`. When medication is dispensed, the pharmacy system can generate an invoice under the `PHARMACY` payment category or settle charges directly, preventing duplicate financial entries while preserving departmental cash accounting.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Unified billing integration linking `PharmacyDispensation` to `InvoiceModule` (`Payment` header and `InvoiceItem` rows).
+  - [ ] **Option B**: Independent pharmacy register maintaining isolated cash collections without integration into patient invoices.
+
+### 40. Returned Medication Disposal vs. Resaleable Restocking Policy
+- **Evidence**: When patients return unused medications, safety regulations dictate that contaminated, opened, or cold-chain-broken medicines must not re-enter saleable inventory.
+- **Implementation**: `PharmacyReturn` records condition as `SALEABLE`, `DAMAGED`, or `EXPIRED`. Only items explicitly confirmed as `SALEABLE` by a licensed pharmacist are returned to the batch inventory via `CUSTOMER_RETURN`. Damaged or expired returns generate write-off movements (`DAMAGED_WRITE_OFF` / `EXPIRED_WRITE_OFF`) without increasing available stock.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Condition-based return triage where only verified `SALEABLE` packages re-enter inventory, while others are quarantined or written off.
+  - [ ] **Option B**: Universal prohibition of patient medication returns to inventory (100% write-off policy).
+
 
 
 
