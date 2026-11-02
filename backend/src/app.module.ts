@@ -22,6 +22,7 @@ import { MedicineModule } from './modules/medicine/medicine.module';
 import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
 import { LaboratoryModule } from './modules/laboratory/laboratory.module';
 import { RadiologyModule } from './modules/radiology/radiology.module';
+import { InpatientModule } from './modules/inpatient/inpatient.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 
 @Module({
@@ -52,6 +53,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     PharmacyModule,
     LaboratoryModule,
     RadiologyModule,
+    InpatientModule,
   ],
   providers: [
     {

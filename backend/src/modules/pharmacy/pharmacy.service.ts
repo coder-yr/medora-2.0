@@ -5,6 +5,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBatchDto, UpdateBatchStatusDto } from './dto/batch.dto';
 import { CreateGoodsReceiptDto, CreatePurchaseOrderDto } from './dto/purchase.dto';
@@ -989,9 +990,25 @@ export class PharmacyService {
         ? BigInt(dto.doctorId)
         : prescription?.doctorId || null;
 
-      // Optional InvoiceModule integration
+      // Resolve active admission if specified or patient is admitted
+      let admissionId: bigint | null = null;
+      if (dto.admissionId) {
+        admissionId = BigInt(dto.admissionId);
+      } else if (patientId && tx.admission) {
+        const activeStay = await tx.admission.findFirst({
+          where: {
+            patientId,
+            status: { in: ['ADMITTED', 'TRANSFERRED', 'DISCHARGE_PENDING'] },
+          },
+        });
+        if (activeStay) {
+          admissionId = activeStay.id;
+        }
+      }
+
+      // Optional Outpatient InvoiceModule integration (only when not inpatient)
       let invoiceId: bigint | null = null;
-      if (dto.generateInvoice && patientId) {
+      if (!admissionId && dto.generateInvoice && patientId) {
         const invoice = await tx.payment.create({
           data: {
             patientId,
@@ -1033,6 +1050,7 @@ export class PharmacyService {
           totalAmount,
           status: 'COMPLETED',
           invoiceId,
+          admissionId,
           dispensedById: userId ? BigInt(userId) : null,
           notes: dto.notes,
           items: {
@@ -1045,6 +1063,44 @@ export class PharmacyService {
           doctor: { select: { id: true, name: true } },
         },
       });
+
+      // Post financial charge to Inpatient Folio if active stay
+      if (admissionId && totalAmount > 0) {
+        const folio = await tx.inpatientFolio.findUnique({
+          where: { admissionId },
+        });
+        if (folio) {
+          const idempotencyKey = `PHARM-${dispensation.id}`;
+          const existingItem = await tx.inpatientFolioItem.findUnique({
+            where: { idempotencyKey },
+          });
+          if (!existingItem) {
+            await tx.inpatientFolioItem.create({
+              data: {
+                folioId: folio.id,
+                sourceModule: 'PHARMACY',
+                sourceRecordId: dispensation.id.toString(),
+                idempotencyKey,
+                chargeCategory: 'PHARMACY',
+                description: `Pharmacy Dispensation: ${dispensationItemsData.map((d) => d.medicineName).join(', ')}`.slice(0, 255),
+                quantity: 1,
+                unitPrice: new Prisma.Decimal(totalAmount),
+                totalAmount: new Prisma.Decimal(totalAmount),
+                postedAt: new Date(),
+                postedBy: userId ? BigInt(userId) : null,
+              },
+            });
+
+            await tx.inpatientFolio.update({
+              where: { id: folio.id },
+              data: {
+                totalCharges: { increment: totalAmount },
+                balance: { increment: totalAmount },
+              },
+            });
+          }
+        }
+      }
 
       // Write StockMovement logs
       for (const m of movementsToCreate) {

@@ -70,6 +70,11 @@ export class CreateRadiologyOrderDto {
   @IsString()
   @IsOptional()
   equipmentRoom?: string;
+
+  @ApiPropertyOptional({ description: 'Optional Active Admission ID for inpatient folio posting', example: 1 })
+  @IsNumber()
+  @IsOptional()
+  admissionId?: number;
 }
 
 export class ScheduleRadiologyOrderDto {

@@ -109,6 +109,12 @@ export class DispensePrescriptionDto {
   @IsString()
   notes?: string;
 
+  @ApiPropertyOptional({ description: 'Optional Active Admission ID for inpatient folio posting', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  admissionId?: number;
+
   @ApiProperty({ description: 'Medications being dispensed', type: [DispenseItemDto] })
   @IsArray()
   @ArrayMinSize(1, { message: 'Must dispense at least one medication line.' })

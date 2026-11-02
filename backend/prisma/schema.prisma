@@ -105,6 +105,7 @@ model HospitalBranch {
   appointments Appointment[]
   doctors      Doctor[]
   beds         Bed[]
+  admissions   Admission[]
   invoices     Payment[]
 
   @@map("hospital_branch")
@@ -203,6 +204,8 @@ model Patient {
   invoices         Payment[]
   patientDeposits  PatientDeposit[]
   pharmacyDispensations PharmacyDispensation[]
+  admissions       Admission[]
+  inpatientFolios  InpatientFolio[]
 
   @@index([patientTypeId])
   @@index([branchId])
@@ -213,12 +216,19 @@ model Patient {
 }
 
 model BedCategory {
-  id          BigInt   @id @default(autoincrement())
-  category    String   @db.VarChar(100) // Ward Name (e.g. General Ward, ICU)
-  description String?  @db.Text
+  id          BigInt    @id @default(autoincrement())
+  category    String    @db.VarChar(100) // Ward Name (e.g. General Ward, ICU)
+  code        String?   @db.VarChar(50)  // Ward Code (e.g. GW-01, ICU-A)
+  description String?   @db.Text
+  baseRate    Decimal   @default(0.00) @map("base_rate") @db.Decimal(10, 2)
+  billingUnit String    @default("DAILY") @map("billing_unit") @db.VarChar(20)
+  isActive    Boolean   @default(true) @map("is_active")
+  createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  beds Bed[]
+  beds        Bed[]
+  admissions  Admission[]
 
   @@map("bed_category")
 }
@@ -228,18 +238,22 @@ model Bed {
   categoryId  BigInt    @map("category")
   number      String    @db.VarChar(100)
   description String?   @db.VarChar(255)
-  status      String?   @default("available") @db.VarChar(50)
+  status      String    @default("AVAILABLE") @db.VarChar(50)
+  isActive    Boolean   @default(true) @map("is_active")
   branchId    BigInt?   @map("branch_id")
   createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  category    BedCategory     @relation(fields: [categoryId], references: [id])
-  branch      HospitalBranch? @relation(fields: [branchId], references: [id])
+  category    BedCategory          @relation(fields: [categoryId], references: [id])
+  branch      HospitalBranch?      @relation(fields: [branchId], references: [id])
   allotedBeds AllotedBed[]
+  admissions  Admission[]
+  allocations BedAllocationHistory[]
 
   @@unique([categoryId, number])
   @@index([branchId])
+  @@index([status])
   @@map("bed")
 }
 
@@ -255,13 +269,136 @@ model AllotedBed {
   updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  patient Patient @relation(fields: [patientId], references: [id])
-  bed     Bed     @relation(fields: [bedId], references: [id])
+  patient     Patient   @relation(fields: [patientId], references: [id])
+  bed         Bed       @relation(fields: [bedId], references: [id])
 
   @@index([patientId])
   @@index([bedId])
   @@index([dTime])
   @@map("alloted_bed")
+}
+
+model Admission {
+  id                    BigInt    @id @default(autoincrement())
+  admissionNumber       String    @unique @map("admission_number") @db.VarChar(50)
+  patientId             BigInt    @map("patient_id")
+  attendingDoctorId     BigInt?   @map("attending_doctor_id")
+  admittingDoctorId     BigInt?   @map("admitting_doctor_id")
+  wardId                BigInt    @map("ward_id")
+  bedId                 BigInt    @map("bed_id")
+  admissionDate         DateTime  @map("admission_date") @db.Timestamptz
+  expectedDischargeDate DateTime? @map("expected_discharge_date") @db.Timestamptz
+  actualDischargeDate   DateTime? @map("actual_discharge_date") @db.Timestamptz
+  admissionType         String    @default("ELECTIVE") @map("admission_type") @db.VarChar(50) // EMERGENCY, ELECTIVE, TRANSFER, URGENT
+  admissionReason       String?   @map("admission_reason") @db.Text
+  diagnosis             String?   @db.Text
+  clinicalNotes         String?   @map("clinical_notes") @db.Text
+  status                String    @default("ADMITTED") @db.VarChar(50) // PENDING, ADMITTED, TRANSFERRED, DISCHARGE_PENDING, DISCHARGED, CANCELLED
+  dischargeSummary      String?   @map("discharge_summary") @db.Text
+  dischargeCondition    String?   @map("discharge_condition") @db.VarChar(100) // RECOVERED, IMPROVED, UNCHANGED, REFERRED, DECEASED, LAMA
+  createdBy             BigInt?   @map("created_by")
+  dischargedBy          BigInt?   @map("discharged_by")
+  branchId              BigInt?   @map("branch_id")
+  createdAt             DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  patient               Patient                 @relation(fields: [patientId], references: [id])
+  attendingDoctor       Doctor?                 @relation("AttendingDoctor", fields: [attendingDoctorId], references: [id])
+  admittingDoctor       Doctor?                 @relation("AdmittingDoctor", fields: [admittingDoctorId], references: [id])
+  ward                  BedCategory             @relation(fields: [wardId], references: [id])
+  bed                   Bed                     @relation(fields: [bedId], references: [id])
+  branch                HospitalBranch?         @relation(fields: [branchId], references: [id])
+  allocations           BedAllocationHistory[]
+  folio                 InpatientFolio?
+  pharmacyDispensations PharmacyDispensation[]
+  labOrders             Lab[]
+  radiologyOrders       RadiologyOrder[]
+  invoices              Payment[]
+
+  @@index([patientId])
+  @@index([bedId])
+  @@index([wardId])
+  @@index([status])
+  @@index([admissionDate])
+  @@map("admissions")
+}
+
+model BedAllocationHistory {
+  id             BigInt    @id @default(autoincrement())
+  admissionId    BigInt    @map("admission_id")
+  bedId          BigInt    @map("bed_id")
+  allocatedAt    DateTime  @map("allocated_at") @db.Timestamptz
+  releasedAt     DateTime? @map("released_at") @db.Timestamptz
+  rateSnapshot   Decimal   @default(0.00) @map("rate_snapshot") @db.Decimal(10, 2)
+  transferReason String?   @map("transfer_reason") @db.VarChar(255)
+  allocatedBy    BigInt?   @map("allocated_by")
+  releasedBy     BigInt?   @map("released_by")
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  admission      Admission @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  bed            Bed       @relation(fields: [bedId], references: [id])
+
+  @@index([admissionId])
+  @@index([bedId])
+  @@index([releasedAt])
+  @@map("bed_allocation_history")
+}
+
+model InpatientFolio {
+  id             BigInt    @id @default(autoincrement())
+  folioNumber    String    @unique @map("folio_number") @db.VarChar(50) // FOL-YYYYMMDD-XXXX
+  admissionId    BigInt    @unique @map("admission_id")
+  patientId      BigInt    @map("patient_id")
+  status         String    @default("OPEN") @db.VarChar(50) // OPEN, CLOSED, SETTLED
+  totalCharges   Decimal   @default(0.00) @map("total_charges") @db.Decimal(12, 2)
+  totalPaid      Decimal   @default(0.00) @map("total_paid") @db.Decimal(12, 2)
+  balance        Decimal   @default(0.00) @db.Decimal(12, 2)
+  settledAt      DateTime? @map("settled_at") @db.Timestamptz
+  settledBy      BigInt?   @map("settled_by")
+  finalInvoiceId BigInt?   @map("final_invoice_id")
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  admission      Admission            @relation(fields: [admissionId], references: [id], onDelete: Cascade)
+  patient        Patient              @relation(fields: [patientId], references: [id])
+  finalInvoice   Payment?             @relation(fields: [finalInvoiceId], references: [id])
+  items          InpatientFolioItem[]
+
+  @@index([patientId])
+  @@index([status])
+  @@map("inpatient_folios")
+}
+
+model InpatientFolioItem {
+  id             BigInt    @id @default(autoincrement())
+  folioId        BigInt    @map("folio_id")
+  sourceModule   String    @map("source_module") @db.VarChar(50) // BED, PHARMACY, LABORATORY, RADIOLOGY, SERVICE
+  sourceRecordId String?   @map("source_record_id") @db.VarChar(100) // Dispensation ID, Lab Order ID, etc.
+  idempotencyKey String?   @unique @map("idempotency_key") @db.VarChar(150) // Prevents duplicate charges
+  chargeCategory String    @map("charge_category") @db.VarChar(100)
+  description    String    @db.VarChar(255)
+  quantity       Int       @default(1)
+  unitPrice      Decimal   @map("unit_price") @db.Decimal(10, 2)
+  totalAmount    Decimal   @map("total_amount") @db.Decimal(12, 2)
+  postedAt       DateTime  @default(now()) @map("posted_at") @db.Timestamptz
+  postedBy       BigInt?   @map("posted_by")
+  isReversed     Boolean   @default(false) @map("is_reversed")
+  reversedAt     DateTime? @map("reversed_at") @db.Timestamptz
+  reversedBy     BigInt?   @map("reversed_by")
+  reversalReason String?   @map("reversal_reason") @db.VarChar(255)
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  folio          InpatientFolio @relation(fields: [folioId], references: [id], onDelete: Cascade)
+
+  @@index([folioId])
+  @@index([sourceModule, sourceRecordId])
+  @@map("inpatient_folio_items")
 }
 
 model MedicalHistory {
@@ -337,6 +474,8 @@ model Doctor {
   doctorShares    DoctorShare[]
   invoiceItems    InvoiceItem[]
   pharmacyDispensations PharmacyDispensation[]
+  attendingAdmissions   Admission[] @relation("AttendingDoctor")
+  admittingAdmissions   Admission[] @relation("AdmittingDoctor")
 
   @@index([email])
   @@index([department])
@@ -635,6 +774,7 @@ model Lab {
   completedAt    DateTime? @map("completed_at") @db.Timestamptz
   cancelledAt    DateTime? @map("cancelled_at") @db.Timestamptz
   cancelReason   String?   @map("cancel_reason") @db.Text
+  admissionId    BigInt?   @map("admission_id")
   createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -644,6 +784,7 @@ model Lab {
   appointment  Appointment?         @relation(fields: [appointmentId], references: [id])
   consultation Consultation?        @relation(fields: [consultationId], references: [id])
   invoice      Payment?             @relation(fields: [invoiceId], references: [id])
+  admission    Admission?           @relation(fields: [admissionId], references: [id])
   tests        LabTest[]
   samples      LabSample[]
   amendments   LabReportAmendment[]
@@ -652,6 +793,7 @@ model Lab {
   @@index([doctorId])
   @@index([status])
   @@index([invoiceId])
+  @@index([admissionId])
   @@map("lab")
 }
 
@@ -820,6 +962,7 @@ model RadiologyOrder {
   cancelledById      BigInt?                    @map("cancelled_by")
   cancelReason       String?                    @map("cancel_reason") @db.Text
   createdBy          BigInt?                    @map("created_by")
+  admissionId        BigInt?                    @map("admission_id")
   createdAt          DateTime?                  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime?                  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -833,6 +976,7 @@ model RadiologyOrder {
   verifiedBy         User?                      @relation("VerifiedRadiology", fields: [verifiedById], references: [id])
   technologist       User?                      @relation("TechnologistRadiology", fields: [technologistId], references: [id])
   invoice            Payment?                   @relation(fields: [invoiceId], references: [id])
+  admission          Admission?                 @relation(fields: [admissionId], references: [id])
   amendments         RadiologyReportAmendment[]
 
   @@index([patientId])
@@ -842,6 +986,7 @@ model RadiologyOrder {
   @@index([scheduledAt])
   @@index([equipmentRoom])
   @@index([invoiceId])
+  @@index([admissionId])
   @@map("radiology_order")
 }
 
@@ -1206,6 +1351,7 @@ model PharmacyDispensation {
   status             String                     @default("COMPLETED") @db.VarChar(30) // COMPLETED, RETURNED, CANCELLED
   invoiceId          BigInt?                    @map("invoice_id")
   dispensedById      BigInt?                    @map("dispensed_by_id")
+  admissionId        BigInt?                    @map("admission_id")
   notes              String?                    @db.Text
   createdAt          DateTime?                  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime?                  @updatedAt @map("updated_at") @db.Timestamptz
@@ -1215,6 +1361,7 @@ model PharmacyDispensation {
   patient            Patient?                   @relation(fields: [patientId], references: [id])
   doctor             Doctor?                    @relation(fields: [doctorId], references: [id])
   invoice            Payment?                   @relation(fields: [invoiceId], references: [id])
+  admission          Admission?                 @relation(fields: [admissionId], references: [id])
   items              PharmacyDispensationItem[]
   returns            PharmacyReturn[]
 
@@ -1223,6 +1370,7 @@ model PharmacyDispensation {
   @@index([doctorId])
   @@index([invoiceId])
   @@index([dispenseDate])
+  @@index([admissionId])
   @@map("pharmacy_dispensation")
 }
 
@@ -1408,6 +1556,7 @@ model Payment {
   category        String?   @db.VarChar(255)
   categoryName    String?   @map("category_name") @db.VarChar(1000)
   categoryAmount  String?   @map("category_amount") @db.VarChar(1000)
+  admissionId     BigInt?   @map("admission_id")
   createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1416,6 +1565,8 @@ model Payment {
   patientType     PatientType?     @relation(fields: [patientTypeId], references: [id])
   branch          HospitalBranch?  @relation(fields: [branchId], references: [id])
   shiftClose      ShiftClose?      @relation(fields: [shiftCloseId], references: [id])
+  admission       Admission?       @relation(fields: [admissionId], references: [id])
+  inpatientFolios InpatientFolio[]
   items           InvoiceItem[]
   payments        InvoicePayment[]
   doctorShares    DoctorShare[]
@@ -1426,6 +1577,7 @@ model Payment {
   @@index([patientId])
   @@index([status])
   @@index([shiftCloseId])
+  @@index([admissionId])
   @@map("payment")
 }
 

@@ -383,14 +383,30 @@ export class LaboratoryService {
     }
 
     return await this.prisma.$transaction(async (tx: any) => {
-      // 1. Optional Invoice Integration
-      let invoiceId: bigint | null = null;
-      if (dto.generateInvoice) {
-        const totalAmount = catalogueTests.reduce(
-          (sum: number, t: any) => sum + (t.price ? Number(t.price) : 0),
-          0,
-        );
+      // Resolve active admission if specified or patient is admitted
+      let admissionId: bigint | null = null;
+      if (dto.admissionId) {
+        admissionId = BigInt(dto.admissionId);
+      } else if (tx.admission) {
+        const activeStay = await tx.admission.findFirst({
+          where: {
+            patientId: BigInt(dto.patientId),
+            status: { in: ['ADMITTED', 'TRANSFERRED', 'DISCHARGE_PENDING'] },
+          },
+        });
+        if (activeStay) {
+          admissionId = activeStay.id;
+        }
+      }
 
+      const totalAmount = catalogueTests.reduce(
+        (sum: number, t: any) => sum + (t.price ? Number(t.price) : 0),
+        0,
+      );
+
+      // 1. Optional Invoice Integration (only for outpatient when not admitted)
+      let invoiceId: bigint | null = null;
+      if (!admissionId && dto.generateInvoice) {
         const payment = await tx.payment.create({
           data: {
             patientId: BigInt(dto.patientId),
@@ -426,6 +442,7 @@ export class LaboratoryService {
           appointmentId: dto.appointmentId ? BigInt(dto.appointmentId) : null,
           consultationId: dto.consultationId ? BigInt(dto.consultationId) : null,
           invoiceId,
+          admissionId,
           date: orderDate,
           dateString: orderDate,
           priority: dto.priority || 'ROUTINE',
@@ -438,6 +455,44 @@ export class LaboratoryService {
           status: 'ORDERED',
         },
       });
+
+      // Post financial charge to Inpatient Folio if active stay
+      if (admissionId && totalAmount > 0) {
+        const folio = await tx.inpatientFolio.findUnique({
+          where: { admissionId },
+        });
+        if (folio) {
+          const idempotencyKey = `LAB-${lab.id}`;
+          const existingItem = await tx.inpatientFolioItem.findUnique({
+            where: { idempotencyKey },
+          });
+          if (!existingItem) {
+            await tx.inpatientFolioItem.create({
+              data: {
+                folioId: folio.id,
+                sourceModule: 'LABORATORY',
+                sourceRecordId: lab.id.toString(),
+                idempotencyKey,
+                chargeCategory: 'LABORATORY',
+                description: `Lab Tests: ${catalogueTests.map((t: any) => t.category).join(', ')}`.slice(0, 255),
+                quantity: 1,
+                unitPrice: new Prisma.Decimal(totalAmount),
+                totalAmount: new Prisma.Decimal(totalAmount),
+                postedAt: new Date(),
+                postedBy: userId ? BigInt(userId) : null,
+              },
+            });
+
+            await tx.inpatientFolio.update({
+              where: { id: folio.id },
+              data: {
+                totalCharges: { increment: totalAmount },
+                balance: { increment: totalAmount },
+              },
+            });
+          }
+        }
+      }
 
       // 3. Create LabSample records for each distinct specimen type
       const createdSamples = new Map<string, bigint>();

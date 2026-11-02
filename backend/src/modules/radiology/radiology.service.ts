@@ -396,6 +396,22 @@ export class RadiologyService {
     const urgency = dto.urgency || (urgent ? 'urgent' : 'routine');
 
     return await this.prisma.$transaction(async (tx) => {
+      // Resolve active admission if specified or patient is admitted
+      let admissionId: bigint | null = null;
+      if (dto.admissionId) {
+        admissionId = BigInt(dto.admissionId);
+      } else if (tx.admission) {
+        const activeStay = await tx.admission.findFirst({
+          where: {
+            patientId: BigInt(dto.patientId),
+            status: { in: ['ADMITTED', 'TRANSFERRED', 'DISCHARGE_PENDING'] },
+          },
+        });
+        if (activeStay) {
+          admissionId = activeStay.id;
+        }
+      }
+
       const createdOrders = [];
       const invoiceLineItems = [];
 
@@ -410,6 +426,7 @@ export class RadiologyService {
             doctorId: dto.doctorId ? BigInt(dto.doctorId) : undefined,
             appointmentId: dto.appointmentId ? BigInt(dto.appointmentId) : undefined,
             consultationId: dto.consultationId ? BigInt(dto.consultationId) : undefined,
+            admissionId,
             radiologyExamId: exam.id,
             examName: exam.name,
             modality: exam.modality,
@@ -448,10 +465,48 @@ export class RadiologyService {
           paymentCategoryId: exam.paymentCategoryId || undefined,
           doctorId: dto.doctorId ? BigInt(dto.doctorId) : undefined,
         });
+
+        // Post financial charge to Inpatient Folio if active stay
+        if (admissionId && unitPrice > 0) {
+          const folio = await tx.inpatientFolio.findUnique({
+            where: { admissionId },
+          });
+          if (folio) {
+            const idempotencyKey = `RAD-${order.id}`;
+            const existingItem = await tx.inpatientFolioItem.findUnique({
+              where: { idempotencyKey },
+            });
+            if (!existingItem) {
+              await tx.inpatientFolioItem.create({
+                data: {
+                  folioId: folio.id,
+                  sourceModule: 'RADIOLOGY',
+                  sourceRecordId: order.id.toString(),
+                  idempotencyKey,
+                  chargeCategory: 'RADIOLOGY',
+                  description: `Radiology Exam: ${exam.name}`,
+                  quantity: 1,
+                  unitPrice: new Prisma.Decimal(unitPrice),
+                  totalAmount: new Prisma.Decimal(unitPrice),
+                  postedAt: new Date(),
+                  postedBy: userId ? BigInt(userId) : null,
+                },
+              });
+
+              await tx.inpatientFolio.update({
+                where: { id: folio.id },
+                data: {
+                  totalCharges: { increment: unitPrice },
+                  balance: { increment: unitPrice },
+                },
+              });
+            }
+          }
+        }
       }
 
-      // Handle Auto-Billing if requested
-      if (dto.bill && invoiceLineItems.length > 0) {
+      // Handle Outpatient Auto-Billing if requested (only when not admitted)
+      if (!admissionId && dto.bill && invoiceLineItems.length > 0) {
         const grossTotal = invoiceLineItems.reduce((acc, item) => acc + item.lineTotal, 0);
 
         const payment = await tx.payment.create({

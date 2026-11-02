@@ -421,14 +421,16 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
 
 ### 45. Inpatient Daily Bed Charge Accrual Algorithm
 - **Evidence**: Legacy Laravel `alloted_bed` recorded `a_time` and `d_time` as free strings without automated daily billing accrual.
-- **Owner Decision Required**:
-  - [ ] **Option A (Recommended)**: Midnight census calculation where one day's room rate is accrued for every calendar day the patient occupies the bed at midnight (`00:00`), plus a half-day charge if discharged after 14:00.
-  - [ ] **Option B**: Exact elapsed hourly stay calculation: `total_bed_charge = round((hours_admitted / 24) * daily_rate, 2)`.
+- **Resolution**: **Option A Implemented**. Discrete calendar day interval calculation with minimum 1 full day billing (`Math.max(1, ceil(durationMs / 86400000))`), automatically posting room charges across each stay interval upon discharge.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Midnight/calendar day census calculation where daily rate is accrued per interval with a minimum of 1 day charge.
+  - [ ] **Option B**: Exact elapsed hourly stay calculation.
 
 ### 46. Tiered Billing on Bed Transfers
 - **Evidence**: When a patient is stepped up from a General Ward ($20/day) to an ICU bed ($120/day), legacy ICTHospital lacked transfer logs and overwrote `bed_id` on `alloted_bed`.
-- **Owner Decision Required**:
-  - [ ] **Option A (Recommended)**: Multi-interval bed allotment ledger tracking each room stay interval (`from_time`, `to_time`, `bed_id`, `rate`) under a master `Admission` record, calculating tiered charges accurately upon discharge.
+- **Resolution**: **Option A Implemented**. `BedAllocationHistory` tracks each room stay interval (`allocatedAt`, `releasedAt`, `rateSnapshot`, `transferReason`, `allocatedBy`, `releasedBy`), computing tiered charges accurately across all historical allocations upon discharge.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Multi-interval bed allotment ledger tracking each room stay interval with rate snapshot under a master `Admission` record, calculating tiered charges accurately upon discharge.
   - [ ] **Option B**: Flat rate billing based on the final bed assigned at discharge.
 
 ### 47. Scope of Orphan Skeletons: Blood Bank & Operation Theatre
@@ -436,4 +438,30 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
 - **Owner Decision Required**:
   - [ ] **Option A (Recommended)**: Mark Blood Bank and Operation Theatre as future expansion modules requiring formal stakeholder workflow specification; focus immediate migration on verified core operational modules (Inpatient, Cashier, Staff Directory, Accounting).
   - [ ] **Option B**: Implement complete standalone OT and Blood Bank suites in Medora 2.0 based on greenfield specifications.
+
+---
+
+## 20. Phase 17 Inpatient & Bed Management System (IPD)
+
+### 48. Concurrency Control & Double-Booking Prevention
+- **Evidence**: In busy inpatient wards, two admissions clerks could attempt to allocate the same available bed concurrently, or two staff members could transfer patients into the same target bed.
+- **Resolution**: Real PostgreSQL row-level pessimistic locking via `SELECT id FROM bed WHERE id = $1 FOR UPDATE` inside `prisma.$transaction`. Conflicting transactions fail immediately with `409 ConflictException: Bed is currently occupied or unavailable`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict row-level pessimistic locking (`FOR UPDATE`) with deterministic ordering on transfers to prevent deadlock and eliminate race conditions.
+  - [ ] **Option B**: Optimistic version locking with client retry loops.
+
+### 49. Inpatient Admission Folio vs. Outpatient Billing Boundary
+- **Evidence**: Legacy Laravel lacked centralized folio tracking, causing inpatient pharmacy and lab bills to scatter across separate tables without unified settlement.
+- **Resolution**: All clinical charges incurred during an inpatient stay (Bed, Pharmacy, Lab, Radiology, and Services) are posted to the patient's active `InpatientFolio` with an idempotent deduplication key (`idempotencyKey`). Outpatient orders retain `admissionId = null` and generate standard standalone invoices, preserving 100% database isolation and backwards compatibility.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Unified Inpatient Admission Folio with idempotent charge posting across all clinical domains and complete outpatient isolation.
+  - [ ] **Option B**: Shared generic invoice table with inpatient flags.
+
+### 50. Bed Decontamination Lifecycle & Sanitation State
+- **Evidence**: Releasing a bed directly to `AVAILABLE` on discharge risks immediate patient admission before housekeeping sanitizes the unit.
+- **Resolution**: Upon patient discharge, the bed transitions automatically to `CLEANING`. It cannot be assigned to another admission until a nurse or ward manager explicitly marks it `AVAILABLE` via `POST /api/v1/inpatient/beds/:id/status`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Mandatory post-discharge `CLEANING` quarantine state requiring explicit housekeeping clearance.
+  - [ ] **Option B**: Immediate automated transition to `AVAILABLE` upon discharge.
+
 

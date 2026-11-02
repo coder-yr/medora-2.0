@@ -81,6 +81,12 @@ export class CreateLabOrderDto {
   @IsOptional()
   @IsBoolean()
   generateInvoice?: boolean;
+
+  @ApiPropertyOptional({ description: 'Optional Active Admission ID for inpatient folio posting', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  admissionId?: number;
 }
 
 export class CancelLabOrderDto {

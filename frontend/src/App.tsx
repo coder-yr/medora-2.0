@@ -18,7 +18,8 @@ import { MedicineCatalogue } from './components/MedicineCatalogue';
 import { PharmacyWorkspace } from './components/PharmacyWorkspace';
 import { LaboratoryWorkspace } from './components/LaboratoryWorkspace';
 import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
-import { Radio } from 'lucide-react';
+import { InpatientWorkspace } from './components/InpatientWorkspace';
+import { Radio, BedDouble } from 'lucide-react';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -56,7 +57,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines' | 'pharmacy' | 'laboratory' | 'radiology'>('radiology');
+  const [activeModule, setActiveModule] = useState<'inpatient' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('inpatient');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -306,7 +307,14 @@ export function App() {
       </header>
 
       {/* Module Switcher Navigation */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20 }} className="no-print">
+      <div style={{ display: 'flex', gap: 10, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }} className="no-print">
+        <button
+          className={`btn ${activeModule === 'inpatient' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('inpatient')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <BedDouble size={18} /> Inpatient & Bed Management (IPD)
+        </button>
         <button
           className={`btn ${activeModule === 'radiology' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('radiology')}
@@ -365,6 +373,16 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* Inpatient & Bed Management (IPD) View */}
+      {activeModule === 'inpatient' && (
+        <InpatientWorkspace
+          apiBaseUrl={API_BASE_URL}
+          token={token}
+          userRole={userRole}
+          onNotification={(type, message) => setNotification({ type, message })}
+        />
       )}
 
       {/* Radiology Information System (RIS) View */}
