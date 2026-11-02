@@ -464,4 +464,44 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Mandatory post-discharge `CLEANING` quarantine state requiring explicit housekeeping clearance.
   - [ ] **Option B**: Immediate automated transition to `AVAILABLE` upon discharge.
 
+---
+
+## 21. Phase 18 Cashier, Shift Close & Treasury Settlement
+
+### 51. Single Active Shift Invariant per Cashier
+- **Evidence**: Legacy Laravel `ShiftClose` lacked active shift enforcement, allowing cashiers to accept payments indefinitely without opening floats or formal shift boundaries.
+- **Resolution**: A cashier is restricted to at most one active shift (`status IN ('OPEN', 'CLOSING', 'PENDING_APPROVAL')`). Attempting to open a second shift returns `409 ConflictException: Cashier already has an active shift`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict database and service-level invariant restricting each cashier to a single active shift until approved and closed.
+  - [ ] **Option B**: Allow concurrent floating shifts across counters without session binding.
+
+### 52. Physical Drawer Cash vs. Non-Cash Isolation
+- **Evidence**: In legacy reports, card and bank payments were sometimes conflated with physical cash, leading to false drawer shortages during shift closing.
+- **Resolution**: Only payments with `method = 'Cash'` contribute to expected physical drawer cash: `expectedCash = openingFloat + sum(cash_payments) - sum(cash_payouts) + sum(cash_adjustments)`. Non-cash collections (Card, Bank Transfer, Cheque, Online) are tracked in independent treasury buckets and never counted towards physical drawer cash.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict financial separation between physical cash drawer balances and non-cash clearing methods.
+  - [ ] **Option B**: Conflate all settlement methods into a single generic shift total.
+
+### 53. Dual-Control Shift Approval & Separation of Duties
+- **Evidence**: Legacy `CashController.php` allowed the same user closing a shift to mark it reconciled without managerial oversight.
+- **Resolution**: Implemented dual-control verification. Cashiers count physical cash, record denomination breakdowns (5000, 1000, 500, etc.), and submit shifts to `PENDING_APPROVAL`. Cashiers cannot approve their own shift (`403 Forbidden: Separation of duties`). An authorized supervisor must review the variance and approve (`CLOSED`) or reject with a mandatory explanation (`REJECTED`). Dual-write backwards compatibility syncs approved closures to the legacy `shift_close` table.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Enforced managerial separation of duties with denomination auditing, variance explanation, and legacy synchronization.
+  - [ ] **Option B**: Single-step self-closing by cashiers without supervisor review.
+
+### 54. Inpatient Folio Charge Accrual vs. Cashier Receipt Invariant
+- **Evidence**: In hospital accounting, ordering a lab test or incurring a daily bed fee creates accrued hospital debt, but does NOT represent received cash.
+- **Resolution**: Inpatient folio charges (`InpatientFolioItem`) do not generate `CashTransaction` records. Only when an actual payment is collected (e.g. folio deposit, direct invoice payment, or discharge folio settlement) does the cashier module create an immutable `CashTransaction` linked to the active shift.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict segregation between debt accrual (folio charges) and cash receipts (settled payments).
+  - [ ] **Option B**: Create temporary receipt records for uncollected folio charges.
+
+### 55. Multi-Invoice Oldest-First Allocation with Audited Write-Offs
+- **Evidence**: Returning outpatient and inpatient clients frequently owe balances across multiple historical invoices, which legacy cashiers struggled to reconcile individually.
+- **Resolution**: Implemented unified patient treasury settlement (`POST /api/v1/cashier/settlement/:patientId`) allocating lump-sum payments to the oldest unpaid invoice first. Any approved concession or write-off requires a mandatory textual reason, updates invoice balances atomically within an interactive transaction, and records an auditable `write_off` transaction.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Automated oldest-first debt liquidation with mandatory justification for write-offs.
+  - [ ] **Option B**: Require manual line-by-line payment against individual invoices.
+
+
 

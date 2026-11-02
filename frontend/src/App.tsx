@@ -19,7 +19,8 @@ import { PharmacyWorkspace } from './components/PharmacyWorkspace';
 import { LaboratoryWorkspace } from './components/LaboratoryWorkspace';
 import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
 import { InpatientWorkspace } from './components/InpatientWorkspace';
-import { Radio, BedDouble } from 'lucide-react';
+import { CashierWorkspace } from './components/CashierWorkspace';
+import { Radio, BedDouble, DollarSign } from 'lucide-react';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -57,7 +58,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'inpatient' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('inpatient');
+  const [activeModule, setActiveModule] = useState<'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('cashier');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -65,7 +66,7 @@ export function App() {
 
   // Auth & Token simulation (Development only)
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
-  const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist'>('Laboratorist');
+  const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist' | 'Receptionist'>('Receptionist');
 
   // Form state
   const [patientId, setPatientId] = useState('1');
@@ -100,7 +101,7 @@ export function App() {
     }
   }, [userRole]);
 
-  const loginAs = async (role: 'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist') => {
+  const loginAs = async (role: 'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist' | 'Receptionist') => {
     if (!isDev) {
       // In production, authentication is handled through the dedicated login screen
       return;
@@ -111,6 +112,7 @@ export function App() {
       if (role === 'Doctor') email = 'doctor.test@medora.hospital';
       if (role === 'Pharmacist') email = 'pharmacist.test@medora.hospital';
       if (role === 'Laboratorist') email = 'laboratorist.test@medora.hospital';
+      if (role === 'Receptionist') email = 'receptionist.test@medora.hospital';
 
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
@@ -291,6 +293,7 @@ export function App() {
                 value={userRole}
                 onChange={(e) => setUserRole(e.target.value as any)}
               >
+                <option value="Receptionist">Receptionist / Cashier (POS & Drawer)</option>
                 <option value="Laboratorist">Laboratorist (LIS Specimen/Analysis)</option>
                 <option value="Doctor">Doctor (Prescribe/View)</option>
                 <option value="Pharmacist">Pharmacist (Catalogue/Stock)</option>
@@ -314,6 +317,13 @@ export function App() {
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
         >
           <BedDouble size={18} /> Inpatient & Bed Management (IPD)
+        </button>
+        <button
+          className={`btn ${activeModule === 'cashier' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('cashier')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <DollarSign size={18} /> Cashier & Shift Close (POS)
         </button>
         <button
           className={`btn ${activeModule === 'radiology' ? 'btn-primary' : 'btn-secondary'}`}
@@ -385,6 +395,14 @@ export function App() {
         />
       )}
 
+      {/* Cashier, Shift Close & Treasury View */}
+      {activeModule === 'cashier' && (
+        <CashierWorkspace
+          token={token}
+          userRole={userRole}
+        />
+      )}
+
       {/* Radiology Information System (RIS) View */}
       {activeModule === 'radiology' && (
         <RadiologyWorkspace
@@ -406,7 +424,7 @@ export function App() {
         <PharmacyWorkspace
           apiBaseUrl={API_BASE_URL}
           token={token}
-          userRole={userRole}
+          userRole={userRole as any}
           onNotification={(type, message) => setNotification({ type, message })}
         />
       )}
@@ -416,7 +434,7 @@ export function App() {
         <MedicineCatalogue
           apiBaseUrl={API_BASE_URL}
           token={token}
-          userRole={userRole}
+          userRole={userRole as any}
           onNotification={(type, message) => setNotification({ type, message })}
         />
       )}

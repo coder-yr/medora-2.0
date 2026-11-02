@@ -229,7 +229,17 @@ export class InvoiceService {
         );
       }
 
-      await tx.invoicePayment.create({
+      let activeShiftId: bigint | null = null;
+      if (userId && (tx as any).cashierShift) {
+        const activeShift = await (tx as any).cashierShift.findFirst({
+          where: { cashierId: BigInt(userId), status: 'OPEN' },
+        });
+        if (activeShift) {
+          activeShiftId = activeShift.id;
+        }
+      }
+
+      const createdInvPayment = await tx.invoicePayment.create({
         data: {
           paymentId: BigInt(idStr),
           amount,
@@ -237,8 +247,38 @@ export class InvoiceService {
           reference: dto.reference ?? null,
           paidAt,
           receivedBy: userId ? BigInt(userId) : null,
+          shiftId: activeShiftId,
         },
       });
+
+      if (activeShiftId && (tx as any).cashTransaction) {
+        const methodStr = (dto.method || 'Cash').toLowerCase().trim();
+        const isCash = methodStr === '' || methodStr === 'cash';
+        const now = new Date();
+        const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+        const count = await (tx as any).cashTransaction.count({
+          where: { transactionNumber: { startsWith: `CTX-${dateStr}-` } },
+        });
+        const txNumber = `CTX-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+        await (tx as any).cashTransaction.create({
+          data: {
+            shiftId: activeShiftId,
+            transactionNumber: txNumber,
+            transactionType: 'PAYMENT_RECEIVED',
+            paymentId: BigInt(idStr),
+            invoicePaymentId: createdInvPayment.id,
+            sourceModule: 'INVOICE',
+            sourceReference: dto.reference ?? `INV-${idStr}`,
+            idempotencyKey: `INV-PAY-${createdInvPayment.id}`,
+            paymentMethod: dto.method || 'Cash',
+            amount,
+            isCash,
+            direction: 'INFLOW',
+            recordedBy: BigInt(userId!),
+            notes: `Payment recorded on invoice #${idStr}`,
+          },
+        });
+      }
 
       const newTotalPaid = InvoiceService.round2(totalPaidBefore + amount);
       const newBalance = InvoiceService.round2(grossTotal - newTotalPaid);

@@ -1294,6 +1294,40 @@ export class InpatientService {
         },
       });
 
+      // If amountPaid > 0 and user has an active shift, record CashTransaction
+      if (amountPaid > 0 && userId && (tx as any).cashierShift) {
+        const activeShift = await (tx as any).cashierShift.findFirst({
+          where: { cashierId: BigInt(userId), status: 'OPEN' },
+        });
+
+        if (activeShift && (tx as any).cashTransaction) {
+          const methodStr = (dto.paymentMethod || 'Cash').toLowerCase().trim();
+          const isCash = methodStr === '' || methodStr === 'cash';
+          const now = new Date();
+          const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+          const count = await (tx as any).cashTransaction.count({
+            where: { transactionNumber: { startsWith: `CTX-${dateStr}-` } },
+          });
+          const txNumber = `CTX-${dateStr}-${String(count + 1).padStart(4, '0')}`;
+          await (tx as any).cashTransaction.create({
+            data: {
+              shiftId: activeShift.id,
+              transactionNumber: txNumber,
+              transactionType: 'PAYMENT_RECEIVED',
+              sourceModule: 'INPATIENT_FOLIO',
+              sourceReference: folio.folioNumber,
+              idempotencyKey: `FOL-SETTLE-${folio.id}-${newPaid}`,
+              paymentMethod: dto.paymentMethod || 'Cash',
+              amount: new Prisma.Decimal(amountPaid),
+              isCash,
+              direction: 'INFLOW',
+              recordedBy: BigInt(userId),
+              notes: dto.remarks || `Inpatient folio settlement for ${folio.folioNumber}`,
+            },
+          });
+        }
+      }
+
       return {
         folio: serializeBigInt(updated),
       };

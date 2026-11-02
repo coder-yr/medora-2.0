@@ -2,9 +2,10 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 17: Inpatient & Bed Management System (IPD)**
+- **Current Phase**: **Phase 18: Cashier, Shift Close & Treasury Settlement**
 - **Status**: **COMPLETED**
 - **Date**: 2026-11-02
+- **Next Phase**: **Phase 19: Emergency, Triage & Operating Theatre (OT)**
 - **Approved Target Stack**:
   - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS / Modern CSS (scaffolded in `frontend/`)
   - **Backend**: NestJS 11 + TypeScript (trusted business logic boundary)
@@ -40,6 +41,7 @@
 | **Phase 15** | Radiology Information System (RIS) (11th Module) | `RadiologyModule` (imaging catalogue, multi-modality procedures, collision-free equipment scheduling, patient arrival & examination workflow, reporting workbench, two-stage verification/authorization, immutable report amendments with mandatory justification, automated financial billing integration, TAT analytics), React 19 RIS workspace with printable diagnostic imaging report, Supabase migration `20261102160000_phase_15_radiology`, [`docs/radiology-migration-mapping.md`](radiology-migration-mapping.md) | **COMPLETED** |
 | **Phase 16** | Complete Legacy Gap Analysis & Remaining Module Discovery | Comprehensive audit of all 96 legacy models, 47 controllers, 251 routes, and 104 tables; identification of 33 obsolete school tables; 17 active hospital domains categorized; cross-module integration risks, database integrity, and architecture security evaluated; prioritized 7-phase roadmap created with Phase 17 (Inpatient & Bed Management) justified as next phase, [`docs/phase-16-legacy-gap-analysis.md`](phase-16-legacy-gap-analysis.md) | **COMPLETED** |
 | **Phase 17** | Inpatient & Bed Management System (IPD) (12th Module) | `InpatientModule` (ward/bed registers, pessimistic row-locked admissions, deterministic dual-bed transfer locks, complete discharge lifecycle with `CLEANING` state, stay days auto-calculation, unified Inpatient Folio with multi-department charge posting, idempotency deduplication, audited reversals, settlement sync), React 19 IPD workspace, Supabase migration `20261102180000_phase_17_inpatient`, [`docs/inpatient-migration-mapping.md`](inpatient-migration-mapping.md) | **COMPLETED** |
+| **Phase 18** | Cashier, Shift Close & Treasury Settlement (13th Module) | `CashierModule` (drawer register, single active shift invariant, expected cash calculation, non-cash separation, petty cash payouts/adjustments, counted cash & denominations breakdown, supervisor dual-control separation of duties, legacy `shift_close` sync, multi-invoice oldest-first patient settlement, Financial Day Book with CSV export, cross-module invoice & inpatient folio hooks), React 19 Cashier Workspace with handover slip, Supabase migration `20261102200000_phase_18_cashier`, [`docs/cashier-migration-mapping.md`](cashier-migration-mapping.md) | **COMPLETED** |
 
 ---
 
