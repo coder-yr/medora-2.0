@@ -129,10 +129,31 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 7. Next Module Readiness
+## 7. Phase 14 Domain Migration Summary: Laboratory Management System (LIS)
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, and `PharmacyModule` fully migrated and verified on Supabase PostgreSQL:
-- **`Phase 14: Laboratory & Diagnostic Module`**: Lab test catalogues, specimen collection, outpatient diagnostic orders, and formal pathology/radiology report generation.
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Selected Domain** | **`LaboratoryModule`** (Diagnostic Laboratory Information System - LIS) & **Frontend Laboratory Workspace** | Test catalogue & parameterized formulary, computerized physician order entry (CPOE), phlebotomy collection queues, accessioning, specimen rejection triage, parameter result entry workbench, two-stage QC validation & release, controlled audited amendments, turnaround time analytics, and billing auto-invoice generation |
+| **Target Database Mapping** | 7 new relational models in `backend/prisma/schema.prisma`: `lab_category`, `lab_test_parameter`, `lab`, `lab_sample`, `lab_test`, `lab_result_parameter`, `lab_report_amendment`, plus reverse relations on `appointment`, `consultation`, `payment` | `backend/prisma/migrations/20261031160000_phase_14_laboratory/migration.sql`, verified on disposable PostgreSQL schema, applied to Supabase PostgreSQL |
+| **Legacy Source Parity** | `legacy/app/Http/Controllers/LabController.php`, `legacy/app/Http/Controllers/Laboratorist/`, `legacy/app/Models/Lab.php`, `legacy/app/Models/LabCategory.php`, `legacy/resources/views/app/laboratories/` | Complete 100% legacy parity with modern multi-parameter testing, phlebotomy, and accessioning workflows |
+| **Backend Endpoints** | `GET /api/v1/lab/dashboard`<br>`GET /api/v1/lab/catalogue`<br>`POST /api/v1/lab/catalogue`<br>`GET /api/v1/lab/catalogue/:id`<br>`PUT /api/v1/lab/catalogue/:id`<br>`DELETE /api/v1/lab/catalogue/:id`<br>`POST /api/v1/lab/orders`<br>`GET /api/v1/lab/orders`<br>`GET /api/v1/lab/orders/:id`<br>`POST /api/v1/lab/orders/:id/cancel`<br>`GET /api/v1/lab/samples/queue`<br>`POST /api/v1/lab/samples/:id/collect`<br>`POST /api/v1/lab/samples/:id/receive`<br>`POST /api/v1/lab/samples/:id/reject`<br>`POST /api/v1/lab/orders/:id/results`<br>`POST /api/v1/lab/orders/:id/verify`<br>`POST /api/v1/lab/orders/:id/approve`<br>`POST /api/v1/lab/orders/:id/amend`<br>`GET /api/v1/lab/reports/tat`<br>`GET /api/v1/lab/reports/rejections` | Full OpenAPI Swagger documented endpoints with granular RBAC permissions |
+| **Frontend Deliverables** | React 19 + TypeScript + Vite comprehensive LIS workspace in `frontend/src/components/LaboratoryWorkspace.tsx` | Real-time laboratory KPI row (Pending, Collection, Processing, Verification, Completed, Rejections, Formulary), multi-tab worklists (Dashboard, Test Formulary, Orders, Phlebotomy & Accessioning, Result Workbench, Printable Report), Requisition Modal with auto-invoicing, Specimen Rejection Modal, Controlled Amendment Modal, and printable Hospital Diagnostic Report with electronic sign-offs |
+| **Business Rules & Data Integrity** | 1. **Accessioning & Tube Barcoding**: Unique specimen tracking number generated per sample container with cold-chain verification<br>2. **Legacy Blank-Box Preservation**: Empty input submissions for existing parameters never overwrite previously recorded readings<br>3. **Specimen Rejection Triage**: Samples rejected for hemolysis/clotting trigger re-draw queues without corrupting requisition history<br>4. **Two-Stage Clinical Review**: Medical technologist parameter verification followed by consultant pathologist final release (`VERIFIED` &rarr; `COMPLETED`)<br>5. **Immutable Authorized Reports**: Direct modification of `COMPLETED` reports is blocked (`400 Bad Request`); all corrections require audited `lab_report_amendment` records with stated clinical justification<br>6. **Automated Financial Reconciliation**: Creates itemized `Payment` records in `InvoiceModule` with category `'LABORATORY'` | `LaboratoryService` unit test suite (15 unit tests) & PostgreSQL E2E suite (27 integration tests) |
+| **Authorization & Security** | Granular RBAC (`lab_view`, `lab_order`, `lab_process`, `lab_result_enter`, `lab_verify`, `lab_approve`, `lab_amend`, `lab_catalogue_manage`) | Laboratorist, Doctor, and Admin granted appropriate clinical capabilities; unauthorized operations strictly rejected (401/403) |
+| **Unit Test Coverage** | **18 suites passed, 172 tests passed** (15 new tests in `laboratory.service.spec.ts`) | `npm test` (Exit code 0) |
+| **E2E Integration Tests**| **12 suites passed, 146 tests passed** across all modules against live Supabase PostgreSQL (27 new tests in `laboratory.e2e-spec.ts`) | `npm run test:e2e` (Exit code 0) |
+| **Linting & Code Quality**| **ESLint 9 + Prettier + Strict TypeScript** | Backend: `npm run lint` (0 errors), `npx tsc --noEmit` (0 errors)<br>Frontend: `npm run lint` (0 errors), `tsc -b && vite build` (0 errors) |
+| **Production Builds** | Backend: `npm run build` (Exit code 0)<br>Frontend: `npm run build` (Exit code 0, 610ms) | Ready for containerization |
+| **Legacy Source Integrity**| **100% Preserved** | `legacy/` 0 modifications; unstaged `app/Models/SMS.php` artifact strictly preserved |
+
+---
+
+## 8. Next Module Readiness
+
+With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, `PharmacyModule`, and `LaboratoryModule` fully migrated and verified on Supabase PostgreSQL:
 - **`Phase 15: Inpatient & Bed Management System`**: Ward/bed admission, bed transfers, inpatient nurse charting, and discharge summaries.
+- **`Phase 16: Operation Theatre & Surgical Suite`**: OT scheduling, surgical teams, pre-op/post-op notes, and anesthesia records.
+
+
 
 

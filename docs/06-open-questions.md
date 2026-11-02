@@ -383,6 +383,38 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [ ] **Option A (Recommended)**: Condition-based return triage where only verified `SALEABLE` packages re-enter inventory, while others are quarantined or written off.
   - [ ] **Option B**: Universal prohibition of patient medication returns to inventory (100% write-off policy).
 
+---
+
+## 18. Phase 14 Laboratory Management System (LIS)
+
+### 41. Specimen Accessioning & Barcode Rejection Policy
+- **Evidence**: Legacy Laravel had no sample collection records (`lab_sample`); requests directly received text results in `lab_test.result`. Medora 2.0 introduces specimen accessioning (`LabSample`) with unique identifiers and rejection tracking (`HEMOLYZED`, `CLOTTED`, `INSUFFICIENT_VOLUME`, `WRONG_CONTAINER`, `MISLABELED`).
+- **Implementation**: When an order is raised, sample records are generated in `SAMPLE_PENDING` state. Phlebotomists collect specimens (`COLLECTED`), and laboratory reception accessions them (`RECEIVED`) or rejects them with an explicit clinical rationale (`REJECTED`), which returns the order to `SAMPLE_PENDING` for recollection.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Explicit accessioning lifecycle where processing and result entry are blocked until specimen receipt is verified.
+  - [ ] **Option B**: Streamlined direct result entry without mandatory phlebotomy accessioning steps for rapid walk-in tests.
+
+### 42. Separation of Duties for Lab Result Entry vs. Verification/Approval
+- **Evidence**: Clinical laboratory accreditation (ISO 15189 / CAP) requires that high-complexity analytical results entered by a laboratory technician be independently reviewed and verified by a pathologist or senior laboratorist before release to clinicians or patients.
+- **Implementation**: Result entry moves test items to `RESULT_ENTERED`. Final clinical release to `COMPLETED` requires authorization with `lab_report_approve` permission, with the verifier identity (`verified_by`) and timestamp recorded. For small outpatient clinics, single-step verification can be permitted by administrators with both permissions.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Role-based separation of duties requiring verified approval prior to report finalization, with dual-role override for solo practitioners.
+  - [ ] **Option B**: Automatic immediate release upon entering all parameter results without a distinct verification stage.
+
+### 43. Final Report Immutability vs. Structured Amendments
+- **Evidence**: In legacy Laravel, results could be repeatedly edited by re-submitting the form, risking silent retroactive alterations to patient clinical records.
+- **Implementation**: Once an order reaches `COMPLETED`, direct modifications are blocked (`400 Bad Request`). Any amendments must be submitted via `POST /lab/orders/:id/amend`, which records the prior value, the amended value, the reason for amendment, the authorizing pathologist, and the timestamp in an immutable `LabReportAmendment` audit trail.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Strict report immutability with append-only clinical amendment logs.
+  - [ ] **Option B**: Mutable reports with general revision timestamp updates.
+
+### 44. Prepayment vs. Post-service Billing for Outpatient Laboratory Tests
+- **Evidence**: The prompt specifies: *"Inspect the existing billing workflow before implementing payment requirements. Do not invent a mandatory prepayment policy."*
+- **Implementation**: Medora 2.0 supports both workflows: tests can be ordered with immediate invoice generation (`invoice_id` linked to `InvoiceModule`), or raised as pending clinical orders where payment can be collected at the cashier desk either before sample collection or at report pickup.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Flexible billing policy where unpaid orders are accepted for processing but clearly flagged in the LIS workspace.
+  - [ ] **Option B**: Mandatory prepayment gate where phlebotomy cannot collect samples until payment is verified.
+
 
 
 

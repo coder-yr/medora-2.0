@@ -11,10 +11,12 @@ import {
   Shield,
   Stethoscope,
   Boxes,
+  Microscope,
 } from 'lucide-react';
 
 import { MedicineCatalogue } from './components/MedicineCatalogue';
 import { PharmacyWorkspace } from './components/PharmacyWorkspace';
+import { LaboratoryWorkspace } from './components/LaboratoryWorkspace';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -52,7 +54,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines' | 'pharmacy'>('pharmacy');
+  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines' | 'pharmacy' | 'laboratory'>('laboratory');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -60,7 +62,7 @@ export function App() {
 
   // Auth & Token simulation (Development only)
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
-  const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Pharmacist'>('Admin');
+  const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist'>('Laboratorist');
 
   // Form state
   const [patientId, setPatientId] = useState('1');
@@ -95,7 +97,7 @@ export function App() {
     }
   }, [userRole]);
 
-  const loginAs = async (role: 'Doctor' | 'Admin' | 'Pharmacist') => {
+  const loginAs = async (role: 'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist') => {
     if (!isDev) {
       // In production, authentication is handled through the dedicated login screen
       return;
@@ -105,6 +107,7 @@ export function App() {
       let email = 'admin.test@medora.hospital';
       if (role === 'Doctor') email = 'doctor.test@medora.hospital';
       if (role === 'Pharmacist') email = 'pharmacist.test@medora.hospital';
+      if (role === 'Laboratorist') email = 'laboratorist.test@medora.hospital';
 
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
         method: 'POST',
@@ -285,6 +288,7 @@ export function App() {
                 value={userRole}
                 onChange={(e) => setUserRole(e.target.value as any)}
               >
+                <option value="Laboratorist">Laboratorist (LIS Specimen/Analysis)</option>
                 <option value="Doctor">Doctor (Prescribe/View)</option>
                 <option value="Pharmacist">Pharmacist (Catalogue/Stock)</option>
                 <option value="Admin">Administrator (All Permissions)</option>
@@ -301,6 +305,13 @@ export function App() {
 
       {/* Module Switcher Navigation */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20 }} className="no-print">
+        <button
+          className={`btn ${activeModule === 'laboratory' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('laboratory')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <Microscope size={18} /> Laboratory & Diagnostics (LIS)
+        </button>
         <button
           className={`btn ${activeModule === 'pharmacy' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('pharmacy')}
@@ -345,6 +356,14 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* Laboratory Information System (LIS) View */}
+      {activeModule === 'laboratory' && (
+        <LaboratoryWorkspace
+          token={token}
+          userRole={userRole}
+        />
       )}
 
       {/* Pharmacy & Inventory Management View */}

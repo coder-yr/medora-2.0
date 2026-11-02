@@ -381,6 +381,7 @@ model Appointment {
   doctor       Doctor          @relation(fields: [doctorId], references: [id])
   branch       HospitalBranch? @relation(fields: [branchId], references: [id])
   consultation Consultation?
+  labs         Lab[]
 
   @@index([doctorId, date])
   @@index([patientId])
@@ -489,6 +490,7 @@ model Consultation {
   appointment Appointment? @relation(fields: [appointmentId], references: [id])
   patient     Patient      @relation(fields: [patientId], references: [id])
   doctor      Doctor?      @relation(fields: [doctorId], references: [id])
+  labs        Lab[]
 
   @@index([patientId])
   @@index([doctorId])
@@ -567,58 +569,175 @@ model LabCategory {
   referenceValue String?  @map("reference_value") @db.VarChar(255)
   description    String?  @db.Text
   price          Decimal? @db.Decimal(10, 2)
+  sampleType     String?  @map("sample_type") @db.VarChar(50)
+  turnaroundHours Int?    @default(24) @map("turnaround_hours")
+  instructions   String?  @db.Text
+  isActive       Boolean  @default(true) @map("is_active")
 
   // Relations
-  labTests LabTest[]
+  labTests   LabTest[]
+  parameters LabTestParameter[]
 
   @@map("lab_category")
 }
 
+model LabTestParameter {
+  id             BigInt    @id @default(autoincrement())
+  labCategoryId  BigInt    @map("lab_category_id")
+  name           String    @db.VarChar(100)
+  unit           String?   @db.VarChar(50)
+  referenceRange String?   @map("reference_range") @db.VarChar(255)
+  gender         String?   @default("ALL") @db.VarChar(20)
+  ageMin         Int?      @map("age_min")
+  ageMax         Int?      @map("age_max")
+  displayOrder   Int       @default(0) @map("display_order")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  labCategory      LabCategory          @relation(fields: [labCategoryId], references: [id], onDelete: Cascade)
+  resultParameters LabResultParameter[]
+
+  @@index([labCategoryId])
+  @@map("lab_test_parameter")
+}
+
 model Lab {
   id             BigInt    @id @default(autoincrement())
+  orderNumber    String?   @unique @map("order_number") @db.VarChar(50)
   patientId      BigInt    @map("patient")
   doctorId       BigInt?   @map("doctor")
+  appointmentId  BigInt?   @map("appointment_id")
+  consultationId BigInt?   @map("consultation_id")
+  invoiceId      BigInt?   @map("invoice_id")
   date           String    @db.VarChar(50)
   dateString     String?   @map("date_string") @db.VarChar(50)
   category       String?   @db.VarChar(255) // Comma-delimited category IDs
   categoryName   String?   @map("category_name") @db.VarChar(1000)
   report         String?   @db.Text
   status         String    @default("requested") @db.VarChar(50)
+  priority       String    @default("ROUTINE") @db.VarChar(20)
+  clinicalNotes  String?   @map("clinical_notes") @db.Text
   user           String?   @db.VarChar(50)
   patientName    String?   @map("patient_name") @db.VarChar(100)
   patientPhone   String?   @map("patient_phone") @db.VarChar(50)
   patientAddress String?   @map("patient_address") @db.VarChar(255)
   doctorName     String?   @map("doctor_name") @db.VarChar(100)
+  verifiedBy     BigInt?   @map("verified_by")
+  verifiedAt     DateTime? @map("verified_at") @db.Timestamptz
+  approvedBy     BigInt?   @map("approved_by")
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz
+  completedAt    DateTime? @map("completed_at") @db.Timestamptz
+  cancelledAt    DateTime? @map("cancelled_at") @db.Timestamptz
+  cancelReason   String?   @map("cancel_reason") @db.Text
   createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  patient Patient   @relation(fields: [patientId], references: [id])
-  doctor  Doctor?   @relation(fields: [doctorId], references: [id])
-  tests   LabTest[]
+  patient      Patient              @relation(fields: [patientId], references: [id])
+  doctor       Doctor?              @relation(fields: [doctorId], references: [id])
+  appointment  Appointment?         @relation(fields: [appointmentId], references: [id])
+  consultation Consultation?        @relation(fields: [consultationId], references: [id])
+  invoice      Payment?             @relation(fields: [invoiceId], references: [id])
+  tests        LabTest[]
+  samples      LabSample[]
+  amendments   LabReportAmendment[]
 
   @@index([patientId])
+  @@index([doctorId])
   @@index([status])
+  @@index([invoiceId])
   @@map("lab")
 }
 
-model LabTest {
-  id            BigInt    @id @default(autoincrement())
-  labId         BigInt    @map("lab_id")
-  labCategoryId BigInt?   @map("lab_category_id")
-  name          String    @db.VarChar(100)
-  referenceValue String?  @map("reference_value") @db.VarChar(255)
-  result        String?   @db.Text
-  status        String    @default("requested") @db.VarChar(50)
-  createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+model LabSample {
+  id              BigInt    @id @default(autoincrement())
+  labId           BigInt    @map("lab_id")
+  sampleNumber    String    @unique @map("sample_number") @db.VarChar(50)
+  sampleType      String    @map("sample_type") @db.VarChar(50)
+  status          String    @default("PENDING") @db.VarChar(50)
+  collectedAt     DateTime? @map("collected_at") @db.Timestamptz
+  collectedBy     BigInt?   @map("collected_by")
+  receivedAt      DateTime? @map("received_at") @db.Timestamptz
+  receivedBy      BigInt?   @map("received_by")
+  rejectedAt      DateTime? @map("rejected_at") @db.Timestamptz
+  rejectedBy      BigInt?   @map("rejected_by")
+  rejectionReason String?   @map("rejection_reason") @db.Text
+  notes           String?   @db.Text
+  createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  lab         Lab          @relation(fields: [labId], references: [id], onDelete: Cascade)
-  labCategory LabCategory? @relation(fields: [labCategoryId], references: [id])
+  lab   Lab       @relation(fields: [labId], references: [id], onDelete: Cascade)
+  tests LabTest[]
 
   @@index([labId])
+  @@index([status])
+  @@map("lab_sample")
+}
+
+model LabTest {
+  id             BigInt    @id @default(autoincrement())
+  labId          BigInt    @map("lab_id")
+  labCategoryId  BigInt?   @map("lab_category_id")
+  sampleId       BigInt?   @map("sample_id")
+  name           String    @db.VarChar(100)
+  referenceValue String?   @map("reference_value") @db.VarChar(255)
+  priceSnapshot  Decimal?  @map("price_snapshot") @db.Decimal(10, 2)
+  sampleType     String?   @map("sample_type") @db.VarChar(50)
+  result         String?   @db.Text
+  status         String    @default("requested") @db.VarChar(50)
+  reportedAt     DateTime? @map("reported_at") @db.Timestamptz
+  createdAt      DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  lab              Lab                  @relation(fields: [labId], references: [id], onDelete: Cascade)
+  labCategory      LabCategory?         @relation(fields: [labCategoryId], references: [id])
+  sample           LabSample?           @relation(fields: [sampleId], references: [id])
+  resultParameters LabResultParameter[]
+
+  @@index([labId])
+  @@index([labCategoryId])
+  @@index([sampleId])
   @@map("lab_test")
+}
+
+model LabResultParameter {
+  id                     BigInt    @id @default(autoincrement())
+  labTestId              BigInt    @map("lab_test_id")
+  parameterId            BigInt?   @map("parameter_id")
+  parameterName          String    @map("parameter_name") @db.VarChar(100)
+  value                  String    @db.VarChar(255)
+  unitSnapshot           String?   @map("unit_snapshot") @db.VarChar(50)
+  referenceRangeSnapshot String?   @map("reference_range_snapshot") @db.VarChar(255)
+  abnormalFlag           String    @default("NORMAL") @map("abnormal_flag") @db.VarChar(20)
+  clinicalComments       String?   @map("clinical_comments") @db.Text
+  createdAt              DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  labTest   LabTest           @relation(fields: [labTestId], references: [id], onDelete: Cascade)
+  parameter LabTestParameter? @relation(fields: [parameterId], references: [id])
+
+  @@index([labTestId])
+  @@map("lab_result_parameter")
+}
+
+model LabReportAmendment {
+  id               BigInt    @id @default(autoincrement())
+  labId            BigInt    @map("lab_id")
+  amendedBy        BigInt    @map("amended_by")
+  reason           String    @db.Text
+  previousSnapshot Json      @map("previous_snapshot")
+  newSnapshot      Json      @map("new_snapshot")
+  createdAt        DateTime? @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  lab Lab @relation(fields: [labId], references: [id], onDelete: Cascade)
+
+  @@index([labId])
+  @@map("lab_report_amendment")
 }
 
 model RadiologyExam {
@@ -1228,6 +1347,7 @@ model Payment {
   doctorShares    DoctorShare[]
   radiologyOrders RadiologyOrder[]
   pharmacyDispensations PharmacyDispensation[]
+  labs            Lab[]
 
   @@index([patientId])
   @@index([status])

@@ -143,4 +143,6 @@ npx prisma migrate resolve --rolled-back <migration_name>
 | `0_init/migration.sql` | 2026-10-31 | Baseline Schema | 39 core hospital models, sequences, keys, and indexes |
 | `20261031120000_phase_12_medicine_catalogue` | 2026-10-31 | Phase 12: Medicine Catalogue | Modernized `medicine` table, normalized foreign keys, `medicine_category`, `manufacturer`, `dosage_form`, `measurement_unit`, `supplier` |
 | `20261031140000_phase_13_pharmacy_inventory` | 2026-10-31 | Phase 13: Pharmacy & Inventory | Batch management (`medicine_batch`), audit ledger (`stock_movement`), procurement (`purchase_order`, `purchase_order_item`, `goods_receipt`, `goods_receipt_item`), dispensing (`pharmacy_dispensation`, `pharmacy_dispensation_item`), adjustments (`stock_adjustment`, `stock_adjustment_item`), returns (`pharmacy_return`, `pharmacy_return_item`), and `prescription_medicine.dispensed_quantity` |
+| `20261031160000_phase_14_laboratory` | 2026-10-31 | Phase 14: Laboratory Information System (LIS) | Test catalogue & parameters (`lab_category`, `lab_test_parameter`), requisitions & specimens (`lab`, `lab_sample`, `lab_test`), analytical parameter entry (`lab_result_parameter`), audit-controlled report amendments (`lab_report_amendment`), reverse relations on `appointment`, `consultation`, `payment` |
+
 

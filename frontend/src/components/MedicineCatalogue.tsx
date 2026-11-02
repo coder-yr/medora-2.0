@@ -29,7 +29,7 @@ import type {
 interface Props {
   apiBaseUrl: string;
   token: string;
-  userRole: 'Doctor' | 'Admin' | 'Pharmacist';
+  userRole: 'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist';
   onNotification: (type: 'success' | 'error', message: string) => void;
 }
 

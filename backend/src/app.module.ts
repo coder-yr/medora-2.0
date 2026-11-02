@@ -20,6 +20,7 @@ import { PatientModule } from './modules/patient/patient.module';
 import { PrescriptionModule } from './modules/prescription/prescription.module';
 import { MedicineModule } from './modules/medicine/medicine.module';
 import { PharmacyModule } from './modules/pharmacy/pharmacy.module';
+import { LaboratoryModule } from './modules/laboratory/laboratory.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 
 @Module({
@@ -48,6 +49,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     PrescriptionModule,
     MedicineModule,
     PharmacyModule,
+    LaboratoryModule,
   ],
   providers: [
     {
