@@ -40,10 +40,13 @@ model User {
   updatedAt   DateTime?  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  branch             HospitalBranch?   @relation(fields: [branchId], references: [id])
-  shiftCloses        ShiftClose[]
-  reportedRadiologies RadiologyOrder[] @relation("ReportedRadiology")
-  sessions           UserSession[]
+  branch                 HospitalBranch?            @relation(fields: [branchId], references: [id])
+  shiftCloses            ShiftClose[]
+  reportedRadiologies    RadiologyOrder[]           @relation("ReportedRadiology")
+  technologistRadiologies RadiologyOrder[]          @relation("TechnologistRadiology")
+  verifiedRadiologies    RadiologyOrder[]           @relation("VerifiedRadiology")
+  radiologyAmendments    RadiologyReportAmendment[]
+  sessions               UserSession[]
 
   @@map("users")
 }
@@ -380,8 +383,9 @@ model Appointment {
   patient      Patient         @relation(fields: [patientId], references: [id])
   doctor       Doctor          @relation(fields: [doctorId], references: [id])
   branch       HospitalBranch? @relation(fields: [branchId], references: [id])
-  consultation Consultation?
-  labs         Lab[]
+  consultation    Consultation?
+  labs            Lab[]
+  radiologyOrders RadiologyOrder[]
 
   @@index([doctorId, date])
   @@index([patientId])
@@ -489,8 +493,9 @@ model Consultation {
   // Relations
   appointment Appointment? @relation(fields: [appointmentId], references: [id])
   patient     Patient      @relation(fields: [patientId], references: [id])
-  doctor      Doctor?      @relation(fields: [doctorId], references: [id])
-  labs        Lab[]
+  doctor          Doctor?          @relation(fields: [doctorId], references: [id])
+  labs            Lab[]
+  radiologyOrders RadiologyOrder[]
 
   @@index([patientId])
   @@index([doctorId])
@@ -740,55 +745,124 @@ model LabReportAmendment {
   @@map("lab_report_amendment")
 }
 
-model RadiologyExam {
-  id                BigInt    @id @default(autoincrement())
-  code              String    @unique @db.VarChar(20)
-  name              String    @db.VarChar(100)
-  modality          String    @db.VarChar(20) // XRAY, CT, MRI, US, MAMMO
-  bodyPart          String?   @map("body_part") @db.VarChar(50)
-  paymentCategoryId BigInt?   @map("payment_category_id")
-  active            Boolean   @default(true)
-  createdAt         DateTime? @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+model RadiologyCategory {
+  id           BigInt          @id @default(autoincrement())
+  name         String          @unique @db.VarChar(100)
+  modality     String          @db.VarChar(20) // xray, ultrasound, ct, mri, mammography, fluoroscopy, other
+  description  String?         @db.Text
+  displayOrder Int             @default(0) @map("display_order")
+  isActive     Boolean         @default(true) @map("is_active")
+  createdAt    DateTime?       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime?       @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  paymentCategory PaymentCategory? @relation(fields: [paymentCategoryId], references: [id])
-  orders          RadiologyOrder[]
+  exams        RadiologyExam[]
 
+  @@map("radiology_category")
+}
+
+model RadiologyExam {
+  id                      BigInt             @id @default(autoincrement())
+  code                    String             @unique @db.VarChar(30)
+  name                    String             @db.VarChar(120)
+  modality                String             @db.VarChar(20) // xray, ultrasound, ct, mri, mammography, fluoroscopy, other
+  bodyPart                String?            @map("body_part") @db.VarChar(50)
+  categoryId              BigInt?            @map("category_id")
+  paymentCategoryId       BigInt?            @map("payment_category_id")
+  price                   Decimal?           @db.Decimal(10, 2)
+  reportTemplate          String?            @map("report_template") @db.Text
+  preparationInstructions String?            @map("preparation_instructions") @db.Text
+  turnaroundHours         Int?               @default(24) @map("turnaround_hours")
+  active                  Boolean            @default(true)
+  createdAt               DateTime?          @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  category                RadiologyCategory? @relation(fields: [categoryId], references: [id])
+  paymentCategory         PaymentCategory?   @relation(fields: [paymentCategoryId], references: [id])
+  orders                  RadiologyOrder[]
+
+  @@index([categoryId])
+  @@index([modality])
   @@map("radiology_exam")
 }
 
 model RadiologyOrder {
-  id                 BigInt    @id @default(autoincrement())
-  orderNumber        String    @unique @map("order_number") @db.VarChar(30)
-  patientId          BigInt    @map("patient_id")
-  doctorId           BigInt?   @map("doctor_id")
-  radiologyExamId    BigInt    @map("radiology_exam_id")
-  orderDate          DateTime  @map("order_date") @db.Timestamptz
-  clinicalIndication String?   @map("clinical_indication") @db.Text
-  urgency            String    @default("routine") @db.VarChar(10) // routine, urgent, stat
-  status             String    @default("ordered") @db.VarChar(20)
-  reportedAt         DateTime? @map("reported_at") @db.Timestamptz
-  reportedById       BigInt?   @map("reported_by")
-  technologistId     BigInt?   @map("technologist_id")
-  invoiceId          BigInt?   @map("invoice_id")
-  branchId           BigInt?   @map("branch_id")
-  findings           String?   @db.Text
-  impression         String?   @db.Text
-  recommendations    String?   @db.Text
-  createdAt          DateTime? @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt          DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  id                 BigInt                     @id @default(autoincrement())
+  orderNumber        String                     @unique @map("order_number") @db.VarChar(30)
+  patientId          BigInt                     @map("patient_id")
+  doctorId           BigInt?                    @map("doctor_id")
+  appointmentId      BigInt?                    @map("appointment_id")
+  consultationId     BigInt?                    @map("consultation_id")
+  radiologyExamId    BigInt                     @map("radiology_exam_id")
+  examName           String?                    @map("exam_name") @db.VarChar(120)
+  modality           String?                    @db.VarChar(20)
+  orderDate          DateTime                   @map("order_date") @db.Timestamptz
+  clinicalIndication String?                    @map("clinical_indication") @db.Text
+  urgency            String                     @default("routine") @db.VarChar(20) // routine, urgent, stat
+  urgent             Boolean                    @default(false)
+  status             String                     @default("ordered") @db.VarChar(30)
+  scheduledAt        DateTime?                  @map("scheduled_at") @db.Timestamptz
+  arrivedAt          DateTime?                  @map("arrived_at") @db.Timestamptz
+  performedAt        DateTime?                  @map("performed_at") @db.Timestamptz
+  equipmentRoom      String?                    @map("equipment_room") @db.VarChar(50)
+  findings           String?                    @db.Text
+  impression         String?                    @db.Text
+  recommendations    String?                    @db.Text
+  reportedById       BigInt?                    @map("reported_by")
+  reportedAt         DateTime?                  @map("reported_at") @db.Timestamptz
+  verifiedById       BigInt?                    @map("verified_by")
+  verifiedAt         DateTime?                  @map("verified_at") @db.Timestamptz
+  technologistId     BigInt?                    @map("technologist_id")
+  invoiceId          BigInt?                    @map("invoice_id")
+  branchId           BigInt?                    @map("branch_id")
+  cancelledAt        DateTime?                  @map("cancelled_at") @db.Timestamptz
+  cancelledById      BigInt?                    @map("cancelled_by")
+  cancelReason       String?                    @map("cancel_reason") @db.Text
+  createdBy          BigInt?                    @map("created_by")
+  createdAt          DateTime?                  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime?                  @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  patient       Patient         @relation(fields: [patientId], references: [id])
-  doctor        Doctor?         @relation(fields: [doctorId], references: [id])
-  radiologyExam RadiologyExam   @relation(fields: [radiologyExamId], references: [id])
-  reportedBy    User?           @relation("ReportedRadiology", fields: [reportedById], references: [id])
-  invoice       Payment?        @relation(fields: [invoiceId], references: [id])
+  patient            Patient                    @relation(fields: [patientId], references: [id])
+  doctor             Doctor?                    @relation(fields: [doctorId], references: [id])
+  appointment        Appointment?               @relation(fields: [appointmentId], references: [id])
+  consultation       Consultation?              @relation(fields: [consultationId], references: [id])
+  radiologyExam      RadiologyExam              @relation(fields: [radiologyExamId], references: [id])
+  reportedBy         User?                      @relation("ReportedRadiology", fields: [reportedById], references: [id])
+  verifiedBy         User?                      @relation("VerifiedRadiology", fields: [verifiedById], references: [id])
+  technologist       User?                      @relation("TechnologistRadiology", fields: [technologistId], references: [id])
+  invoice            Payment?                   @relation(fields: [invoiceId], references: [id])
+  amendments         RadiologyReportAmendment[]
 
   @@index([patientId])
+  @@index([doctorId])
+  @@index([appointmentId])
   @@index([status])
+  @@index([scheduledAt])
+  @@index([equipmentRoom])
+  @@index([invoiceId])
   @@map("radiology_order")
+}
+
+model RadiologyReportAmendment {
+  id                 BigInt         @id @default(autoincrement())
+  radiologyOrderId   BigInt         @map("radiology_order_id")
+  amendedBy          BigInt         @map("amended_by")
+  reason             String         @db.Text
+  previousFindings   String?        @map("previous_findings") @db.Text
+  previousImpression String?        @map("previous_impression") @db.Text
+  newFindings        String?        @map("new_findings") @db.Text
+  newImpression      String?        @map("new_impression") @db.Text
+  createdAt          DateTime?      @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  order              RadiologyOrder @relation(fields: [radiologyOrderId], references: [id], onDelete: Cascade)
+  amendedByUser      User           @relation(fields: [amendedBy], references: [id])
+
+  @@index([radiologyOrderId])
+  @@index([amendedBy])
+  @@map("radiology_report_amendment")
 }
 
 // =============================================================================

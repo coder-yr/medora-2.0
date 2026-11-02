@@ -61,6 +61,18 @@ export enum HospitalPermission {
   OPERATION_THEATRE_VIEW = 'operation_theatre_view',
   OPERATION_THEATRE_SCHEDULE = 'operation_theatre_schedule',
 
+  // Radiology & Imaging
+  RADIOLOGY_VIEW = 'radiology_view',
+  RADIOLOGY_ORDER = 'radiology_order',
+  RADIOLOGY_SCHEDULE = 'radiology_schedule',
+  RADIOLOGY_PROCESS = 'radiology_process',
+  RADIOLOGY_RESULT_ENTER = 'radiology_result_enter',
+  RADIOLOGY_VERIFY = 'radiology_verify',
+  RADIOLOGY_APPROVE = 'radiology_approve',
+  RADIOLOGY_AMEND = 'radiology_amend',
+  RADIOLOGY_CATALOGUE_MANAGE = 'radiology_catalogue_manage',
+  RADIOLOGY_REPORTS = 'radiology_reports',
+
   // Pharmacy
   MEDICINE_VIEW = 'medicine_view',
   MEDICINE_ADD = 'medicine_add',
@@ -164,6 +176,13 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.MEDICINE_VIEW,
     HospitalPermission.TELEMEDICINE_VIEW,
     HospitalPermission.TELEMEDICINE_SCHEDULE,
+    HospitalPermission.RADIOLOGY_VIEW,
+    HospitalPermission.RADIOLOGY_ORDER,
+    HospitalPermission.RADIOLOGY_RESULT_ENTER,
+    HospitalPermission.RADIOLOGY_VERIFY,
+    HospitalPermission.RADIOLOGY_APPROVE,
+    HospitalPermission.RADIOLOGY_AMEND,
+    HospitalPermission.RADIOLOGY_REPORTS,
   ],
   Nurse: [
     HospitalPermission.PATIENT_VIEW,
@@ -184,6 +203,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.LAB_SAMPLE_COLLECT,
     HospitalPermission.DOCTOR_VIEW,
     HospitalPermission.NURSE_VIEW,
+    HospitalPermission.RADIOLOGY_VIEW,
   ],
   Receptionist: [
     HospitalPermission.PATIENT_VIEW,
@@ -206,6 +226,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.PAYMENT_ADD,
     HospitalPermission.SMS_VIEW,
     HospitalPermission.SMS_SEND,
+    HospitalPermission.RADIOLOGY_VIEW,
+    HospitalPermission.RADIOLOGY_SCHEDULE,
   ],
   Accountant: [
     HospitalPermission.INVOICE_VIEW,
@@ -260,5 +282,15 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.DIAGNOSTIC_REPORT_VIEW,
     HospitalPermission.DIAGNOSTIC_REPORT_ADD,
     HospitalPermission.PATIENT_VIEW,
+    HospitalPermission.RADIOLOGY_VIEW,
+    HospitalPermission.RADIOLOGY_ORDER,
+    HospitalPermission.RADIOLOGY_SCHEDULE,
+    HospitalPermission.RADIOLOGY_PROCESS,
+    HospitalPermission.RADIOLOGY_RESULT_ENTER,
+    HospitalPermission.RADIOLOGY_VERIFY,
+    HospitalPermission.RADIOLOGY_APPROVE,
+    HospitalPermission.RADIOLOGY_AMEND,
+    HospitalPermission.RADIOLOGY_CATALOGUE_MANAGE,
+    HospitalPermission.RADIOLOGY_REPORTS,
   ],
 };

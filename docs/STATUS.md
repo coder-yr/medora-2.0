@@ -2,9 +2,9 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 13: Pharmacy & Inventory Management System**
+- **Current Phase**: **Phase 15: Radiology Information System (RIS)**
 - **Status**: **COMPLETED**
-- **Date**: 2026-10-31
+- **Date**: 2026-11-02
 - **Approved Target Stack**:
   - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS / Modern CSS (scaffolded in `frontend/`)
   - **Backend**: NestJS 11 + TypeScript (trusted business logic boundary)
@@ -36,13 +36,12 @@
 | **Phase 11.2** | Prisma Migration Baseline & Database Change Management | Baseline migration (`0_init/migration.sql`), `migration_lock.toml` (`postgresql`), verified zero drift against live Supabase PostgreSQL, official baseline resolution (`prisma migrate resolve --applied 0_init`), clean disposable PostgreSQL schema replication test, database migration runbook ([`docs/database-migration-runbook.md`](database-migration-runbook.md)), and documentation discrepancy reconciliation ([`docs/prescription-schema-reconciliation.md`](prescription-schema-reconciliation.md)), commit `64e7949` | **COMPLETED** |
 | **Phase 12** | Medicine & Pharmacy Catalogue Migration (8th Module) | `MedicineModule` (modernized medicine master catalogue, category/manufacturer/dosage/unit/supplier CRUD, normalized foreign keys, pack format reconciliation, duplicate prevention, prescription deletion guards, soft deactivation, doctor view permissions), React 19 catalogue management dashboard, Supabase migration `20261031120000_phase_12_medicine_catalogue`, [`docs/medicine-catalogue-mapping.md`](medicine-catalogue-mapping.md) | **COMPLETED** |
 | **Phase 13** | Pharmacy & Inventory Management System (9th Module) | `PharmacyModule` (batch inventory, immutable ledger audit, procurement PO/GRN, FEFO auto-allocation, concurrency-safe row-locked dispensing, partial dispensing, patient/supplier returns, physical count adjustments, unified `InvoiceModule` billing), React 19 pharmacy workspace with receipt printing, Supabase migration `20261031140000_phase_13_pharmacy_inventory`, [`docs/pharmacy-inventory-mapping.md`](pharmacy-inventory-mapping.md) | **COMPLETED** |
+| **Phase 14** | Laboratory Management System (LIS) (10th Module) | `LaboratoryModule` (test catalogue & parameterized formulary, CPOE requisitions, phlebotomy & accessioning, specimen rejection triage, parameter result entry, two-stage QC verification & release, immutable reports with audited amendments, unified auto-billing), React 19 LIS workspace with printable reports, Supabase migration `20261031160000_phase_14_laboratory`, [`docs/laboratory-migration-mapping.md`](laboratory-migration-mapping.md) | **COMPLETED** |
+| **Phase 15** | Radiology Information System (RIS) (11th Module) | `RadiologyModule` (imaging catalogue, multi-modality procedures, collision-free equipment scheduling, patient arrival & examination workflow, reporting workbench, two-stage verification/authorization, immutable report amendments with mandatory justification, automated financial billing integration, TAT analytics), React 19 RIS workspace with printable diagnostic imaging report, Supabase migration `20261102160000_phase_15_radiology`, [`docs/radiology-migration-mapping.md`](radiology-migration-mapping.md) | **COMPLETED** |
 
 ---
 
 ## 2. Phase 11 Domain Migration Summary: `PrescriptionModule` & Frontend Screen
-
-| Property | Value | Evidence / Command |
-| :--- | :--- | :--- |
 | **Selected Domain** | **`PrescriptionModule`** (Clinical Medication Orders & Regimens) & **Frontend Clinical Screen** | Core outpatient clinical prescribing workflow, migrating legacy string-packed prescriptions to typed relational models with React 19 clinical UI |
 | **Target Database Mapping** | `prescription` & `prescription_medicine` models aligned in Prisma schema and pushed to live Supabase PostgreSQL | `npx prisma db push` (Exit code 0, 7.19s), `npm run prisma:generate` |
 | **Legacy Source Parity** | `legacy/app/Http/Controllers/PrescriptionController.php`, `legacy/app/Models/Prescription.php`, `legacy/app/Models/PrescriptionMedicine.php`, `legacy/tests/Feature/PrescriptionTest.php` | Complete parity across prescription generation, catalog lookup, line item management, editing, deletion, and legacy summary text generation |
@@ -148,12 +147,27 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 8. Next Module Readiness
+## 8. Phase 15 Domain Migration Summary: Radiology Information System (RIS)
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, `PharmacyModule`, and `LaboratoryModule` fully migrated and verified on Supabase PostgreSQL:
-- **`Phase 15: Inpatient & Bed Management System`**: Ward/bed admission, bed transfers, inpatient nurse charting, and discharge summaries.
-- **`Phase 16: Operation Theatre & Surgical Suite`**: OT scheduling, surgical teams, pre-op/post-op notes, and anesthesia records.
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Selected Domain** | **`RadiologyModule`** (Radiology Information System - RIS) & **Frontend Radiology Workspace** | Imaging catalogue, multi-modality procedures (X-ray, Ultrasound, CT, MRI, Mammography, Fluoroscopy), computerized imaging orders, collision-free room/equipment scheduling, examination workflow tracking, reporting workbench, two-stage report verification & authorization, immutable report amendments, and automated financial billing integration |
+| **Target Database Mapping** | Modernized `radiology_category`, `radiology_exam`, `radiology_order`, and append-only audited `radiology_report_amendment` models in `backend/prisma/schema.prisma` with reverse relations to `user`, `appointment`, `consultation`, `payment` | `backend/prisma/migrations/20261102160000_phase_15_radiology/migration.sql`, verified on disposable PostgreSQL schema, applied to Supabase PostgreSQL |
+| **Legacy Source Parity** | `legacy/database/migrations/2026_10_24_150000_radiology.php`, `legacy/app/Models/RadiologyExam.php`, `legacy/app/Models/RadiologyOrder.php`, `legacy/app/Http/Controllers/RadiologyController.php`, `legacy/tests/Feature/RadiologyTest.php` | Complete 100% legacy parity documented in [`docs/radiology-migration-mapping.md`](radiology-migration-mapping.md) |
+| **Backend Endpoints** | `GET /api/v1/radiology/dashboard`<br>`GET /api/v1/radiology/catalogue/categories`<br>`POST /api/v1/radiology/catalogue/categories`<br>`GET /api/v1/radiology/catalogue/exams`<br>`POST /api/v1/radiology/catalogue/exams`<br>`GET /api/v1/radiology/catalogue/exams/:id`<br>`PUT /api/v1/radiology/catalogue/exams/:id`<br>`DELETE /api/v1/radiology/catalogue/exams/:id`<br>`POST /api/v1/radiology/orders`<br>`GET /api/v1/radiology/orders`<br>`GET /api/v1/radiology/orders/:id`<br>`POST /api/v1/radiology/orders/:id/cancel`<br>`POST /api/v1/radiology/orders/:id/schedule`<br>`POST /api/v1/radiology/orders/:id/arrive`<br>`POST /api/v1/radiology/orders/:id/start`<br>`POST /api/v1/radiology/orders/:id/complete-exam`<br>`POST /api/v1/radiology/orders/:id/draft`<br>`POST /api/v1/radiology/orders/:id/report`<br>`POST /api/v1/radiology/orders/:id/verify`<br>`POST /api/v1/radiology/orders/:id/approve`<br>`POST /api/v1/radiology/orders/:id/amend`<br>`GET /api/v1/radiology/reports/tat` | Full OpenAPI Swagger documented endpoints with granular RBAC permissions |
+| **Frontend Deliverables** | React 19 + TypeScript + Vite comprehensive RIS workspace in `frontend/src/features/radiology/RadiologyWorkspace.tsx` and re-exported in `frontend/src/components/RadiologyWorkspace.tsx` | Real-time department KPI row (Pending Orders, Scheduled Today, Awaiting Scan, In Progress, Report Pending, Completed Today), multi-tab worklists (Department Overview, Requisitions, Scanner Scheduling, Scanner Worklist, Reporting Workbench, Modality Catalogue, Printable Report), Requisition Modal with multi-procedure selection and auto-invoicing, 30-min Room Conflict Warning scheduling modal with STAT override, Audited Amendment Modal with mandatory clinical justification, and printable Hospital Diagnostic Imaging Report with electronic stamps and addendums |
+| **Business Rules & Data Integrity** | 1. **8-Stage State Machine**: `ORDERED` &rarr; `SCHEDULED` &rarr; `PATIENT_ARRIVED` &rarr; `IN_PROGRESS` &rarr; `STUDY_COMPLETED` &rarr; `REPORT_PENDING` &rarr; `VERIFIED` &rarr; `COMPLETED`, plus terminal `CANCELLED`<br>2. **Equipment Room Collision Protection**: Detects overlapping room bookings within 30 minutes; returns `409 ConflictException` unless overridden by emergency `forceConflict: true`<br>3. **Two-Stage Quality Control**: Radiographer/technologist preliminary verification followed by consultant radiologist final release (`VERIFIED` &rarr; `COMPLETED`)<br>4. **Immutable Released Reports**: Direct modification of `COMPLETED` reports is blocked (`400 Bad Request`); all corrections require append-only `radiology_report_amendment` records with mandatory clinical justification, author, and previous vs new findings/impression snapshots<br>5. **Duplicate Prevention**: Prevents duplicate active orders for the same patient, doctor, and exam on the same day (`409 Conflict`)<br>6. **Automated Financial Reconciliation**: Creates itemized `Payment` records in `InvoiceModule` with category `'RADIOLOGY'` and method `'PENDING'` within transactional consistency boundaries | `RadiologyService` unit test suite (19 unit tests) & PostgreSQL E2E suite (22 integration tests) |
+| **Authorization & Security** | Granular RBAC (`radiology_view`, `radiology_order`, `radiology_schedule`, `radiology_process`, `radiology_result_enter`, `radiology_verify`, `radiology_approve`, `radiology_amend`, `radiology_catalogue_manage`, `radiology_reports`) | Radiologist/Doctor, Radiographer/Technologist, Nurse, Receptionist, and Admin granted appropriate clinical capabilities; unauthorized operations strictly rejected (401/403) |
+| **Unit Test Coverage** | **19 suites passed, 191 tests passed** (19 new tests in `radiology.service.spec.ts`) | `npm test` (Exit code 0) |
+| **E2E Integration Tests**| **13 suites passed, 168 tests passed** across all modules against live Supabase PostgreSQL (22 new tests in `radiology.e2e-spec.ts`) | `npm run test:e2e` (Exit code 0) |
+| **Linting & Code Quality**| **ESLint 9 + Prettier + Strict TypeScript** | Backend: `npm run lint` (0 errors), `npx tsc --noEmit` (0 errors)<br>Frontend: `npm run lint` (0 errors), `tsc -b && vite build` (0 errors) |
+| **Production Builds** | Backend: `npm run build` (Exit code 0)<br>Frontend: `npm run build` (Exit code 0, 216ms) | Ready for containerization |
+| **Legacy Source Integrity**| **100% Preserved** | `legacy/` 0 modifications; unstaged `app/Models/SMS.php` artifact strictly preserved |
 
+---
 
+## 9. Next Module Readiness
 
-
+With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, `PharmacyModule`, `LaboratoryModule`, and `RadiologyModule` fully migrated and verified on Supabase PostgreSQL:
+- **`Phase 16: Inpatient & Bed Management System (IPD)`**: Ward/bed admission, bed transfers, inpatient nurse charting, and discharge summaries.
+- **`Phase 17: Operation Theatre & Surgical Suite`**: OT scheduling, surgical teams, pre-op/post-op notes, and anesthesia records.

@@ -17,6 +17,8 @@ import {
 import { MedicineCatalogue } from './components/MedicineCatalogue';
 import { PharmacyWorkspace } from './components/PharmacyWorkspace';
 import { LaboratoryWorkspace } from './components/LaboratoryWorkspace';
+import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
+import { Radio } from 'lucide-react';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -54,7 +56,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines' | 'pharmacy' | 'laboratory'>('laboratory');
+  const [activeModule, setActiveModule] = useState<'prescriptions' | 'medicines' | 'pharmacy' | 'laboratory' | 'radiology'>('radiology');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -306,6 +308,13 @@ export function App() {
       {/* Module Switcher Navigation */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20 }} className="no-print">
         <button
+          className={`btn ${activeModule === 'radiology' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('radiology')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <Radio size={18} /> Radiology & Imaging (RIS)
+        </button>
+        <button
           className={`btn ${activeModule === 'laboratory' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('laboratory')}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
@@ -356,6 +365,14 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* Radiology Information System (RIS) View */}
+      {activeModule === 'radiology' && (
+        <RadiologyWorkspace
+          token={token}
+          userRole={userRole}
+        />
       )}
 
       {/* Laboratory Information System (LIS) View */}
