@@ -415,7 +415,25 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [ ] **Option A (Recommended)**: Flexible billing policy where unpaid orders are accepted for processing but clearly flagged in the LIS workspace.
   - [ ] **Option B**: Mandatory prepayment gate where phlebotomy cannot collect samples until payment is verified.
 
+---
 
+## 19. Phase 16 Legacy Gap Analysis & Remaining Modules
 
+### 45. Inpatient Daily Bed Charge Accrual Algorithm
+- **Evidence**: Legacy Laravel `alloted_bed` recorded `a_time` and `d_time` as free strings without automated daily billing accrual.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Midnight census calculation where one day's room rate is accrued for every calendar day the patient occupies the bed at midnight (`00:00`), plus a half-day charge if discharged after 14:00.
+  - [ ] **Option B**: Exact elapsed hourly stay calculation: `total_bed_charge = round((hours_admitted / 24) * daily_rate, 2)`.
 
+### 46. Tiered Billing on Bed Transfers
+- **Evidence**: When a patient is stepped up from a General Ward ($20/day) to an ICU bed ($120/day), legacy ICTHospital lacked transfer logs and overwrote `bed_id` on `alloted_bed`.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Multi-interval bed allotment ledger tracking each room stay interval (`from_time`, `to_time`, `bed_id`, `rate`) under a master `Admission` record, calculating tiered charges accurately upon discharge.
+  - [ ] **Option B**: Flat rate billing based on the final bed assigned at discharge.
+
+### 47. Scope of Orphan Skeletons: Blood Bank & Operation Theatre
+- **Evidence**: Legacy models `Donor`, `Bankb`, and `OtPayment` exist with database migrations, but have 0 controller routes, 0 Blade templates, and no active user workflows.
+- **Owner Decision Required**:
+  - [ ] **Option A (Recommended)**: Mark Blood Bank and Operation Theatre as future expansion modules requiring formal stakeholder workflow specification; focus immediate migration on verified core operational modules (Inpatient, Cashier, Staff Directory, Accounting).
+  - [ ] **Option B**: Implement complete standalone OT and Blood Bank suites in Medora 2.0 based on greenfield specifications.
 

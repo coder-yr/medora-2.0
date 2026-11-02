@@ -2,7 +2,7 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 15: Radiology Information System (RIS)**
+- **Current Phase**: **Phase 16: Complete Legacy Gap Analysis & Remaining Module Discovery**
 - **Status**: **COMPLETED**
 - **Date**: 2026-11-02
 - **Approved Target Stack**:
@@ -38,6 +38,7 @@
 | **Phase 13** | Pharmacy & Inventory Management System (9th Module) | `PharmacyModule` (batch inventory, immutable ledger audit, procurement PO/GRN, FEFO auto-allocation, concurrency-safe row-locked dispensing, partial dispensing, patient/supplier returns, physical count adjustments, unified `InvoiceModule` billing), React 19 pharmacy workspace with receipt printing, Supabase migration `20261031140000_phase_13_pharmacy_inventory`, [`docs/pharmacy-inventory-mapping.md`](pharmacy-inventory-mapping.md) | **COMPLETED** |
 | **Phase 14** | Laboratory Management System (LIS) (10th Module) | `LaboratoryModule` (test catalogue & parameterized formulary, CPOE requisitions, phlebotomy & accessioning, specimen rejection triage, parameter result entry, two-stage QC verification & release, immutable reports with audited amendments, unified auto-billing), React 19 LIS workspace with printable reports, Supabase migration `20261031160000_phase_14_laboratory`, [`docs/laboratory-migration-mapping.md`](laboratory-migration-mapping.md) | **COMPLETED** |
 | **Phase 15** | Radiology Information System (RIS) (11th Module) | `RadiologyModule` (imaging catalogue, multi-modality procedures, collision-free equipment scheduling, patient arrival & examination workflow, reporting workbench, two-stage verification/authorization, immutable report amendments with mandatory justification, automated financial billing integration, TAT analytics), React 19 RIS workspace with printable diagnostic imaging report, Supabase migration `20261102160000_phase_15_radiology`, [`docs/radiology-migration-mapping.md`](radiology-migration-mapping.md) | **COMPLETED** |
+| **Phase 16** | Complete Legacy Gap Analysis & Remaining Module Discovery | Comprehensive audit of all 96 legacy models, 47 controllers, 251 routes, and 104 tables; identification of 33 obsolete school tables; 17 active hospital domains categorized; cross-module integration risks, database integrity, and architecture security evaluated; prioritized 7-phase roadmap created with Phase 17 (Inpatient & Bed Management) justified as next phase, [`docs/phase-16-legacy-gap-analysis.md`](phase-16-legacy-gap-analysis.md) | **COMPLETED** |
 
 ---
 
@@ -166,8 +167,28 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 9. Next Module Readiness
+## 9. Phase 16 Legacy Gap Analysis & Remaining Module Discovery Summary
+
+| Property | Value | Evidence / Document |
+| :--- | :--- | :--- |
+| **Audit Scope** | 251 legacy routes, 96 Eloquent models, 47 controllers, 104 database tables, 134 Blade views, 97 permissions, and 6 console commands | [`docs/phase-16-legacy-gap-analysis.md`](phase-16-legacy-gap-analysis.md) |
+| **Active Hospital Domains Evaluated** | 17 operational hospital domains + 1 legacy school fork domain (33 tables) | Systematic source inspection of `legacy/` |
+| **Fully Migrated Domains** | **11 Domains**: Authentication, Patient, Department, Doctor, Appointment, Consultation, Invoicing & Billing, Prescription, Medicine Catalogue, Pharmacy Inventory, Laboratory (LIS), Radiology (RIS) | Verified by 191 unit tests and 168 PostgreSQL E2E tests |
+| **Partially Migrated Domains** | **4 Domains**: Cashier / Shift Cash Close, Non-Medical Staff Registers, Hospital Settings & Branches, Service Packages | Documented in gap analysis report |
+| **Unmigrated Domains** | **3 Domains**: Inpatient & Bed Management (IPD), General Accounting & Expenses, Asynchronous Communications Gateway | Full business rules & data mapping documented |
+| **Orphan Legacy Skeletons** | Blood Bank (`donor`, `bankb`) & Operation Theatre (`ot_payment`) | Verified orphan tables with 0 routes and 0 views; flagged for business-owner decision |
+| **Obsolete Remnants** | 33 tables from ICTSchool fork (`stdBill`, `billHistory`, `Marks`, `GPA`, `Subject`, `Class`, etc.) | Scheduled for removal via `RemoveSchoolTables.php`; excluded from target architecture |
+| **Database & Schema Audit** | 5 sequential Prisma migrations applied to Supabase PostgreSQL with zero drift; baseline `alloted_bed` identified for timestamp normalization (`DateTime @db.Timestamptz`) | `npx prisma migrate status` (0 drift) |
+| **Security & Architecture** | Eliminated `SEC-01` backdoor; hardened session rotation; flagged `SEC-02` public cron to be replaced by Redis + BullMQ workers | [`docs/05-security-findings.md`](05-security-findings.md) |
+| **Recommended Next Phase** | **Phase 17: Inpatient & Bed Management System (IPD / Ward / Admissions)** | Core clinical missing link, operational urgency, and immediate synergy with existing modules |
+
+---
+
+## 10. Next Module Readiness
 
 With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, `PharmacyModule`, `LaboratoryModule`, and `RadiologyModule` fully migrated and verified on Supabase PostgreSQL:
-- **`Phase 16: Inpatient & Bed Management System (IPD)`**: Ward/bed admission, bed transfers, inpatient nurse charting, and discharge summaries.
-- **`Phase 17: Operation Theatre & Surgical Suite`**: OT scheduling, surgical teams, pre-op/post-op notes, and anesthesia records.
+- **`Phase 17: Inpatient & Bed Management System (IPD / Ward / Admissions)`**: Ward categories, room/bed register, admission intake, bed transfer workflows, nurse charting, discharge summaries, and automated room charge accumulation.
+- **`Phase 18: Cashier, Shift Cash Close & Treasury Settlement`**: Shift drawer opening, counted cash variance auditing, supervisor dual-signoff, and patient final discharge settlement.
+- **`Phase 19: Non-Medical Staff Registers & HR Directory`**: Departmental profiles and shift credentials for nurses, receptionists, accountants, and lab techs.
+- **`Phase 20: General Accounting, Chart of Accounts & Expense Ledger`**: General ledger, expense logging, income categorization, and monthly P&L statements.
+
