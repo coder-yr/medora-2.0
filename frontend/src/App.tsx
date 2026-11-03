@@ -21,7 +21,8 @@ import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
 import { InpatientWorkspace } from './components/InpatientWorkspace';
 import { CashierWorkspace } from './components/CashierWorkspace';
 import { StaffWorkspace } from './components/StaffWorkspace';
-import { Radio, BedDouble, DollarSign, Users } from 'lucide-react';
+import { AccountingWorkspace } from './components/AccountingWorkspace';
+import { Radio, BedDouble, DollarSign, Users, BookOpen } from 'lucide-react';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -59,7 +60,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'staff' | 'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('staff');
+  const [activeModule, setActiveModule] = useState<'accounting' | 'staff' | 'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('accounting');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -67,7 +68,7 @@ export function App() {
 
   // Auth & Token simulation (Development only)
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
-  const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist' | 'Receptionist'>('Receptionist');
+  const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Accountant' | 'Pharmacist' | 'Laboratorist' | 'Receptionist'>('Accountant');
 
   // Form state
   const [patientId, setPatientId] = useState('1');
@@ -102,7 +103,7 @@ export function App() {
     }
   }, [userRole]);
 
-  const loginAs = async (role: 'Doctor' | 'Admin' | 'Pharmacist' | 'Laboratorist' | 'Receptionist') => {
+  const loginAs = async (role: 'Doctor' | 'Admin' | 'Accountant' | 'Pharmacist' | 'Laboratorist' | 'Receptionist') => {
     if (!isDev) {
       // In production, authentication is handled through the dedicated login screen
       return;
@@ -110,6 +111,7 @@ export function App() {
 
     try {
       let email = 'admin.test@medora.hospital';
+      if (role === 'Accountant') email = 'accountant.test@medora.hospital';
       if (role === 'Doctor') email = 'doctor.test@medora.hospital';
       if (role === 'Pharmacist') email = 'pharmacist.test@medora.hospital';
       if (role === 'Laboratorist') email = 'laboratorist.test@medora.hospital';
@@ -294,6 +296,7 @@ export function App() {
                 value={userRole}
                 onChange={(e) => setUserRole(e.target.value as any)}
               >
+                <option value="Accountant">Accountant (General Ledger, COA, Expenses)</option>
                 <option value="Receptionist">Receptionist / Cashier (POS & Drawer)</option>
                 <option value="Laboratorist">Laboratorist (LIS Specimen/Analysis)</option>
                 <option value="Doctor">Doctor (Prescribe/View)</option>
@@ -312,6 +315,13 @@ export function App() {
 
       {/* Module Switcher Navigation */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }} className="no-print">
+        <button
+          className={`btn ${activeModule === 'accounting' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('accounting')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <BookOpen size={18} /> General Accounting & Ledger
+        </button>
         <button
           className={`btn ${activeModule === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('staff')}
@@ -391,6 +401,13 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* General Accounting, Chart of Accounts & Expense Ledger View */}
+      {activeModule === 'accounting' && (
+        <AccountingWorkspace
+          token={token}
+        />
       )}
 
       {/* Staff Registers & HR Directory View */}

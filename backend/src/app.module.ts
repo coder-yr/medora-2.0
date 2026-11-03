@@ -25,6 +25,7 @@ import { RadiologyModule } from './modules/radiology/radiology.module';
 import { InpatientModule } from './modules/inpatient/inpatient.module';
 import { CashierModule } from './modules/cashier/cashier.module';
 import { StaffModule } from './modules/staff/staff.module';
+import { AccountingModule } from './modules/accounting/accounting.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 
 @Module({
@@ -58,6 +59,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     InpatientModule,
     CashierModule,
     StaffModule,
+    AccountingModule,
   ],
   providers: [
     {

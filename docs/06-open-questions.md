@@ -535,6 +535,39 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Strict soft offboarding with mandatory reason, session revocation, and zero deletion of historical financial/clinical data.
   - [ ] **Option B**: Hard deletion of staff profiles.
 
+---
+
+## 23. Phase 20 General Accounting, Chart of Accounts & Expense Ledger Decisions
+
+### 60. Double-Entry General Ledger Invariant vs. Legacy Single-Entry
+- **Evidence**: Legacy ICTHospital used flat single-entry tables (`accounting`, `expense`) with unvalidated string amounts and unstructured categories, with zero mathematical equilibrium checks.
+- **Resolution**: Implemented enterprise GAAP/IFRS double-entry general ledger (`accounting_journal_entry`, `accounting_journal_line`). Every posted transaction mathematically asserts $\sum \text{Debit} = \sum \text{Credit}$ with decimal(14,2) precision. Unbalanced attempts are strictly rejected with `400 Bad Request`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict double-entry accounting ledger with real-time debit/credit equilibrium invariant.
+  - [ ] **Option B**: Retain legacy single-entry cashbook model.
+
+### 61. Immutable Posted Journals & Signed Mirror-Image Reversals
+- **Evidence**: Legacy application permitted users to edit or delete accounting records directly without an audit trail.
+- **Resolution**: Implemented immutable ledger invariant: posted journal entries cannot be edited or deleted (`403 Forbidden`). Adjustments require signed mirror-image reversal entries (`POST /api/v1/accounting/journals/:id/reverse`) with mandatory audit justification, which swaps all debits and credits and marks the original journal `REVERSED`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strictly immutable posted journals with auditable mirror-image reversal workflow.
+  - [ ] **Option B**: Mutable accounting records with in-place updates.
+
+### 62. Multi-Stage Expense Lifecycle & Separation of Duties
+- **Evidence**: Legacy expenses were directly inserted without review, approval, or validation.
+- **Resolution**: Formal state machine: `DRAFT` &rarr; `SUBMITTED` &rarr; `APPROVED` &rarr; `PAID` (or `REJECTED`, `CANCELLED`). Enforced Separation of Duties: submitters are strictly forbidden from approving their own expenses (`expense.createdById !== approverUserId`). Disbursing payment automatically creates and posts a balanced double-entry journal entry.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Dual-control multi-stage expense workflow with mandatory separation of duties.
+  - [ ] **Option B**: Single-click unapproved direct expense logging.
+
+### 63. Accounting Period Lockout vs. Historical Back-Posting
+- **Evidence**: Legacy had no fiscal periods; users could back-date transactions indefinitely.
+- **Resolution**: Implemented `AccountingPeriod` (`OPEN`, `CLOSED`). Closing a period checks for zero unposted drafts and asserts debit/credit balance. Once closed, posting any journal with an accounting date within the period is blocked with `409 Conflict`. Reopening requires high-level administrative authorization and mandatory reason logging.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict accounting period locks preventing back-posting into closed books.
+  - [ ] **Option B**: Allow unrestricted posting to any historical date without period locks.
+
+
 
 
 
