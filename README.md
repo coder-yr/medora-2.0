@@ -7,7 +7,7 @@
 
 ## 1. Architecture Overview
 
-**Medora 2.0** is an enterprise-grade hospital management system operating as a clean, modular TypeScript monorepo with complete independence from PHP:
+**Medora 2.0** is an enterprise-grade hospital management system operating as a clean, modern TypeScript monorepo with 100% independence from PHP/Laravel:
 
 - **Frontend (`frontend/`)**: Modern **React 19 + TypeScript + Vite + Tailwind CSS** client delivering an accessible clinical user experience across 18 hospital domains.
 - **Backend (`backend/`)**: Modular **NestJS 11 + TypeScript** service enforcing zero-trust multi-branch authorization, domain-driven design, clinical permissions, and financial audit trails.
@@ -15,7 +15,6 @@
 - **Background Processing (`backend/src/modules/notification/`)**: Native **Transactional Outbox Pattern** with exponential backoff and PostgreSQL concurrency row locks.
 - **Infrastructure (`infra/`)**: Containerized production workflows with multi-stage Dockerfiles and Docker Compose.
 - **Documentation (`docs/`)**: Comprehensive migration specifications, audit records, workflow validations, and system runbooks.
-- **Legacy Reference Archive (`legacy/`)**: Pristine, isolated reference archive of the historical ICTHospital PHP application for behavioral reference and audit trail.
 
 ---
 
@@ -27,12 +26,10 @@
 ├── backend/              # NestJS 11 + Prisma ORM 7 enterprise hospital API
 │   └── prisma/           # PostgreSQL schema, migrations, and seeds
 ├── infra/                # Production Docker Compose, Dockerfiles, and Nginx configs
-├── docs/                 # System architecture, audit records, and runbooks
-│   ├── STATUS.md         # Full project migration status and verification history
-│   ├── 06-open-questions.md # Architecture decisions & open questions log
-│   └── stage-3-system-validation.md # Full-stack workflow verification report
-├── app/Models/SMS.php    # Protected historical artifact preserved in place
-└── legacy/               # Isolated historical reference archive (Laravel 12)
+└── docs/                 # System architecture, audit records, and runbooks
+    ├── STATUS.md         # Full project migration status and verification history
+    ├── 06-open-questions.md # Architecture decisions & open questions log
+    └── stage-3-system-validation.md # Full-stack workflow verification report
 ```
 
 ---

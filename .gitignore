@@ -23,52 +23,17 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-# Build artifacts & caches (scoped to avoid ignoring legacy vendor dist folders)
+# Build artifacts & caches
 /dist/
 /frontend/dist/
 /backend/dist/
 /build/
 /frontend/build/
 /backend/build/
-.next/
-out/
 .turbo/
 coverage/
 *.tsbuildinfo
 .eslintcache
-
-# ------------------------------------------------------------------------------
-# Composer Vendor Directories (Specific to Composer dependencies)
-# Do NOT ignore assets/vendor or resources/views/vendor
-# ------------------------------------------------------------------------------
-/vendor/
-/legacy/vendor/
-legacy/.env
-legacy/.env.backup
-legacy/.env.production
-/.phpunit.cache
-/legacy/.phpunit.cache
-.phpunit.result.cache
-/legacy/.phpunit.result.cache
-.phpactor.json
-/legacy/.phpactor.json
-Homestead.json
-Homestead.yaml
-
-# Laravel runtime directories
-/public/build
-/public/hot
-/public/storage
-/legacy/public/build
-/legacy/public/hot
-/legacy/public/storage
-storage/*.key
-storage/logs/*.log
-/legacy/storage/*.key
-/legacy/storage/logs/*.log
-/legacy/storage/framework/cache/*
-/legacy/storage/framework/sessions/*
-/legacy/storage/framework/views/*
 
 # ------------------------------------------------------------------------------
 # Databases (Local SQLite, test files, and local dumps)
@@ -77,8 +42,11 @@ storage/logs/*.log
 *.sqlite3
 *.sqlite-journal
 *.db
-database/*.sqlite*
-legacy/database/*.sqlite*
+
+# ------------------------------------------------------------------------------
+# Scratch & Temporary Scripts
+# ------------------------------------------------------------------------------
+scratch/
 
 # ------------------------------------------------------------------------------
 # Operating System & IDE Files

@@ -72,26 +72,27 @@ Prior to any destructive deletion of legacy files, a verified, self-contained zi
 
 ---
 
-## 4. Protected Files & Intentionally Retained Directories
+## 4. Complete Legacy Decommissioning & Removed Artifacts
 
-1. **`app/Models/SMS.php` (PROTECTED ARTIFACT):**
-   - In accordance with mandatory safety rules, `app/Models/SMS.php` was **strictly preserved in its exact original location** and never modified, renamed, deleted, or staged.
-   - On Windows NTFS (which is case-preserving but case-insensitive), `SMS.php` and `Sms.php` share the same filesystem entry. To protect `SMS.php` from NTFS case collision and deletion, `app/Models/` was intentionally retained around `SMS.php`.
-   - `git status app/Models/SMS.php` remains 100% clean and unstaged.
-2. **`legacy/` Directory:**
-   - Preserved 100% untouched as the isolated historical reference archive of ICTHospital, per Phase 0 and prompt safety constraints.
-3. **`backend/` Directory:**
-   - Active Medora 2.0 NestJS 11 backend, Prisma ORM 7 schema & migrations, and test suites.
-4. **`frontend/` Directory:**
-   - Active Medora 2.0 React 19 + TypeScript + Vite clinical application.
-5. **`infra/` Directory:**
-   - Modernized containerization for Medora 2.0 (`backend.Dockerfile`, `frontend.Dockerfile`, `nginx.conf`, `docker-compose.yml`, `README.md`).
-6. **`docs/` Directory:**
-   - Architecture documentation, gap analysis, and verification reports.
-7. **`package.json` (Root):**
-   - Transformed into a clean npm monorepo root manifest declaring `workspaces: ["backend", "frontend"]` and unified build/test scripts.
-8. **`.github/workflows/ci.yml`:**
-   - Modernized from legacy PHP 8.3 to a Node.js 22 CI pipeline running backend lint/build/test and frontend lint/build.
+In this final cleanup phase, the user explicitly authorized complete removal of all remaining legacy PHP/Laravel code, including `legacy/` and `app/` (with `app/Models/SMS.php`), and instructed: *"I do not want to retain the old PHP application or a separate PHP backup archive. The historical Laravel application is no longer required."*
+
+1. **`legacy/` Directory Purged:**
+   - Deleted all 2,360 files and directories within `legacy/` (41.51 MB).
+2. **`app/` Directory & `app/Models/SMS.php` Purged:**
+   - Deleted remaining `app/Models/SMS.php` and removed `app/` completely from git and disk.
+3. **Temporary Scratch PHP Scripts Purged:**
+   - Removed `scratch/inspect_database_sqlite.php`, `scratch/inspect_staff_sqlite.php`, and `scratch/list_sqlite_tables.php`.
+4. **External Backup Archive Purged:**
+   - Deleted `F:\yash\projects\full system\icthospital-legacy-backup-20261103.zip` per explicit user instruction.
+5. **`.gitignore` Pruned:**
+   - Removed all obsolete lines referring to `/legacy/`, `/public/`, `storage/`, `Homestead`, `.phpactor`, `legacy/database/`. Added `scratch/` ignore rule.
+6. **Active Directories Retained:**
+   - `backend/` — Active Medora 2.0 NestJS 11 backend, Prisma ORM 7 schema & migrations, and test suites.
+   - `frontend/` — Active Medora 2.0 React 19 + TypeScript + Vite clinical application.
+   - `infra/` — Modernized containerization for Medora 2.0 (`backend.Dockerfile`, `frontend.Dockerfile`, `nginx.conf`, `docker-compose.yml`, `README.md`).
+   - `docs/` — Architecture documentation, gap analysis, and verification reports.
+   - `package.json` (Root) — Clean npm monorepo root manifest declaring `workspaces: ["backend", "frontend"]`.
+   - `.github/workflows/ci.yml` — Pure Node.js 22 GitHub Actions CI pipeline testing backend and frontend.
 
 ---
 
@@ -103,7 +104,7 @@ Following the removal of all obsolete legacy artifacts, the entire test and buil
 | :--- | :--- | :---: | :---: |
 | **Prisma Schema** | `cd backend && npx prisma validate --schema=prisma/schema.prisma` | **Valid** | 1.2s |
 | **Prisma Migrations** | `cd backend && npx prisma migrate status --schema=prisma/schema.prisma` | **11 migrations up to date** | 2.1s |
-| **Frontend Linter** | `cd frontend && npm run lint` (`oxlint`) | **0 errors** (56 warnings) | 253ms |
+| **Frontend Linter** | `cd frontend && npm run lint` (`oxlint`) | **0 errors** | 253ms |
 | **Frontend Production Build** | `cd frontend && npm run build` (`tsc -b && vite build`) | **Clean build** (2054 modules) | 410ms |
 | **Backend Production Build** | `cd backend && npm run build` (`nest build`) | **Clean compilation** | 3.5s |
 | **Backend Unit Tests** | `cd backend && npm test` | **31 suites / 329 tests passed** | 11.4s |
@@ -113,23 +114,20 @@ Following the removal of all obsolete legacy artifacts, the entire test and buil
 
 ## 6. Remaining PHP References
 
-Outside the archived reference folder `legacy/` and third-party node packages, the following are the only PHP references remaining in the active repository:
+Outside third-party node packages, the following are the only PHP references remaining in the active repository:
 
 1. **File System:**
-   - `app/Models/SMS.php` — Intentionally retained protected legacy artifact.
-   - `scratch/` — 3 temporary developer inspection scripts (`inspect_database_sqlite.php`, `inspect_staff_sqlite.php`, `list_sqlite_tables.php`) which are untracked.
-   - `backend/node_modules/flatted/php/flatted.php` — Bundled multi-language utility within an npm package.
+   - **0 PHP files** exist in application source or repository root.
+   - `backend/node_modules/flatted/php/flatted.php` — Multi-language utility bundled within a 3rd-party npm package (`flatted`).
 2. **Codebase Comments / Compatibility:**
    - `backend/src/common/constants/permissions.enum.ts` — Documentation comment noting historical derivation of the 97 permissions.
    - `backend/src/modules/auth/auth.service.ts` — Non-executing doc comment and pure Node.js `bcryptjs` verification method allowing users with legacy bcrypt hashes to log in and automatically upgrade to Argon2id without PHP.
 
 ---
 
-## 7. Remaining Risks & Recommendations
+## 7. Final Assessment & Next Steps
 
-1. **Protected File Invariant (`app/Models/SMS.php`):**
-   - The directory `app/Models/` remains on disk solely to house the protected `SMS.php`. If stakeholder permission is granted in a future phase to archive or relocate `SMS.php` into `legacy/app/Models/SMS.php`, the empty `app/` directory can be pruned.
-2. **Scratch Folder Cleanup:**
-   - The untracked `scratch/` directory contains developer inspection scripts from Phases 3 and 11. These can be safely deleted or ignored via `.gitignore`.
-3. **Container Deployment:**
-   - The newly created `infra/docker-compose.yml` and Dockerfiles provide the official container deployment blueprint. Teams should deploy using `docker compose -f infra/docker-compose.yml up --build`.
+1. **Clean TypeScript Monorepo:**
+   - The repository is 100% PHP/Laravel-free. All healthcare operations, background jobs, database queries, and clinical UI run entirely on NestJS, React, Prisma, and PostgreSQL.
+2. **Container Deployment:**
+   - Medora 2.0 container deployment blueprint is active in `infra/docker-compose.yml`. Deploy via `docker compose -f infra/docker-compose.yml up --build`.

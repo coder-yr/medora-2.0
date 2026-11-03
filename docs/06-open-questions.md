@@ -769,3 +769,10 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
 - **Decision Status**:
   - [x] **Option A (Adopted)**: Clean Node.js 22 / PostgreSQL container deployment and CI pipeline.
   - [ ] **Option B**: Retain legacy PHP Docker containers.
+
+### 89. Complete Decommissioning & Removal of Legacy PHP Codebase and Backup Archive
+- **Evidence**: The user explicitly authorized complete removal of all legacy PHP/Laravel code, including `legacy/`, `app/` (with `app/Models/SMS.php`), temporary scratch PHP scripts, and instructed: *"I do not want to retain the old PHP application or a separate PHP backup archive. The historical Laravel application is no longer required."*
+- **Resolution**: Completely deleted `legacy/` (2,360 files), removed remaining `app/` folder (including `app/Models/SMS.php`), removed scratch PHP inspection scripts, purged legacy references from `.gitignore`, and deleted the external backup zip `icthospital-legacy-backup-20261103.zip`. Verified that exactly 0 PHP files remain across the entire repository outside third-party `node_modules`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Complete decommissioning and removal of legacy PHP application, `app/Models/SMS.php`, and backup archive.
+  - [ ] **Option B**: Retain legacy PHP folder or external backup archive.
