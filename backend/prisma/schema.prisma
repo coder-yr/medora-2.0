@@ -51,6 +51,9 @@ model User {
   verifiedRadiologies    RadiologyOrder[]           @relation("VerifiedRadiology")
   radiologyAmendments    RadiologyReportAmendment[]
   sessions               UserSession[]
+  staffProfile           StaffProfile?
+  staffAssignmentsAssigned StaffDepartmentAssignment[] @relation("AssignmentAssigner")
+  staffEmploymentEvents  StaffEmploymentHistory[]   @relation("HistoryRecorder")
 
   @@map("users")
 }
@@ -113,6 +116,8 @@ model HospitalBranch {
   invoices     Payment[]
   cashDrawers  CashDrawer[]
   cashierShifts CashierShift[]
+  staffProfiles StaffProfile[]
+  staffDepartmentAssignments StaffDepartmentAssignment[]
 
   @@map("hospital_branch")
 }
@@ -140,7 +145,208 @@ model Department {
   createdAt   DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
+  // Relations
+  staffProfiles         StaffProfile[]
+  departmentAssignments StaffDepartmentAssignment[]
+
   @@map("department")
+}
+
+// =============================================================================
+// 2.5 STAFF & HR DIRECTORY (PHASE 19)
+// =============================================================================
+
+model StaffDesignation {
+  id          BigInt         @id @default(autoincrement())
+  code        String         @unique @db.VarChar(50)
+  title       String         @db.VarChar(100)
+  category    String         @db.VarChar(50) // NURSING, PHARMACY, LABORATORY, RECEPTION, FINANCE, ADMINISTRATION, SUPPORT
+  description String?        @db.VarChar(255)
+  isActive    Boolean        @default(true) @map("is_active")
+  createdAt   DateTime?      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime?      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  staffProfiles StaffProfile[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("staff_designation")
+}
+
+model StaffProfile {
+  id                    BigInt         @id @default(autoincrement())
+  employeeNumber        String         @unique @map("employee_number") @db.VarChar(50) // EMP-YYYYMM-XXXX
+  userId                BigInt?        @unique @map("user_id")
+  firstName             String         @map("first_name") @db.VarChar(50)
+  lastName              String         @map("last_name") @db.VarChar(50)
+  displayName           String         @map("display_name") @db.VarChar(100)
+  gender                String?        @db.VarChar(20) // MALE, FEMALE, OTHER
+  dateOfBirth           DateTime?      @map("date_of_birth") @db.Date
+  nationalId            String?        @map("national_id") @db.VarChar(50) // CNIC / National ID
+  email                 String?        @db.VarChar(100)
+  phone                 String?        @db.VarChar(50)
+  alternatePhone        String?        @map("alternate_phone") @db.VarChar(50)
+  address               String?        @db.VarChar(255)
+  emergencyContactName  String?        @map("emergency_contact_name") @db.VarChar(100)
+  emergencyContactPhone String?        @map("emergency_contact_phone") @db.VarChar(50)
+  joiningDate           DateTime       @default(now()) @map("joining_date") @db.Date
+  employmentType        String         @default("FULL_TIME") @map("employment_type") @db.VarChar(50) // FULL_TIME, PART_TIME, CONTRACT, PROBATION, VISITING, INTERN
+  employmentStatus      String         @default("ACTIVE") @map("employment_status") @db.VarChar(50) // ACTIVE, ON_LEAVE, SUSPENDED, INACTIVE, TERMINATED
+  departmentId          BigInt?        @map("department_id")
+  designationId         BigInt?        @map("designation_id")
+  branchId              BigInt?        @map("branch_id")
+  reportingManagerId    BigInt?        @map("reporting_manager_id")
+  profileImage          String?        @map("profile_image") @db.VarChar(255)
+  qualifications        String?        @db.Text
+  offboardedAt          DateTime?      @map("offboarded_at") @db.Timestamptz
+  offboardingReason     String?        @map("offboarding_reason") @db.Text
+  createdAt             DateTime?      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime?      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user                  User?          @relation(fields: [userId], references: [id])
+  department            Department?    @relation(fields: [departmentId], references: [id])
+  designation           StaffDesignation? @relation(fields: [designationId], references: [id])
+  branch                HospitalBranch? @relation(fields: [branchId], references: [id])
+  reportingManager      StaffProfile?  @relation("StaffHierarchy", fields: [reportingManagerId], references: [id])
+  directReports         StaffProfile[] @relation("StaffHierarchy")
+  departmentAssignments StaffDepartmentAssignment[]
+  employmentHistory     StaffEmploymentHistory[]
+
+  @@index([employeeNumber])
+  @@index([departmentId])
+  @@index([designationId])
+  @@index([branchId])
+  @@index([employmentStatus])
+  @@index([email])
+  @@index([phone])
+  @@map("staff_profile")
+}
+
+model StaffDepartmentAssignment {
+  id             BigInt        @id @default(autoincrement())
+  staffProfileId BigInt        @map("staff_profile_id")
+  departmentId   BigInt        @map("department_id")
+  branchId       BigInt?       @map("branch_id")
+  isPrimary      Boolean       @default(true) @map("is_primary")
+  effectiveStart DateTime      @default(now()) @map("effective_start") @db.Date
+  effectiveEnd   DateTime?     @map("effective_end") @db.Date
+  reason         String?       @db.VarChar(255)
+  assignedBy     BigInt?       @map("assigned_by")
+  createdAt      DateTime?     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime?     @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  staffProfile   StaffProfile   @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  department     Department     @relation(fields: [departmentId], references: [id])
+  branch         HospitalBranch? @relation(fields: [branchId], references: [id])
+  assigner       User?          @relation("AssignmentAssigner", fields: [assignedBy], references: [id])
+
+  @@index([staffProfileId])
+  @@index([departmentId])
+  @@index([isPrimary])
+  @@map("staff_department_assignment")
+}
+
+model StaffEmploymentHistory {
+  id             BigInt       @id @default(autoincrement())
+  staffProfileId BigInt       @map("staff_profile_id")
+  eventType      String       @map("event_type") @db.VarChar(50) // ONBOARDED, TRANSFER, DESIGNATION_CHANGE, STATUS_CHANGE, PROBATION_PASSED, OFFBOARDED, REACTIVATED
+  previousValue  String?      @map("previous_value") @db.Text
+  newValue       String?      @map("new_value") @db.Text
+  effectiveDate  DateTime     @default(now()) @map("effective_date") @db.Date
+  comments       String?      @db.Text
+  recordedBy     BigInt       @map("recorded_by")
+  createdAt      DateTime?    @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id], onDelete: Cascade)
+  recorder       User         @relation("HistoryRecorder", fields: [recordedBy], references: [id])
+
+  @@index([staffProfileId])
+  @@index([eventType])
+  @@index([effectiveDate])
+  @@map("staff_employment_history")
+}
+
+// =============================================================================
+// LEGACY COMPATIBILITY MODELS (NURSE, PHARMACIST, LABORATORIST, RECEPTIONIST, ACCOUNTANT)
+// =============================================================================
+
+model Nurse {
+  id        BigInt  @id @default(autoincrement())
+  imgUrl    String  @default("") @map("img_url") @db.VarChar(100)
+  name      String  @db.VarChar(100)
+  email     String  @default("") @db.VarChar(100)
+  address   String  @default("") @db.VarChar(100)
+  phone     String  @default("") @db.VarChar(100)
+  x         String  @default("") @db.VarChar(100)
+  y         String  @default("") @db.VarChar(100)
+  z         String  @default("") @db.VarChar(100)
+  ionUserId String  @default("") @map("ion_user_id") @db.VarChar(100)
+
+  @@map("nurse")
+}
+
+model Pharmacist {
+  id        BigInt  @id @default(autoincrement())
+  imgUrl    String  @default("") @map("img_url") @db.VarChar(100)
+  name      String  @db.VarChar(100)
+  email     String  @default("") @db.VarChar(100)
+  address   String  @default("") @db.VarChar(100)
+  phone     String  @default("") @db.VarChar(100)
+  x         String  @default("") @db.VarChar(100)
+  y         String  @default("") @db.VarChar(100)
+  z         String  @default("") @db.VarChar(100)
+  ionUserId String  @default("") @map("ion_user_id") @db.VarChar(100)
+
+  @@map("pharmacist")
+}
+
+model Laboratorist {
+  id        BigInt  @id @default(autoincrement())
+  imgUrl    String  @default("") @map("img_url") @db.VarChar(100)
+  name      String  @db.VarChar(100)
+  email     String  @default("") @db.VarChar(100)
+  address   String  @default("") @db.VarChar(100)
+  phone     String  @default("") @db.VarChar(100)
+  x         String  @default("") @db.VarChar(100)
+  y         String  @default("") @db.VarChar(100)
+  z         String  @default("") @db.VarChar(100)
+  ionUserId String  @default("") @map("ion_user_id") @db.VarChar(100)
+
+  @@map("laboratorist")
+}
+
+model Receptionist {
+  id        BigInt  @id @default(autoincrement())
+  imgUrl    String  @default("") @map("img_url") @db.VarChar(100)
+  name      String  @db.VarChar(100)
+  email     String  @default("") @db.VarChar(100)
+  address   String  @default("") @db.VarChar(100)
+  phone     String  @default("") @db.VarChar(100)
+  x         String  @default("") @db.VarChar(100)
+  y         String  @default("") @db.VarChar(100)
+  z         String  @default("") @db.VarChar(100)
+  ionUserId String  @default("") @map("ion_user_id") @db.VarChar(100)
+
+  @@map("receptionist")
+}
+
+model Accountant {
+  id        BigInt  @id @default(autoincrement())
+  imgUrl    String  @default("") @map("img_url") @db.VarChar(100)
+  name      String  @db.VarChar(100)
+  email     String  @default("") @db.VarChar(100)
+  address   String  @default("") @db.VarChar(100)
+  phone     String  @default("") @db.VarChar(100)
+  x         String  @default("") @db.VarChar(100)
+  y         String  @default("") @db.VarChar(100)
+  z         String  @default("") @db.VarChar(100)
+  ionUserId String  @default("") @map("ion_user_id") @db.VarChar(100)
+
+  @@map("accountant")
 }
 
 // =============================================================================

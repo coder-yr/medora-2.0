@@ -503,5 +503,38 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Automated oldest-first debt liquidation with mandatory justification for write-offs.
   - [ ] **Option B**: Require manual line-by-line payment against individual invoices.
 
+---
+
+## 22. Phase 19 Non-Medical Staff Registers & HR Directory Decisions
+
+### 56. Decoupled Employee Identity vs. Authentication Account
+- **Evidence**: Legacy Laravel had five duplicate role tables (`nurse`, `pharmacist`, `laboratorist`, `receptionist`, `accountant`) with separate `ion_user_id` strings and zero HR attributes or assignment history.
+- **Resolution**: Staff profiles (`StaffProfile`) store real-world human employee attributes (name, contact, qualifications, department, designation, branch, manager). Authentication credentials are delegated entirely to `User` and `AuthModule`. A user account can be linked to at most one staff profile (`userId BigInt? @unique`). Staff profiles can exist without login credentials (e.g. temporary, outsourced, or trainee staff).
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Decoupled HR staff profile model with 1-to-1 unique optional user account linkage.
+  - [ ] **Option B**: Duplicate login credentials and passwords inside staff profile tables.
+
+### 57. Concurrency-Safe Sequential Employee Numbering (`EMP-YYYYMM-XXXX`)
+- **Evidence**: Legacy staff records lacked formal employee identifiers, relying solely on arbitrary database auto-increment IDs.
+- **Resolution**: Implemented structured, sortable, monthly employee numbers: `EMP-YYYYMM-XXXX`. Concurrency safety is guaranteed by acquiring a PostgreSQL transaction advisory lock (`pg_advisory_xact_lock(hashtext('staff_employee_number'))`) before querying the maximum sequence and generating the next identifier.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: PostgreSQL transaction-level advisory locking for sequential numbering with optimistic retry fallback.
+  - [ ] **Option B**: Client-side UUIDs or random alphanumeric strings.
+
+### 58. Auditable Department Transfers & Designation History
+- **Evidence**: Legacy systems overwrote department strings directly on staff or doctor records, losing historical department assignments when nurses or technicians transferred between wards.
+- **Resolution**: Implemented `StaffDepartmentAssignment` tracking primary status, effective start, and effective end dates. Department transfers close previous active assignments and create new records while logging an immutable `StaffEmploymentHistory` audit event.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Relational assignment tracking preserving historical department and designation tenures.
+  - [ ] **Option B**: Overwrite current department on employee record without historical tracking.
+
+### 59. Offboarding & Audit Preservation Invariant
+- **Evidence**: In legacy Laravel, clicking "Delete Staff" performed a hard `DELETE`, which orphaned foreign keys or risked cascade-deleting historical records.
+- **Resolution**: Offboarding sets `employmentStatus = 'TERMINATED'`, records exit date and mandatory exit justification, closes active department assignments, and optionally revokes active login sessions in `UserSession`. Historical records, cashier shifts, prescriptions, and lab tests remain **100% immutable and intact**.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict soft offboarding with mandatory reason, session revocation, and zero deletion of historical financial/clinical data.
+  - [ ] **Option B**: Hard deletion of staff profiles.
+
+
 
 

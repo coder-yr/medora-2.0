@@ -144,6 +144,42 @@ async function main() {
     console.log(`Seeded staff user: ${staff.email} (${staff.group})`);
   }
 
+  // 3. Phase 19 Standard Staff Designations
+  const defaultDesignations = [
+    { code: 'NURSE-STAFF', title: 'Staff Nurse', category: 'NURSING', description: 'General inpatient/outpatient registered nurse' },
+    { code: 'NURSE-HEAD', title: 'Head Nurse / Matron', category: 'NURSING', description: 'Supervising ward and clinical nursing operations' },
+    { code: 'REC-FRONT', title: 'Front Desk Receptionist', category: 'RECEPTION', description: 'Patient registration, appointments and check-in' },
+    { code: 'REC-CHIEF', title: 'Chief Receptionist', category: 'RECEPTION', description: 'Front desk supervisor and patient coordination' },
+    { code: 'PHARM-TECH', title: 'Pharmacy Technician', category: 'PHARMACY', description: 'Dispensing and medication inventory maintenance' },
+    { code: 'PHARM-CHIEF', title: 'Chief Pharmacist', category: 'PHARMACY', description: 'Licensed pharmacist in charge of pharmacy operations' },
+    { code: 'LAB-TECH', title: 'Laboratory Technician', category: 'LABORATORY', description: 'Sample collection and diagnostic test execution' },
+    { code: 'LAB-SCIENTIST', title: 'Senior Medical Laboratory Scientist', category: 'LABORATORY', description: 'Validation and quality assurance of pathology/lab reports' },
+    { code: 'ACC-STAFF', title: 'Hospital Accountant', category: 'FINANCE', description: 'General accounting, billing audit and financial books' },
+    { code: 'CASHIER-SENIOR', title: 'Senior Cashier & Treasury Officer', category: 'FINANCE', description: 'Shift settlement, drawer oversight and bank reconciliations' },
+    { code: 'RAD-TECH', title: 'Radiologic Technologist', category: 'RADIOLOGY', description: 'X-Ray, CT, Ultrasound imaging specialist' },
+    { code: 'HR-OFFICER', title: 'HR & Administrative Officer', category: 'ADMINISTRATION', description: 'Staff records, department allocations and HR administration' },
+  ];
+
+  for (const desig of defaultDesignations) {
+    await prisma.staffDesignation.upsert({
+      where: { code: desig.code },
+      update: {
+        title: desig.title,
+        category: desig.category,
+        description: desig.description,
+        isActive: true,
+      },
+      create: {
+        code: desig.code,
+        title: desig.title,
+        category: desig.category,
+        description: desig.description,
+        isActive: true,
+      },
+    });
+    console.log(`Seeded staff designation: ${desig.code} - ${desig.title}`);
+  }
+
   console.log('Seeding complete.');
 }
 

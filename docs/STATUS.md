@@ -206,11 +206,43 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 11. Next Module Readiness
+## 11. Phase 18 Domain Migration Summary: Cashier, Shift Close & Treasury Settlement
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, `PharmacyModule`, `LaboratoryModule`, `RadiologyModule`, and `InpatientModule` fully migrated and verified on Supabase PostgreSQL:
-- **`Phase 18: Cashier, Shift Cash Close & Treasury Settlement`**: Shift drawer opening, counted cash variance auditing, supervisor dual-signoff, and patient final discharge settlement.
-- **`Phase 19: Non-Medical Staff Registers & HR Directory`**: Departmental profiles and shift credentials for nurses, receptionists, accountants, and lab techs.
-- **`Phase 20: General Accounting, Chart of Accounts & Expense Ledger`**: General ledger, expense logging, income categorization, and monthly P&L statements.
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Selected Domain** | **`CashierModule`** (Cash Drawer, Shift Close, Cash Transaction Ledger, Treasury Day-Book) & **Frontend Cashier Workspace** | Single active shift invariant per cashier, sequential shift numbers (`SFT-YYYYMMDD-XXXX`), physical cash drawer tracking, immutable cash transaction ledger (`PAYMENT_RECEIVED`, `REFUND`, `CASH_PAYOUT`, `OPENING_FLOAT`, `CASH_ADJUSTMENT`, `REVERSAL`), physical denomination breakdown, dual-control supervisor closing with variance explanation, unified oldest-first patient debt liquidation, and legacy `shift_close` table synchronization |
+| **Target Database Mapping** | `cash_drawer`, `cashier_shift`, `cash_transaction`, `shift_close_denomination`, `cash_reconciliation` in `backend/prisma/schema.prisma` with reverse relations on `users`, `invoice_payment`, `payment`, `hospital_branch` | `backend/prisma/migrations/20261102200000_phase_18_cashier/migration.sql`, verified on disposable PostgreSQL schema, applied to Supabase PostgreSQL |
+| **Legacy Source Parity** | `legacy/app/Http/Controllers/CashController.php`, `legacy/app/Models/ShiftClose.php`, `legacy/resources/views/app/cash/` | Complete 100% legacy parity documented in [`docs/cashier-migration-mapping.md`](cashier-migration-mapping.md) |
+| **Backend Endpoints** | `POST /api/v1/cashier/shifts/open`<br>`GET /api/v1/cashier/shifts/active`<br>`POST /api/v1/cashier/shifts/submit-close`<br>`POST /api/v1/cashier/shifts/:id/approve`<br>`POST /api/v1/cashier/shifts/:id/reject`<br>`POST /api/v1/cashier/payouts`<br>`POST /api/v1/cashier/adjustments`<br>`GET /api/v1/cashier/transactions`<br>`GET /api/v1/cashier/daybook`<br>`POST /api/v1/cashier/settlement/:patientId` | Full OpenAPI Swagger documented endpoints with granular RBAC permissions and explicit HTTP status codes |
+| **Frontend Deliverables** | React 19 + TypeScript + Vite comprehensive POS/Cashier workspace in `frontend/src/features/cashier/CashierWorkspace.tsx` and re-exported in `frontend/src/components/CashierWorkspace.tsx` | Real-time drawer balance widget, Open Shift modal with drawer float, Submit Shift Close modal with denomination counter and variance calculator, Cash Payout and Adjustment modals, Supervisor Audit queue with dual-signoff, Treasury Day-Book with date/method filters and print view, Unified Patient Treasury Settlement modal |
+| **Unit Test Coverage** | **15 tests passed** in `cashier.service.spec.ts` | `npm test` (Exit code 0) |
+| **E2E Integration Tests**| **19 tests passed** in `cashier.e2e-spec.ts` against live Supabase PostgreSQL | `npm run test:e2e` (Exit code 0) |
+
+---
+
+## 12. Phase 19 Domain Migration Summary: Non-Medical Staff Registers & HR Directory
+
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Selected Domain** | **`StaffModule`** (Staff Profiles, Designations Catalogue, Department Assignments, Employment Audit Trail) & **Frontend Staff Workspace** | Normalized human employee directory replacing 5 legacy duplicate role tables (`nurse`, `pharmacist`, `laboratorist`, `receptionist`, `accountant`), concurrency-safe sequential employee number generation (`EMP-YYYYMM-XXXX`) via PostgreSQL transaction advisory lock, decoupled 1-to-1 authentication linking, auditable department transfers, designation promotions, lifecycle state transitions (`ACTIVE`, `ON_LEAVE`, `SUSPENDED`, `INACTIVE`, `TERMINATED`), and soft offboarding with session revocation and zero data destruction |
+| **Target Database Mapping** | `staff_designation`, `staff_profile`, `staff_department_assignment`, `staff_employment_history`, `nurse`, `pharmacist`, `laboratorist`, `receptionist`, `accountant` in `backend/prisma/schema.prisma` with reverse relations on `users`, `department`, `hospital_branch` | `backend/prisma/migrations/20261102220000_phase_19_staff/migration.sql`, verified on disposable PostgreSQL schema, applied to Supabase PostgreSQL |
+| **Legacy Source Parity** | `legacy/app/Http/Controllers/StaffController.php`, `legacy/config/hospital_staff.php`, `legacy/app/Support/StaffLogin.php`, `legacy/resources/views/app/staff/`, `legacy/tests/Feature/StaffTest.php` | Complete 100% legacy parity documented in [`docs/staff-migration-mapping.md`](staff-migration-mapping.md) |
+| **Backend Endpoints** | `GET /api/v1/staff`<br>`POST /api/v1/staff`<br>`GET /api/v1/staff/:id`<br>`PATCH /api/v1/staff/:id`<br>`POST /api/v1/staff/:id/transfer-department`<br>`POST /api/v1/staff/:id/change-designation`<br>`POST /api/v1/staff/:id/status`<br>`POST /api/v1/staff/:id/deactivate`<br>`POST /api/v1/staff/:id/reactivate`<br>`POST /api/v1/staff/:id/offboard`<br>`POST /api/v1/staff/:id/link-user`<br>`POST /api/v1/staff/:id/unlink-user`<br>`GET /api/v1/staff/:id/account-status`<br>`GET /api/v1/staff/designations`<br>`POST /api/v1/staff/designations`<br>`GET /api/v1/staff/dashboard/metrics` | Full OpenAPI Swagger documented endpoints with granular RBAC permissions (`STAFF_VIEW`, `STAFF_CREATE`, `STAFF_UPDATE`, `STAFF_DEACTIVATE`, `STAFF_OFFBOARD`, `STAFF_ASSIGN_DEPARTMENT`, `STAFF_CHANGE_DESIGNATION`, `STAFF_LINK_USER`) and explicit HTTP status codes |
+| **Frontend Deliverables** | React 19 + TypeScript + Vite comprehensive Staff & HR Directory workspace in `frontend/src/features/staff/StaffWorkspace.tsx` and re-exported in `frontend/src/components/StaffWorkspace.tsx` | Real-time HR KPI banner (Total Headcount, Active Duty, On Leave, Suspended, Offboarded, Unlinked Accounts), search & filterable directory table with copy badge, Onboard Staff modal, Profile Details Drawer with full assignment & employment history, Department Transfer modal, Designation Change modal, Status Transition modal, User Account Linking modal, Offboarding modal with session revocation toggle, and Designation Catalogue modal |
+| **Business Rules & Data Integrity** | 1. **Decoupled Identity & Authentication**: `StaffProfile` holds employee facts; login accounts are optionally attached via 1-to-1 unique `userId`<br>2. **Concurrency-Safe Employee Numbering**: Sequential format `EMP-YYYYMM-XXXX` protected by PostgreSQL transaction advisory lock (`pg_advisory_xact_lock(hashtext('staff_employee_number'))`)<br>3. **Historical Department Tenures**: `StaffDepartmentAssignment` tracks primary status and effective intervals, never overwriting historical assignments<br>4. **Audited Employment History**: Every onboarding, transfer, designation change, status change, account link/unlink, and offboarding creates an append-only `StaffEmploymentHistory` record<br>5. **Soft Offboarding Invariant**: Offboarding marks `TERMINATED`, sets exit date and reason, revokes active sessions in `UserSession`, preserving all clinical records, cashier shifts, and financial transactions intact | `StaffService` unit test suite (16 tests) & PostgreSQL E2E suite (17 integration & concurrency tests) |
+| **Unit Test Coverage** | **22 suites passed, 240 tests passed** (16 new tests in `staff.service.spec.ts`) | `npm test` (Exit code 0) |
+| **E2E Integration Tests**| **15 suites passed, 201 tests passed** across all modules against live Supabase PostgreSQL (17 new tests in `staff.e2e-spec.ts` including concurrency race-condition verification) | `npm run test:e2e` (Exit code 0) |
+| **Linting & Code Quality**| **ESLint 9 + Prettier + Strict TypeScript** | Backend: `npm run lint` (0 errors), `npx tsc --noEmit` (0 errors)<br>Frontend: `npm run lint` (0 errors), `tsc -b && vite build` (0 errors in 632ms) |
+| **Production Builds** | Backend: `npm run build` (Exit code 0)<br>Frontend: `npm run build` (Exit code 0) | Ready for containerization |
+| **Legacy Source Integrity**| **100% Preserved** | `legacy/` 0 modifications; unstaged `app/Models/SMS.php` artifact strictly preserved |
+
+---
+
+## 13. Next Module Readiness
+
+With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, `PharmacyModule`, `LaboratoryModule`, `RadiologyModule`, `InpatientModule`, `CashierModule`, and `StaffModule` fully migrated and verified on Supabase PostgreSQL:
+- **`Phase 20: General Accounting, Chart of Accounts & Expense Ledger`**: General ledger, expense logging, income categorization, supplier accounts, and monthly financial statements.
+
+
 
 

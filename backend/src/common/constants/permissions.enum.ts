@@ -105,7 +105,19 @@ export enum HospitalPermission {
   PHARMACY_APPROVE_ADJUSTMENT = 'pharmacy_approve_adjustment',
   PHARMACY_REPORTS = 'pharmacy_reports',
 
-  // Staff & Departments
+  // Staff & HR Directory
+  STAFF_VIEW = 'staff_view',
+  STAFF_CREATE = 'staff_create',
+  STAFF_UPDATE = 'staff_update',
+  STAFF_DEACTIVATE = 'staff_deactivate',
+  STAFF_OFFBOARD = 'staff_offboard',
+  STAFF_ASSIGN_DEPARTMENT = 'staff_assign_department',
+  STAFF_CHANGE_DESIGNATION = 'staff_change_designation',
+  STAFF_LINK_USER = 'staff_link_user',
+  STAFF_VIEW_HISTORY = 'staff_view_history',
+  STAFF_REPORTS = 'staff_reports',
+
+  // Legacy Staff & Departments
   DOCTOR_VIEW = 'doctor_view',
   DOCTOR_ADD = 'doctor_add',
   DOCTOR_UPDATE = 'doctor_update',
@@ -223,6 +235,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.INPATIENT_CHARGE_REVERSE,
     HospitalPermission.BED_VIEW,
     HospitalPermission.BED_MANAGE,
+    HospitalPermission.STAFF_VIEW,
   ],
   Nurse: [
     HospitalPermission.PATIENT_VIEW,
@@ -251,6 +264,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.DOCTOR_VIEW,
     HospitalPermission.NURSE_VIEW,
     HospitalPermission.RADIOLOGY_VIEW,
+    HospitalPermission.STAFF_VIEW,
   ],
   Receptionist: [
     HospitalPermission.PATIENT_VIEW,
@@ -286,6 +300,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.CASHIER_SHIFT_CLOSE,
     HospitalPermission.CASHIER_TRANSACTION_VIEW,
     HospitalPermission.CASH_CLOSE,
+    HospitalPermission.STAFF_VIEW,
   ],
   Accountant: [
     HospitalPermission.INVOICE_VIEW,
@@ -324,6 +339,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.CASHIER_CLOSE_ALL_USERS,
     HospitalPermission.CASH_CLOSE,
     HospitalPermission.VIEW_PAYMENT_REPORTS,
+    HospitalPermission.STAFF_VIEW,
   ],
   Pharmacist: [
     HospitalPermission.MEDICINE_VIEW,
@@ -340,6 +356,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.PHARMACY_ADJUST,
     HospitalPermission.PHARMACY_REPORTS,
     HospitalPermission.PRESCRIPTION_VIEW,
+    HospitalPermission.STAFF_VIEW,
   ],
   Laboratorist: [
     HospitalPermission.LAB_VIEW,
@@ -368,5 +385,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.RADIOLOGY_AMEND,
     HospitalPermission.RADIOLOGY_CATALOGUE_MANAGE,
     HospitalPermission.RADIOLOGY_REPORTS,
+    HospitalPermission.STAFF_VIEW,
   ],
 };

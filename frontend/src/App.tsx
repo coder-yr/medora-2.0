@@ -20,7 +20,8 @@ import { LaboratoryWorkspace } from './components/LaboratoryWorkspace';
 import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
 import { InpatientWorkspace } from './components/InpatientWorkspace';
 import { CashierWorkspace } from './components/CashierWorkspace';
-import { Radio, BedDouble, DollarSign } from 'lucide-react';
+import { StaffWorkspace } from './components/StaffWorkspace';
+import { Radio, BedDouble, DollarSign, Users } from 'lucide-react';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -58,7 +59,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('cashier');
+  const [activeModule, setActiveModule] = useState<'staff' | 'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('staff');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -312,6 +313,13 @@ export function App() {
       {/* Module Switcher Navigation */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }} className="no-print">
         <button
+          className={`btn ${activeModule === 'staff' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('staff')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <Users size={18} /> Staff Registers & HR Directory
+        </button>
+        <button
           className={`btn ${activeModule === 'inpatient' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('inpatient')}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
@@ -383,6 +391,14 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* Staff Registers & HR Directory View */}
+      {activeModule === 'staff' && (
+        <StaffWorkspace
+          token={token}
+          userRole={userRole}
+        />
       )}
 
       {/* Inpatient & Bed Management (IPD) View */}
