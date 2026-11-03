@@ -737,3 +737,35 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
 - **Decision Status**:
   - [x] **Option A (Adopted)**: System validation and workflow integration on established Docker/PostgreSQL stack.
   - [ ] **Option B**: Premature enterprise cloud or Kubernetes orchestration.
+
+---
+
+## 30. Legacy PHP/Laravel Removal & Codebase Cleanup Decisions
+
+### 85. Pre-Cleanup Offline Archive Verification Protocol
+- **Evidence**: Removing historical source code carries catastrophic risk if unmigrated business rules or edge-case logic are accidentally lost.
+- **Resolution**: Created a verified, non-destructive offline archive `icthospital-legacy-backup-20261103.zip` (SHA256 `A241A643...`, 29.19MB, 4,433 files) stored outside the repository before initiating any file deletions.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Mandatory verified offline archive creation with checksum and entry count verification.
+  - [ ] **Option B**: Immediate deletion without external archive.
+
+### 86. Protected Legacy Artifact Preservation Invariant (`app/Models/SMS.php`)
+- **Evidence**: Project safety guidelines mandate that `app/Models/SMS.php` must never be modified, renamed, deleted, overwritten, or staged. Furthermore, on Windows NTFS (case-preserving, case-insensitive), `SMS.php` and `Sms.php` share the same filesystem entry.
+- **Resolution**: Retained `app/Models/` containing `SMS.php` in its exact location without staging or modifications. Cleaned up all other models while preserving the container directory to prevent NTFS case collisions.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict preservation of `app/Models/SMS.php` in place, leaving `app/Models/` directory intact.
+  - [ ] **Option B**: Force-deleting the entire `app/` hierarchy.
+
+### 87. Root Monorepo Structure & Workspace Normalization
+- **Evidence**: Legacy root `package.json` contained Laravel Vite plugin dependencies and root `artisan`/`composer.json` caused ambiguity regarding the primary application stack.
+- **Resolution**: Purged root Composer manifests and modernized root `package.json` to define an npm monorepo (`workspaces: ["backend", "frontend"]`) with unified build, test, and lint commands.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Standard npm monorepo root manifest linking NestJS and React workspaces.
+  - [ ] **Option B**: Leaving obsolete Laravel Vite and Composer manifests at the root.
+
+### 88. Modern Containerization & CI Architecture in `infra/` and `.github/`
+- **Evidence**: The root `Dockerfile`, `docker-compose.yml`, and `.github/workflows/ci.yml` were configured for PHP 8.3, Apache/FPM, and MariaDB.
+- **Resolution**: Replaced root legacy Docker files with dedicated Medora 2.0 multi-stage Dockerfiles (`infra/backend.Dockerfile`, `infra/frontend.Dockerfile`, `infra/nginx.conf`, `infra/docker-compose.yml`) targeting Node.js 22, Nginx, and PostgreSQL. Replaced `.github/workflows/ci.yml` with a Node.js 22 GitHub Actions CI pipeline.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Clean Node.js 22 / PostgreSQL container deployment and CI pipeline.
+  - [ ] **Option B**: Retain legacy PHP Docker containers.

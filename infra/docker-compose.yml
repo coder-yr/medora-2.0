@@ -1,0 +1,57 @@
+# ==============================================================================
+# Medora 2.0 - Production Docker Compose Orchestration
+# ==============================================================================
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: medora-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medora}
+      POSTGRES_USER: ${POSTGRES_USER:-medora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medora_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - medora_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medora} -d ${POSTGRES_DB:-medora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: infra/backend.Dockerfile
+    container_name: medora-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-medora}:${POSTGRES_PASSWORD:-medora_secret}@postgres:5432/${POSTGRES_DB:-medora}?schema=public
+      JWT_SECRET: ${JWT_SECRET:-medora_production_jwt_secret_change_me_32chars}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600s}
+      REFRESH_TOKEN_SECRET: ${REFRESH_TOKEN_SECRET:-medora_production_refresh_secret_change_me}
+      REFRESH_TOKEN_EXPIRATION: ${REFRESH_TOKEN_EXPIRATION:-7d}
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: infra/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: ""
+    container_name: medora-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  medora_pgdata:

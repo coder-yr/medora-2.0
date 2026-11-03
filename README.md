@@ -5,72 +5,89 @@
 
 ---
 
-## 1. Migration Goal & Target Stack
+## 1. Architecture Overview
 
-**Medora 2.0** transitions the monolithic PHP/Laravel clinical application into an enterprise-grade, modular monorepo featuring:
+**Medora 2.0** is an enterprise-grade hospital management system operating as a clean, modular TypeScript monorepo with complete independence from PHP:
 
-- **Frontend (`frontend/`)**: Modern **React + TypeScript + Vite** client delivering an accessible clinical user experience.
-- **Backend (`backend/`)**: Modular **NestJS + TypeScript** service enforcing domain-driven design, clinical permissions, and financial audit trails.
-- **Database (`database/`)**: **Supabase PostgreSQL** managed via **Prisma ORM** (superseding earlier MariaDB/MySQL specifications). Uses pooled connections (`DATABASE_URL`) for traffic and direct connections (`DIRECT_URL`) for migrations.
-- **Background Processing**: **Redis + BullMQ** for scheduled jobs, SMS/email reminders, and asynchronous queues.
-- **Infrastructure (`infra/`)**: Containerized workflows with Docker Compose initially (Kubernetes only if justified).
-- **Documentation (`docs/`)**: Comprehensive migration specifications, audit records, and open questions tracker ([`docs/06-open-questions.md`](docs/06-open-questions.md)).
-- **Legacy Preservation (`legacy/`)**: Pristine, isolated archive of the original ICTHospital codebase for behavioral reference and schema parity.
+- **Frontend (`frontend/`)**: Modern **React 19 + TypeScript + Vite + Tailwind CSS** client delivering an accessible clinical user experience across 18 hospital domains.
+- **Backend (`backend/`)**: Modular **NestJS 11 + TypeScript** service enforcing zero-trust multi-branch authorization, domain-driven design, clinical permissions, and financial audit trails.
+- **Database (`backend/prisma/`)**: **PostgreSQL 16+ / Supabase** managed via **Prisma ORM 7** with pooled and direct connection support.
+- **Background Processing (`backend/src/modules/notification/`)**: Native **Transactional Outbox Pattern** with exponential backoff and PostgreSQL concurrency row locks.
+- **Infrastructure (`infra/`)**: Containerized production workflows with multi-stage Dockerfiles and Docker Compose.
+- **Documentation (`docs/`)**: Comprehensive migration specifications, audit records, workflow validations, and system runbooks.
+- **Legacy Reference Archive (`legacy/`)**: Pristine, isolated reference archive of the historical ICTHospital PHP application for behavioral reference and audit trail.
 
 ---
 
-## 2. Monorepo Repository Structure
+## 2. Monorepo Structure
 
 ```text
 .
-├── frontend/             # Modern client applications (React + TypeScript + Vite)
-├── backend/              # Modular enterprise API (NestJS + TypeScript + Prisma)
-├── database/             # Supabase PostgreSQL migrations, Prisma schemas, seed datasets
-├── infra/                # Docker Compose, orchestration, CI/CD, proxy configurations
-├── docs/                 # Project documentation, status logs, specifications
-│   ├── STATUS.md         # Migration phase progress and verification evidence
-│   ├── 06-open-questions.md # PostgreSQL compatibility, legacy assumptions & risks
-│   └── USER-GUIDE.md     # Reference screenshots and clinical user workflows
-└── legacy/               # 100% verified, isolated copy of ICTHospital (Laravel 12)
-    ├── app/
-    ├── config/
-    ├── database/
-    ├── resources/
-    ├── routes/
-    └── ...
+├── frontend/             # React 19 + TypeScript + Vite clinical application
+├── backend/              # NestJS 11 + Prisma ORM 7 enterprise hospital API
+│   └── prisma/           # PostgreSQL schema, migrations, and seeds
+├── infra/                # Production Docker Compose, Dockerfiles, and Nginx configs
+├── docs/                 # System architecture, audit records, and runbooks
+│   ├── STATUS.md         # Full project migration status and verification history
+│   ├── 06-open-questions.md # Architecture decisions & open questions log
+│   └── stage-3-system-validation.md # Full-stack workflow verification report
+├── app/Models/SMS.php    # Protected historical artifact preserved in place
+└── legacy/               # Isolated historical reference archive (Laravel 12)
 ```
 
 ---
 
-## 3. Security & Governance Rules
+## 3. Quick Start
 
-1. **Trusted Authority**: The NestJS backend is the sole trusted boundary for all clinical and financial operations. The React frontend never bypasses backend authorization.
-2. **Credential Isolation**: Database connection strings, passwords, and the Supabase `SERVICE_ROLE_KEY` must never be exposed to the frontend, logged, or checked into Git.
-3. **No Blind Translation**: Migrations are mapped systematically from the legacy Laravel models rather than automated code conversion.
-4. **Data Protection**: Development and rehearsals are strictly isolated from production patient data.
+### Prerequisites
+- Node.js 22 LTS or higher
+- PostgreSQL 16+ (or Docker)
+- npm 10+
 
----
+### Development Setup
 
-## 4. Current Status
-
-| Phase | Description | Status |
-| :--- | :--- | :--- |
-| **Phase 0** | **Workspace and Source Preservation (Supabase PostgreSQL Update)** | **COMPLETED** |
-| **Phase 1** | Domain Model & NestJS Core Services (Prisma + Supabase) | Pending |
-| **Phase 2** | Modern Clinical Frontend Development (React + Vite) | Pending |
-| **Phase 3** | Data Migration & Dual-Run Validation | Pending |
-| **Phase 4** | Production Deployment & Decommissioning | Pending |
-
-Detailed verification hashes, integrity logs, and phase documentation are maintained in [`docs/STATUS.md`](docs/STATUS.md) and [`docs/06-open-questions.md`](docs/06-open-questions.md).
-
----
-
-## 5. Development & Environment Setup
-
-1. **Environment Variables**:
-   Copy the master example configuration:
+1. **Install Dependencies:**
    ```bash
-   cp .env.example .env
+   cd backend && npm install
+   cd ../frontend && npm install
    ```
-2. **Review Status & Guidelines**:
-   Check [`docs/STATUS.md`](docs/STATUS.md) and [`docs/06-open-questions.md`](docs/06-open-questions.md) prior to beginning subsequent phases.
+
+2. **Database Setup:**
+   ```bash
+   cd backend
+   npx prisma generate
+   ```
+
+3. **Start Services:**
+   - **Backend API (Port 3000):**
+     ```bash
+     cd backend && npm run start:dev
+     ```
+   - **Frontend Web Client (Port 5173):**
+     ```bash
+     cd frontend && npm run dev
+     ```
+
+### Production Container Deployment
+
+```bash
+docker compose -f infra/docker-compose.yml up --build
+```
+
+---
+
+## 4. Verification & Testing
+
+- **Backend Unit Tests:** `cd backend && npm test` (31 test suites, 329 tests)
+- **Backend E2E Validation:** `cd backend && npx jest --config test/jest-e2e.json test/stage3-system-validation.e2e-spec.ts` (34 tests)
+- **Frontend Linter:** `cd frontend && npm run lint` (0 errors)
+- **Frontend Production Build:** `cd frontend && npm run build` (Clean build in ~200ms)
+
+---
+
+## 5. Security & Governance Rules
+
+1. **Trusted Authority**: The NestJS backend is the sole trusted boundary for all clinical and financial operations.
+2. **Zero-Trust Multi-Branch Isolation**: All operations enforce strict branch access boundaries through `BranchAccessGuard` and `BranchAuthorizationService`.
+3. **Ledger Immutability**: Posted accounting journals are immutable; corrections require signed reversal entries.
+4. **Credential Isolation**: Database credentials, passwords, and secrets are managed via environment variables and never exposed to the frontend or checked into version control.

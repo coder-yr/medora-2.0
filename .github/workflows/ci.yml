@@ -1,67 +1,68 @@
-name: CI
+name: Medora 2.0 CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/medora-2.0-migration]
   pull_request:
-  schedule:
-    # Advisories land after a merge, not during one, so re-check weekly.
-    - cron: '0 6 * * 1'
 
 permissions:
   contents: read
 
 jobs:
-  security:
-    name: Dependency advisories
+  backend:
+    name: Backend (NestJS + Prisma)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
         with:
-          php-version: '8.3'
-          extensions: bcmath, ctype, curl, dom, fileinfo, gd, intl, mbstring, openssl, pdo, pdo_mysql, tokenizer, xml, zip
-          coverage: none
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
 
-      - name: Validate composer files
-        run: composer validate --strict --no-check-publish
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
 
-      # Reads composer.lock only, so it does not need a working install.
-      - name: Audit dependencies
-        run: composer audit --locked --no-interaction
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npx prisma generate
 
-  tests:
-    name: Install and test
+      - name: Lint backend
+        working-directory: backend
+        run: npm run lint
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Run backend unit tests
+        working-directory: backend
+        run: npm test
+
+  frontend:
+    name: Frontend (React 19 + Vite)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up PHP
-        uses: shivammathur/setup-php@v2
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
         with:
-          php-version: '8.3'
-          extensions: bcmath, ctype, curl, dom, fileinfo, gd, intl, mbstring, openssl, pdo, pdo_mysql, tokenizer, xml, zip
-          coverage: none
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
 
-      - name: Cache composer packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.composer/cache
-          key: composer-${{ hashFiles('composer.lock') }}
-          restore-keys: composer-
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
 
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Lint frontend
+        working-directory: frontend
+        run: npm run lint
 
-      - name: Prepare environment
-        run: |
-          cp .env.example .env || true
-          php artisan key:generate --ansi
-
-      - name: Run tests
-        env:
-          DB_CONNECTION: sqlite
-          DB_DATABASE: ':memory:'
-        run: php artisan test
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
