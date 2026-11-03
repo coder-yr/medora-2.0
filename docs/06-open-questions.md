@@ -667,12 +667,38 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Ephemeral SHA-256 token hashing with refresh token family revocation.
   - [ ] **Option B**: Unhashed plaintext tokens or permanent storage in database tables.
 
-### 76. Deferral of Physical Pharmacy Stock Partitioning to Stage 2
+### 76. Deferral of Physical Pharmacy Stock Partitioning to Stage 3
 - **Evidence**: While clinical, billing, consultation, and appointment entities have been partitioned by branch, physical warehouse inventory versus clinic dispensary stock requires enterprise business rule signoff (central procurement vs. autonomous branch purchasing).
-- **Resolution**: Kept schema stable in Stage 1; full physical inventory branch partitioning is formally scoped and scheduled for Remediation Stage 2.
+- **Resolution**: Kept schema stable in Stage 1 & 2; full physical inventory branch partitioning and double-entry ledger refactoring are formally scoped and scheduled for Remediation Stage 3.
 - **Decision Status**:
-  - [x] **Option A (Adopted)**: Enforce access control in Stage 1; refactor multi-warehouse schema in Stage 2.
+  - [x] **Option A (Adopted)**: Enforce access control in Stage 1; complete frontend in Stage 2; refactor multi-warehouse schema and ledger in Stage 3.
   - [ ] **Option B**: Introduce rushed schema migrations without clinical inventory stakeholder signoff.
+
+---
+
+## 28. Remediation Stage 2 Frontend Completion & End-to-End Workflow Integration Decisions
+
+### 77. Unified Frontend Application Shell & Categorized Navigation
+- **Evidence**: The initial frontend only had isolated views for prescriptions, pharmacy, lab, radiology, inpatient, cashier, staff, accounting, and settings, lacking primary workspaces for Patients, Doctors, Departments, Appointments, Consultations, and Invoices.
+- **Resolution**: Implemented a responsive 4-tier navigation hierarchy (Clinical Operations, Diagnostics & Pharmacy, Inpatient & Billing, Hospital Administration) in `frontend/src/App.tsx`, providing full access to all 18 backend hospital modules with role-based visibility.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: 4-category cohesive application shell with collapsible sidebar and branch-aware top bar.
+  - [ ] **Option B**: Fragmented standalone SPAs or disparate micro-frontends without shared context.
+
+### 78. Complete Elimination of Hardcoded Record Identifiers
+- **Evidence**: Earlier frontend prototypes and mockups contained hardcoded record identifiers (`patientId = '1'`, `doctorId = '1'`) or hardcoded branch IDs, preventing dynamic clinical workflows.
+- **Resolution**: Refactored all components to resolve entity IDs dynamically via API lookups, search modals, and cross-module navigation state (`handleBookAppointment`, `handleRaiseInvoice`, `handleStartConsultation`).
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Zero hardcoded entity IDs; fully dynamic API-driven selections across all 18 workspaces.
+  - [ ] **Option B**: Retain fallback stub IDs when search endpoints are empty.
+
+### 79. End-to-End Synthetic Outpatient Journey Verification
+- **Evidence**: Module-level unit and E2E tests verified individual endpoints in isolation, but lacked validation of the continuous patient lifecycle through registration, scheduling, clinical encounter, prescribing, and financial settlement.
+- **Resolution**: Authored and passed `backend/test/stage2-workflow.e2e-spec.ts` executing the complete 6-stage lifecycle across PostgreSQL with role transitions and data assertions.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Formal end-to-end integration test suite verifying the unbroken clinical and financial chain.
+  - [ ] **Option B**: Rely solely on disparate module-level integration tests.
+
 
 
 

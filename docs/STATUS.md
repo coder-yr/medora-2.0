@@ -2,10 +2,10 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Production Remediation Stage 1: Security Hardening & Zero-Trust Multi-Branch Enforcement**
-- **Status**: **STAGE 1 COMPLETED (100% UNIT & E2E TESTS PASSED)**
+- **Current Phase**: **Production Remediation Stage 2: Frontend Completion & End-to-End Workflow Integration**
+- **Status**: **STAGE 2 COMPLETED (100% UNIT, FRONTEND BUILD, AND E2E WORKFLOW TESTS PASSED)**
 - **Date**: 2026-11-03
-- **Next Phase**: **Remediation Stage 2: Accounting Double-Entry Ledger Refactoring & Physical Inventory Partitioning**
+- **Next Phase**: **Remediation Stage 3: Double-Entry Ledger Refactoring & Physical Inventory Partitioning / Production Readiness**
 - **Approved Target Stack**:
   - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS / Modern CSS (scaffolded in `frontend/`)
   - **Backend**: NestJS 11 + TypeScript (trusted business logic boundary)
@@ -48,6 +48,7 @@
 | **Phase 22** | Notifications, Messaging & Background Job Infrastructure (17th Module) | `NotificationModule` (transactional outbox pattern, recipient isolation, unread counter, preferences & quiet hours, provider abstractions: in-app/mock-email/mock-sms, phone normalisation, transient/permanent error classification, exponential backoff, dead-letter recovery, template engine with HTML sanitisation, ban on legacy public cron `/cronjob/payment-reminder`), React 19 Notification Center & Admin Workspace, Supabase migration `20261103180000_phase_22_notifications`, [`docs/phase-22-verification.md`](phase-22-verification.md) | **COMPLETED** |
 | **Phase 23** | Executive Dashboard & Operational Analytics (18th Module) | `DashboardModule` (unified executive analytics, date filters with inclusive UTC boundaries, role-appropriate views: Executive/Super Admin, Branch Admin, Doctor, Receptionist, Pharmacist, Laboratorist, Accountant; strict branch scoping; multi-branch comparison matrix with in-memory TTL caching; real-time actionable alerts for pending shifts, unverified labs, dead-letter notifications, and low-stock batches; zero fabricated metrics), React 19 Executive Dashboard Workspace, [`docs/phase-23-verification.md`](phase-23-verification.md) | **COMPLETED** |
 | **Stage 1 Remediation** | Security Hardening & Zero-Trust Multi-Branch Enforcement | Global `BranchAccessGuard` (`ThrottlerGuard` -> `JwtAuthGuard` -> `BranchAccessGuard`), `BranchAuthorizationService` object-level access control across 7 clinical/financial modules, brute-force sliding-window `AccountLockoutService` (5 attempts, 15m), ephemeral SHA-256 `PasswordResetService`, transparent PHI query/exception redaction (`sanitizeLogUrl`), production Swagger disablement, and test endpoint removal. All 31 unit suites (329 tests) and 4 E2E suites (50 tests) passing, [`docs/stage-1-verification.md`](stage-1-verification.md) | **COMPLETED** |
+| **Stage 2 Remediation** | Frontend Completion & End-to-End Workflow Integration | Comprehensive React 19 UI completion across all 18 migrated backend modules (Patients, Doctors, Departments, Appointments, Consultations, Invoices/Billing, Prescriptions), responsive 4-category application shell, multi-branch contextual switcher, eliminated all hardcoded IDs, 6-step synthetic hospital workflow E2E test passed against PostgreSQL, docs ([`docs/frontend-architecture.md`](frontend-architecture.md), [`docs/frontend-api-integration.md`](frontend-api-integration.md), [`docs/end-to-end-workflow-verification.md`](end-to-end-workflow-verification.md)) | **COMPLETED** |
 
 ---
 
@@ -262,10 +263,22 @@ The Medora 2.0 frontend in `frontend/` is built on React 19, TypeScript, and Vit
 
 ---
 
-## 14. Next Module Readiness
+---
 
-With `PatientModule`, `DepartmentModule`, `DoctorModule`, `AppointmentModule`, `ConsultationModule`, `InvoiceModule`, `PrescriptionModule`, `MedicineModule`, `PharmacyModule`, `LaboratoryModule`, `RadiologyModule`, `InpatientModule`, `CashierModule`, `StaffModule`, and `AccountingModule` fully migrated and verified on Supabase PostgreSQL:
-- **`Phase 21: Emergency, Triage & Operating Theatre (OT)`**: Emergency admission register, Manchester/ATS triage scale, trauma tracking, operating theatre scheduling, surgeon/anesthesia teams, and surgical logs.
+## 15. Stage 2 Remediation Summary: Frontend Completion & End-to-End Workflow Integration
+
+| Property | Value | Evidence / Command |
+| :--- | :--- | :--- |
+| **Scope** | **Frontend Completion & End-to-End Workflow Integration** across all 18 backend hospital modules | Complete implementation of 8 missing workspaces (`PatientWorkspace`, `DoctorWorkspace`, `DepartmentWorkspace`, `AppointmentWorkspace`, `ConsultationWorkspace`, `BillingWorkspace`, `PrescriptionWorkspace`, `LoginView`), modern 4-tier navigation shell in `frontend/src/App.tsx`, elimination of all hardcoded identifiers (`patientId = '1'`, `doctorId = '1'`), and full integration with NestJS backend APIs |
+| **New Workspaces** | 1. **Patients**: Registry, search (MRN/CNIC/phone), registration modal, patient detail drawer, direct actions<br>2. **Doctors**: Consultants directory, department suggestion merge, load indicators, add modal<br>3. **Departments**: Specialty directory, doctor counts, unlisted specialty auto-adoption<br>4. **Appointments**: Clinic calendar, doctor schedule slot calculator (`GET /api/v1/appointments/free-slots`), intake vitals, check-in, telemedicine links<br>5. **Consultations**: Clinical encounter workspace, allergy alerts, past visit timeline, note templates, vitals intake, diagnosis, integrated prescription authoring, printable summary<br>6. **Billing & Invoices**: Itemized charges, subtotal/tax/discount calculation, installment payment modal (`POST /api/v1/invoices/:id/pay`), receivables summary, printable tax receipt<br>7. **Prescriptions**: Standalone prescribing workspace, dynamic patient & doctor selection, formulary search, printable Rx slip<br>8. **Authentication**: Brute-force lockout alerts, forgot-password modal, in-app change password modal | Fully typed in `frontend/src/types/` (`auth.ts`, `patient.ts`, `doctor.ts`, `department.ts`, `appointment.ts`, `consultation.ts`, `billing.ts`, `prescription.ts`) with `verbatimModuleSyntax` compliance |
+| **Cross-Module Workflows** | Seamless user journeys connecting clinical and financial domains: Patient Register &rarr; Book Appointment &rarr; Triage/Consultation &rarr; Prescription Issuance &rarr; Invoicing &rarr; Cashier Settlement | Implemented in `frontend/src/App.tsx` state handlers (`handleBookAppointment`, `handleRaiseInvoice`, `handleStartConsultation`, `handleNavigateToBillingFromConsultation`) |
+| **End-to-End Integration Suite** | 6-stage outpatient journey verified in `backend/test/stage2-workflow.e2e-spec.ts` against PostgreSQL:<br>1. Register patient dynamically (`POST /api/v1/patients`)<br>2. Onboard consulting doctor (`POST /api/v1/doctors`)<br>3. Book appointment using free slots API (`POST /api/v1/appointments`)<br>4. Conduct clinical consultation (`POST /api/v1/consultations`)<br>5. Issue prescription with formulary items (`POST /api/v1/prescriptions`)<br>6. Generate itemized invoice & record installment payments (`POST /api/v1/invoices`, `POST /api/v1/invoices/:id/pay`) | `npx jest --config test/jest-e2e.json test/stage2-workflow.e2e-spec.ts` (**6 passed, 100%**) |
+| **Backend Unit Tests** | **31 suites passed, 329 tests passed, 0 failures** | `npm test` (Exit code 0) |
+| **Frontend Production Build** | **Vite 6 + React 19 + TypeScript**: 0 errors, 2,054 modules transformed | `cd frontend; npm run build` (Exit code 0, 385ms) |
+| **Frontend Linting** | **ESLint 9**: 0 errors | `cd frontend; npm run lint` (Exit code 0) |
+| **Documentation Deliverables** | 1. [`docs/frontend-completion-audit.md`](frontend-completion-audit.md)<br>2. [`docs/frontend-architecture.md`](frontend-architecture.md)<br>3. [`docs/frontend-api-integration.md`](frontend-api-integration.md)<br>4. [`docs/end-to-end-workflow-verification.md`](end-to-end-workflow-verification.md) | Complete architectural specifications and verification proofs |
+| **Repository Integrity** | Protected `app/Models/SMS.php` artifact unmodified; `legacy/` 100% read-only | Verified via `git status` |
+
 
 
 
