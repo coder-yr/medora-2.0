@@ -145,6 +145,7 @@ npx prisma migrate resolve --applied <migration_name>
 | `20261102220000_phase_19_staff` | Phase 19 | Staff profiles, designations, department assignments, history | Applied |
 | `20261103140000_phase_20_accounting` | Phase 20 | Chart of accounts, journal entries, accounting periods, expenses | Applied |
 | `20261103160000_phase_21_hospital_settings_branches` | Phase 21 | `hospital_settings`, `branch_settings`, `user_branch_memberships`, `configuration_audit_logs`, `branch_document_sequences` | Applied |
+| `20261103180000_phase_22_notifications` | Phase 22 | `notifications`, `notification_recipients`, `notification_templates`, `notification_preferences`, `notification_outbox`, `notification_deliveries` | Applied |
 
 
 ### Mark a Failed Migration as Rolled Back:
@@ -167,5 +168,7 @@ npx prisma migrate resolve --rolled-back <migration_name>
 | `20261102200000_phase_18_cashier` | 2026-11-02 | Phase 18: Cashier, Shift Close & Treasury Settlement | Cash drawer registers (`cash_drawer`), single active shift master (`cashier_shift` with `shift_number`, `opening_cash`, `expected_cash`, `counted_cash`, `cash_variance`, `status`), append-only immutable financial ledger (`cash_transaction` with `direction`, `is_cash`, `idempotency_key`, `transaction_number`), physical cash denominations breakdown (`shift_close_denomination`), shift relationship on `invoice_payment.shift_id` and `payment.cash_transactions` |
 | `20261102220000_phase_19_staff` | 2026-11-02 | Phase 19: Non-Medical Staff Registers & HR Directory | Staff designations catalogue (`staff_designation`), normalized human employee profile (`staff_profile` with `employee_number` `EMP-YYYYMM-XXXX`, 1-to-1 `user_id` unique link, emergency contact, qualifications, lifecycle status), historical department assignments (`staff_department_assignment`), auditable employment history events (`staff_employment_history`), legacy compatibility models (`nurse`, `pharmacist`, `laboratorist`, `receptionist`, `accountant`) |
 | `20261103140000_phase_20_accounting` | 2026-11-03 | Phase 20: General Accounting, Chart of Accounts & Expense Ledger | Standardized Chart of Accounts (`accounting_account`), fiscal accounting periods (`accounting_period`), double-entry journal entries and lines (`accounting_journal_entry`, `accounting_journal_line`), expense categories and expenses (`accounting_expense_category`, `accounting_expense`), accounting settings (`accounting_setting`), legacy single-entry compatibility tables (`accounting`, `accounting_sector`) |
+| `20261103160000_phase_21_hospital_settings_branches` | 2026-11-03 | Phase 21: Hospital Settings, Branding & Multi-Branch Management | `hospital_settings`, `branch_settings`, `user_branch_memberships`, `configuration_audit_logs`, `branch_document_sequences` |
+| `20261103180000_phase_22_notifications` | 2026-11-03 | Phase 22: Notifications, Messaging & Background Job Infrastructure | `notifications`, `notification_recipients`, `notification_templates`, `notification_preferences`, `notification_outbox`, `notification_deliveries` |
 
 

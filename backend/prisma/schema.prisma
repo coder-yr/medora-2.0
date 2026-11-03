@@ -66,6 +66,8 @@ model User {
   branchSettingsUpdated      BranchSettings[]           @relation("BranchSettingsUpdater")
   branchMembershipsAssigned  UserBranchMembership[]     @relation("MembershipAssigner")
   branchMembershipsRevoked   UserBranchMembership[]     @relation("MembershipRevoker")
+  notificationRecipients     NotificationRecipient[]
+  notificationPreferences    NotificationPreference?
 
   @@map("users")
 }
@@ -138,6 +140,7 @@ model HospitalBranch {
   userMemberships     UserBranchMembership[]
   auditLogs           ConfigurationAuditLog[]
   documentSequences   BranchDocumentSequence[]
+  notifications       Notification[]
 
   @@map("hospital_branch")
 }
@@ -560,6 +563,8 @@ model Patient {
   pharmacyDispensations PharmacyDispensation[]
   admissions       Admission[]
   inpatientFolios  InpatientFolio[]
+  notificationRecipients NotificationRecipient[]
+  notificationPreferences NotificationPreference?
 
   @@index([patientTypeId])
   @@index([branchId])
@@ -2400,4 +2405,146 @@ model AccountSectorLegacy {
   updatedAt DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   @@map("accounting_sector")
+}
+
+// =============================================================================
+// 19. NOTIFICATIONS, MESSAGING & BACKGROUND JOBS (PHASE 22)
+// =============================================================================
+
+model Notification {
+  id                 BigInt                   @id @default(autoincrement())
+  uuid               String                   @unique @default(uuid())
+  eventType          String                   @map("event_type") @db.VarChar(50)
+  channel            String                   @db.VarChar(20) // 'IN_APP' | 'EMAIL' | 'SMS'
+  title              String                   @db.VarChar(200)
+  message            String                   @db.Text
+  metadata           Json?
+  priority           String                   @default("NORMAL") @db.VarChar(20) // 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT'
+  status             String                   @default("PENDING") @db.VarChar(20) // 'PENDING' | 'PROCESSING' | 'DELIVERED' | 'FAILED' | 'CANCELLED'
+  branchId           BigInt?                  @map("branch_id")
+  scheduledAt        DateTime?                @map("scheduled_at") @db.Timestamptz
+  sentAt             DateTime?                @map("sent_at") @db.Timestamptz
+  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime                 @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  branch             HospitalBranch?          @relation(fields: [branchId], references: [id])
+  recipients         NotificationRecipient[]
+  deliveries         NotificationDelivery[]
+  outbox             NotificationOutbox?
+
+  @@index([eventType])
+  @@index([channel, status])
+  @@index([branchId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model NotificationRecipient {
+  id             BigInt        @id @default(autoincrement())
+  notificationId BigInt        @map("notification_id")
+  userId         BigInt?       @map("user_id")
+  patientId      BigInt?       @map("patient_id")
+  destination    String?       @db.VarChar(150) // Phone number or email
+  recipientName  String?       @map("recipient_name") @db.VarChar(100)
+  isRead         Boolean       @default(false) @map("is_read")
+  readAt         DateTime?     @map("read_at") @db.Timestamptz
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  notification   Notification  @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient        Patient?      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([userId, isRead])
+  @@index([patientId])
+  @@map("notification_recipients")
+}
+
+model NotificationTemplate {
+  id          BigInt    @id @default(autoincrement())
+  templateKey String    @map("template_key") @db.VarChar(100)
+  channel     String    @db.VarChar(20) // 'IN_APP' | 'EMAIL' | 'SMS'
+  locale      String    @default("en") @db.VarChar(10)
+  subject     String?   @db.VarChar(200)
+  body        String    @db.Text
+  variables   Json?
+  isActive    Boolean   @default(true) @map("is_active")
+  version     Int       @default(1)
+  branchId    BigInt?   @map("branch_id")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([templateKey, channel, locale])
+  @@index([templateKey])
+  @@map("notification_templates")
+}
+
+model NotificationPreference {
+  id               BigInt    @id @default(autoincrement())
+  userId           BigInt?   @unique @map("user_id")
+  patientId        BigInt?   @unique @map("patient_id")
+  inAppEnabled     Boolean   @default(true) @map("in_app_enabled")
+  emailEnabled     Boolean   @default(true) @map("email_enabled")
+  smsEnabled       Boolean   @default(true) @map("sms_enabled")
+  channelOverrides Json?     @map("channel_overrides")
+  quietHoursStart  String?   @map("quiet_hours_start") @db.VarChar(5)
+  quietHoursEnd    String?   @map("quiet_hours_end") @db.VarChar(5)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  user             User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patient          Patient?  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model NotificationOutbox {
+  id                  BigInt        @id @default(autoincrement())
+  notificationId      BigInt        @unique @map("notification_id")
+  channel             String        @db.VarChar(20)
+  status              String        @default("PENDING") @db.VarChar(20) // 'PENDING' | 'PROCESSING' | 'DELIVERED' | 'RETRYABLE' | 'DEAD_LETTER' | 'CANCELLED'
+  attempts            Int           @default(0)
+  maxAttempts         Int           @default(5) @map("max_attempts")
+  scheduledAt         DateTime      @default(now()) @map("scheduled_at") @db.Timestamptz
+  nextRetryAt         DateTime?     @map("next_retry_at") @db.Timestamptz
+  processingStartedAt DateTime?     @map("processing_started_at") @db.Timestamptz
+  lastError           String?       @map("last_error") @db.Text
+  lastErrorCategory   String?       @map("last_error_category") @db.VarChar(50) // 'TRANSIENT' | 'PERMANENT' | 'TIMEOUT' | 'RATE_LIMITED'
+  deduplicationKey    String?       @unique @map("deduplication_key") @db.VarChar(150)
+  deliveredAt         DateTime?     @map("delivered_at") @db.Timestamptz
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  notification        Notification  @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([status, nextRetryAt])
+  @@map("notification_outbox")
+}
+
+model NotificationDelivery {
+  id                BigInt        @id @default(autoincrement())
+  notificationId    BigInt        @map("notification_id")
+  channel           String        @db.VarChar(20)
+  provider          String        @db.VarChar(50)
+  providerMessageId String?       @map("provider_message_id") @db.VarChar(150)
+  attemptNumber     Int           @map("attempt_number")
+  status            String        @db.VarChar(20) // 'SUCCESS' | 'TRANSIENT_FAILURE' | 'PERMANENT_FAILURE'
+  statusCode        String?       @map("status_code") @db.VarChar(50)
+  responseBody      String?       @map("response_body") @db.Text
+  errorMessage      String?       @map("error_message") @db.Text
+  durationMs        Int?          @map("duration_ms")
+  sentAt            DateTime      @default(now()) @map("sent_at") @db.Timestamptz
+
+  // Relations
+  notification      Notification  @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([notificationId])
+  @@index([provider, status])
+  @@index([sentAt])
+  @@map("notification_deliveries")
 }

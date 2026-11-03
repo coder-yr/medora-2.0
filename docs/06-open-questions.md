@@ -599,6 +599,32 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Enforced deactivation pre-checks (unclosed shift prevention) and complete operational isolation of inactive branches.
   - [ ] **Option B**: Unrestricted deactivation without validation of open shifts or transactions.
 
+---
+
+## 25. Phase 22 Notifications, Messaging & Background Job Infrastructure Decisions
+
+### 68. Permanent Ban on Legacy Unauthenticated Cron Routes
+- **Evidence**: Legacy Laravel `CronjobController.php` exposed an unauthenticated public route `/cronjob/payment-reminder` that iterated over patient balances and triggered external telecom gateways.
+- **Resolution**: Legacy unauthenticated public cron routes are permanently decommissioned and banned (`404 Not Found`). All background tasks, reminders, and outbox batch jobs run through authenticated server-side workers (`POST /api/v1/admin/notifications/process-outbox`) protected by `JwtAuthGuard` and `PermissionsGuard`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Permanent exclusion and ban of public cron endpoints; all jobs triggered via secure background infrastructure.
+  - [ ] **Option B**: Recreate public `/cronjob` endpoint with token in URL query parameter.
+
+### 69. Transactional Outbox Pattern for Delivery Atomicity
+- **Evidence**: Dispersing notifications synchronously inside clinical or financial request handlers causes transaction timeouts, uncommitted state leaks, or lost notifications if the external provider fails.
+- **Resolution**: Implemented the Transactional Outbox Pattern (`NotificationOutbox`). Notifications and their outbox jobs are persisted atomically within the exact same database transaction as the business event. The background worker asynchronously claims, locks, and dispatches jobs with exponential backoff and watchdog recovery.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Transactional outbox with state machine (`PENDING` &rarr; `PROCESSING` &rarr; `DELIVERED` / `RETRYABLE` / `DEAD_LETTER`).
+  - [ ] **Option B**: Synchronous network calls to third-party SMS/Email gateways inside HTTP controllers.
+
+### 70. Recipient Isolation & PHI Minimization
+- **Evidence**: Legacy SMS and notification logs stored raw telephone numbers and recipient messages in plaintext logs viewable across roles.
+- **Resolution**: Enforced zero-trust recipient isolation: `NotificationRecipient.userId` restricts feed access strictly to the authenticated user. In phone dispatch and logging, phone numbers are redacted (e.g., `92300*****12`), and template variables are sanitized with HTML entity encoding to prevent XSS.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict recipient query isolation and PHI redaction in logs and provider payloads.
+  - [ ] **Option B**: Shared multi-user notification tables without user-bound query filters.
+
+
 
 
 

@@ -412,6 +412,141 @@ async function main() {
   }
   console.log('Seeded user branch memberships for test accounts');
 
+  // 8. Phase 22 Standard Notification Templates & Preferences
+  const defaultTemplates = [
+    {
+      templateKey: 'tpl_appointment_confirmed',
+      channel: 'IN_APP',
+      subject: 'Appointment Confirmed',
+      body: 'Your appointment with Dr. {{doctorName}} has been scheduled for {{appointmentDate}} at {{appointmentTime}} ({{branchName}}).',
+      variables: ['doctorName', 'appointmentDate', 'appointmentTime', 'branchName'],
+    },
+    {
+      templateKey: 'tpl_appointment_confirmed',
+      channel: 'SMS',
+      subject: null,
+      body: 'Medora: Appt confirmed with Dr. {{doctorName}} on {{appointmentDate}} at {{appointmentTime}} at {{branchName}}.',
+      variables: ['doctorName', 'appointmentDate', 'appointmentTime', 'branchName'],
+    },
+    {
+      templateKey: 'tpl_appointment_reminder',
+      channel: 'SMS',
+      subject: null,
+      body: 'Medora Reminder: Your appointment is scheduled for {{appointmentDate}} at {{appointmentTime}} ({{branchName}}). Please arrive 15m early.',
+      variables: ['appointmentDate', 'appointmentTime', 'branchName'],
+    },
+    {
+      templateKey: 'tpl_invoice_issued',
+      channel: 'IN_APP',
+      subject: 'Invoice Issued #{{invoiceNumber}}',
+      body: 'Invoice #{{invoiceNumber}} for PKR {{grossAmount}} has been issued at {{branchName}}.',
+      variables: ['invoiceNumber', 'grossAmount', 'branchName'],
+    },
+    {
+      templateKey: 'tpl_payment_received',
+      channel: 'IN_APP',
+      subject: 'Payment Received',
+      body: 'Payment of PKR {{amount}} received against Invoice #{{invoiceNumber}}. Ref: {{receiptNumber}}.',
+      variables: ['amount', 'invoiceNumber', 'receiptNumber'],
+    },
+    {
+      templateKey: 'tpl_payment_received',
+      channel: 'SMS',
+      subject: null,
+      body: 'Medora: Received PKR {{amount}} for Invoice #{{invoiceNumber}}. Receipt: {{receiptNumber}}. Thank you.',
+      variables: ['amount', 'invoiceNumber', 'receiptNumber'],
+    },
+    {
+      templateKey: 'tpl_admission_created',
+      channel: 'IN_APP',
+      subject: 'Inpatient Admission Registered',
+      body: 'Patient {{patientName}} has been admitted to {{wardName}}, Bed {{bedNumber}} at {{branchName}}.',
+      variables: ['patientName', 'wardName', 'bedNumber', 'branchName'],
+    },
+    {
+      templateKey: 'tpl_inpatient_discharge',
+      channel: 'IN_APP',
+      subject: 'Inpatient Discharge Finalized',
+      body: 'Patient {{patientName}} has been discharged from {{branchName}}. Discharge summary is available.',
+      variables: ['patientName', 'branchName'],
+    },
+    {
+      templateKey: 'tpl_lab_report_ready',
+      channel: 'IN_APP',
+      subject: 'Laboratory Results Released',
+      body: 'Laboratory report for Order #{{orderNumber}} has been verified and released by pathology.',
+      variables: ['orderNumber'],
+    },
+    {
+      templateKey: 'tpl_rad_report_ready',
+      channel: 'IN_APP',
+      subject: 'Radiology Study Report Available',
+      body: 'Diagnostic imaging report for Study #{{studyNumber}} ({{procedureName}}) is verified and ready for review.',
+      variables: ['studyNumber', 'procedureName'],
+    },
+    {
+      templateKey: 'tpl_staff_assignment',
+      channel: 'IN_APP',
+      subject: 'Branch / Department Assignment Updated',
+      body: 'You have been assigned to {{branchName}} ({{departmentName}}). Role: {{designation}}.',
+      variables: ['branchName', 'departmentName', 'designation'],
+    },
+    {
+      templateKey: 'tpl_system_alert',
+      channel: 'IN_APP',
+      subject: 'System Announcement',
+      body: '{{announcementText}}',
+      variables: ['announcementText'],
+    },
+  ];
+
+  for (const tpl of defaultTemplates) {
+    await prisma.notificationTemplate.upsert({
+      where: {
+        templateKey_channel_locale: {
+          templateKey: tpl.templateKey,
+          channel: tpl.channel,
+          locale: 'en',
+        },
+      },
+      update: {
+        subject: tpl.subject,
+        body: tpl.body,
+        variables: tpl.variables,
+        isActive: true,
+      },
+      create: {
+        templateKey: tpl.templateKey,
+        channel: tpl.channel,
+        locale: 'en',
+        subject: tpl.subject,
+        body: tpl.body,
+        variables: tpl.variables,
+        isActive: true,
+      },
+    });
+    console.log(`Seeded notification template: ${tpl.templateKey} [${tpl.channel}]`);
+  }
+
+  // Preferences for test users
+  for (const user of allUsers) {
+    await prisma.notificationPreference.upsert({
+      where: { userId: user.id },
+      update: {
+        inAppEnabled: true,
+        emailEnabled: true,
+        smsEnabled: true,
+      },
+      create: {
+        userId: user.id,
+        inAppEnabled: true,
+        emailEnabled: true,
+        smsEnabled: true,
+      },
+    });
+  }
+  console.log('Seeded notification preferences for test users');
+
   console.log('Seeding complete.');
 }
 

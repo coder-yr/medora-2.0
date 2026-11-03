@@ -27,6 +27,7 @@ import { CashierModule } from './modules/cashier/cashier.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { HospitalSettingsModule } from './modules/hospital-settings/hospital-settings.module';
+import { NotificationModule } from './modules/notification/notification.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 
 @Module({
@@ -62,6 +63,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     StaffModule,
     AccountingModule,
     HospitalSettingsModule,
+    NotificationModule,
   ],
   providers: [
     {

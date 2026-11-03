@@ -225,6 +225,17 @@ export enum HospitalPermission {
   BRANDING_VIEW = 'branding_view',
   BRANDING_UPDATE = 'branding_update',
   BRANCH_VIEW_ALL = 'branch_view_all',
+
+  // Notifications, Messaging & Background Job Infrastructure (Phase 22)
+  NOTIFICATION_VIEW = 'notification_view',
+  NOTIFICATION_MARK_READ = 'notification_mark_read',
+  NOTIFICATION_PREFERENCES_UPDATE = 'notification_preferences_update',
+  NOTIFICATION_ADMIN_VIEW = 'notification_admin_view',
+  NOTIFICATION_RETRY = 'notification_retry',
+  NOTIFICATION_TEMPLATE_VIEW = 'notification_template_view',
+  NOTIFICATION_TEMPLATE_MANAGE = 'notification_template_manage',
+  NOTIFICATION_PROVIDER_MANAGE = 'notification_provider_manage',
+  NOTIFICATION_QUEUE_MONITOR = 'notification_queue_monitor',
 }
 
 /**
@@ -271,6 +282,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.BED_MANAGE,
     HospitalPermission.STAFF_VIEW,
     HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
   ],
   Nurse: [
     HospitalPermission.PATIENT_VIEW,
@@ -301,6 +315,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.RADIOLOGY_VIEW,
     HospitalPermission.STAFF_VIEW,
     HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
   ],
   Receptionist: [
     HospitalPermission.PATIENT_VIEW,
@@ -338,6 +355,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.CASH_CLOSE,
     HospitalPermission.STAFF_VIEW,
     HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
   ],
   Accountant: [
     HospitalPermission.INVOICE_VIEW,
@@ -396,6 +416,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.ACCOUNTING_EXPORT,
     HospitalPermission.BRANCH_VIEW,
     HospitalPermission.BRANCH_SETTINGS_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
   ],
   Pharmacist: [
     HospitalPermission.MEDICINE_VIEW,
@@ -414,6 +437,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.PRESCRIPTION_VIEW,
     HospitalPermission.STAFF_VIEW,
     HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
   ],
   Laboratorist: [
     HospitalPermission.LAB_VIEW,
@@ -444,5 +470,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.RADIOLOGY_REPORTS,
     HospitalPermission.STAFF_VIEW,
     HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
   ],
 };
