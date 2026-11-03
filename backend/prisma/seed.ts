@@ -285,6 +285,133 @@ async function main() {
   });
   console.log('Seeded initial open accounting period: FY2026-M11 (November 2026)');
 
+  // 7. Phase 21 Branches, Hospital Settings & User Memberships
+  const mainBranch = await prisma.hospitalBranch.upsert({
+    where: { code: 'MAIN' },
+    update: {
+      name: 'Main Campus - Karachi',
+      address: 'Plot 12-C, Stadium Road, Karachi',
+      phone: '+92-21-34930051',
+      active: true,
+    },
+    create: {
+      code: 'MAIN',
+      name: 'Main Campus - Karachi',
+      address: 'Plot 12-C, Stadium Road, Karachi',
+      phone: '+92-21-34930051',
+      active: true,
+    },
+  });
+  console.log(`Seeded branch: ${mainBranch.code} - ${mainBranch.name}`);
+
+  const cityBranch = await prisma.hospitalBranch.upsert({
+    where: { code: 'CITY' },
+    update: {
+      name: 'City Clinic - Clifton',
+      address: 'Block 5, Clifton, Karachi',
+      phone: '+92-21-35870011',
+      active: true,
+    },
+    create: {
+      code: 'CITY',
+      name: 'City Clinic - Clifton',
+      address: 'Block 5, Clifton, Karachi',
+      phone: '+92-21-35870011',
+      active: true,
+    },
+  });
+  console.log(`Seeded branch: ${cityBranch.code} - ${cityBranch.name}`);
+
+  // Hospital Settings singleton
+  const existingSettings = await prisma.hospitalSettings.findFirst();
+  if (!existingSettings) {
+    await prisma.hospitalSettings.create({
+      data: {
+        hospitalName: 'Medora Central Hospital',
+        legalName: 'Medora Healthcare System (Pvt) Ltd',
+        registrationNumber: 'HOSP-KHI-2026-9041',
+        taxNumber: 'NTN-4892019-7',
+        email: 'info@medora.hospital',
+        phone: '+92-21-34930051',
+        alternatePhone: '+92-21-34930052',
+        website: 'https://medora.hospital',
+        address: 'Plot 12-C, Stadium Road, Karachi, Pakistan',
+        defaultLocale: 'en',
+        defaultTimezone: 'Asia/Karachi',
+        defaultCurrency: 'PKR',
+        dateFormat: 'YYYY-MM-DD',
+        timeFormat: 'HH:mm',
+        primaryColor: '#0284c7',
+        secondaryColor: '#0f172a',
+        receiptHeader: 'MEDORA CENTRAL HOSPITAL\nPlot 12-C, Stadium Road, Karachi',
+        receiptFooter: 'Thank you for choosing Medora Central Hospital.\nWishing you a speedy recovery.',
+        invoiceFooter: 'Payment is due upon receipt. Computer generated invoice.',
+      },
+    });
+    console.log('Seeded default hospital settings');
+  }
+
+  // Branch Settings for MAIN
+  await prisma.branchSettings.upsert({
+    where: { branchId: mainBranch.id },
+    update: {
+      invoicePrefix: 'INV-MAIN-',
+      mrnPrefix: 'MRN-MAIN-',
+      appointmentPrefix: 'APT-MAIN-',
+      admissionPrefix: 'ADM-MAIN-',
+      operatingHours: { weekdays: '08:00 - 20:00', emergency: '24/7' },
+    },
+    create: {
+      branchId: mainBranch.id,
+      invoicePrefix: 'INV-MAIN-',
+      mrnPrefix: 'MRN-MAIN-',
+      appointmentPrefix: 'APT-MAIN-',
+      admissionPrefix: 'ADM-MAIN-',
+      operatingHours: { weekdays: '08:00 - 20:00', emergency: '24/7' },
+    },
+  });
+  console.log('Seeded branch settings for MAIN');
+
+  // Assign memberships for test users
+  const allUsers = await prisma.user.findMany({
+    where: { login: { in: ['admin_test', 'accountant_test', 'receptionist_test', 'doctor_test'] } },
+  });
+
+  for (const user of allUsers) {
+    // Set default branch on User record
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { branchId: mainBranch.id },
+    });
+
+    // Seed UserBranchMembership for MAIN
+    await prisma.userBranchMembership.upsert({
+      where: { userId_branchId: { userId: user.id, branchId: mainBranch.id } },
+      update: { isDefault: true, isActive: true },
+      create: {
+        userId: user.id,
+        branchId: mainBranch.id,
+        isDefault: true,
+        isActive: true,
+      },
+    });
+
+    // Give admin_test access to CITY branch as well
+    if (user.login === 'admin_test') {
+      await prisma.userBranchMembership.upsert({
+        where: { userId_branchId: { userId: user.id, branchId: cityBranch.id } },
+        update: { isDefault: false, isActive: true },
+        create: {
+          userId: user.id,
+          branchId: cityBranch.id,
+          isDefault: false,
+          isActive: true,
+        },
+      });
+    }
+  }
+  console.log('Seeded user branch memberships for test accounts');
+
   console.log('Seeding complete.');
 }
 

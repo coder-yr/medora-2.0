@@ -2,10 +2,10 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 20: General Accounting, Chart of Accounts & Expense Ledger**
+- **Current Phase**: **Phase 21: Hospital Settings, Branding & Multi-Branch Management**
 - **Status**: **COMPLETED**
 - **Date**: 2026-11-03
-- **Next Phase**: **Phase 21: Emergency, Triage & Operating Theatre (OT)**
+- **Next Phase**: **Phase 22**
 - **Approved Target Stack**:
   - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS / Modern CSS (scaffolded in `frontend/`)
   - **Backend**: NestJS 11 + TypeScript (trusted business logic boundary)
@@ -44,6 +44,7 @@
 | **Phase 18** | Cashier, Shift Close & Treasury Settlement (13th Module) | `CashierModule` (drawer register, single active shift invariant, expected cash calculation, non-cash separation, petty cash payouts/adjustments, counted cash & denominations breakdown, supervisor dual-control separation of duties, legacy `shift_close` sync, multi-invoice oldest-first patient settlement, Financial Day Book with CSV export, cross-module invoice & inpatient folio hooks), React 19 Cashier Workspace with handover slip, Supabase migration `20261102200000_phase_18_cashier`, [`docs/cashier-migration-mapping.md`](cashier-migration-mapping.md) | **COMPLETED** |
 | **Phase 19** | Non-Medical Staff Registers & HR Directory (14th Module) | `StaffModule` (normalized human employee directory, sequential numbering `EMP-YYYYMM-XXXX` with advisory locks, decoupled 1-to-1 login accounts, auditable tenures, designation promotions, lifecycle state transitions, soft offboarding), React 19 Staff Workspace, Supabase migration `20261102220000_phase_19_staff`, [`docs/staff-migration-mapping.md`](staff-migration-mapping.md) | **COMPLETED** |
 | **Phase 20** | General Accounting, Chart of Accounts & Expense Ledger (15th Module) | `AccountingModule` (GAAP/IFRS standard Chart of Accounts, strict double-entry general ledger with balanced debit/credit invariant $\sum \text{Debit} = \sum \text{Credit}$, immutable posted journals, signed mirror-image reversals, accounting period locks, full expense lifecycle with dual-control separation of duties, automated posting integration with invoices/payouts/settlements, financial statement suite: Trial Balance, P&L, Balance Sheet, General Ledger), React 19 Accounting Workspace, Supabase migration `20261103140000_phase_20_accounting`, [`docs/accounting-migration-mapping.md`](accounting-migration-mapping.md) | **COMPLETED** |
+| **Phase 21** | Hospital Settings, Branding & Multi-Branch Management (16th Module) | `HospitalSettingsModule` & `BranchModule` (hospital-wide settings & identity, multi-branch CRUD & lifecycle, 3-tier settings inheritance: Branch Override ?? Hospital Default ?? System Fallback, user branch memberships with zero-trust server-side `BranchAccessGuard`, immutable configuration audit logging, branding asset validation, concurrency-safe document sequence generation with PostgreSQL advisory locks), React 19 Settings Workspace & Top Layout Branch Switcher, Supabase migration `20261103160000_phase_21_hospital_settings_branches`, [`docs/phase-21-verification.md`](phase-21-verification.md) | **COMPLETED** |
 
 ---
 

@@ -567,6 +567,39 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Strict accounting period locks preventing back-posting into closed books.
   - [ ] **Option B**: Allow unrestricted posting to any historical date without period locks.
 
+---
+
+## 24. Phase 21 Hospital Settings, Branding & Multi-Branch Management Decisions
+
+### 64. Three-Tier Configuration Precedence Architecture
+- **Evidence**: In legacy Laravel, settings were stored in a flat single-row table (`settings` / `website_settings`) with zero branch overrides, zero change tracking, and hardcoded values scattered throughout Blade views.
+- **Resolution**: Implemented a deterministic 3-tier configuration hierarchy: `EffectiveSettings = Branch Override ?? Hospital Default ?? System Fallback`. Downstream modules query `getEffectiveSettings(branchId)` to obtain unified configuration without duplicating fallback logic.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Formal 3-tier inheritance model (`BranchSettings` overrides `HospitalSettings` overrides System Defaults).
+  - [ ] **Option B**: Completely isolated per-branch settings without global fallback inheritance.
+
+### 65. Multi-Branch Access Enforcement & Zero-Trust Server Boundary
+- **Evidence**: Legacy Laravel `BranchController.php` relied on client-side session state (`session(['branch_id' => $id])`) and treated users with `users.branch_id === null` as global admins who could switch to any branch without authorization checks.
+- **Resolution**: Implemented `UserBranchMembership` allowing users to legitimately hold active assignments across multiple facilities. Introduced `BranchAccessGuard` validating `X-Branch-Id` headers and route parameters on the server side on every request. Cross-branch access by unassigned users is strictly rejected with `403 Forbidden`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Zero-trust server-side validation via `BranchAccessGuard` checking `UserBranchMembership` and blocking cross-branch tampering.
+  - [ ] **Option B**: Client-side session-based branch switching without server validation.
+
+### 66. Concurrency-Safe Branch Document Sequence Allocation
+- **Evidence**: Generating invoices (`INV-MAIN-2026-000001`), patient numbers (`MRN-MAIN-2026-000001`), appointments, and admissions across concurrent desks risked race conditions and duplicate reference numbers.
+- **Resolution**: Implemented `BranchDocumentSequence` coupled with PostgreSQL transaction advisory locks (`SELECT pg_advisory_xact_lock(hashtext('DOC_SEQ_' || branchId || '_' || docType || '_' || year))`). Guarantees strictly monotonic sequence generation with zero collisions and zero gaps even under concurrent workloads.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: PostgreSQL advisory-locked atomic sequence allocation with branch and year scoping.
+  - [ ] **Option B**: Random UUID identifiers without sequential ordering.
+
+### 67. Branch Deactivation Safety & Isolation Invariant
+- **Evidence**: In legacy Laravel, deactivating a branch was a simple boolean toggle that could strand open cash drawers or unposted clinical encounters.
+- **Resolution**: Deactivating a branch (`setBranchStatus(id, false)`) performs safety checks: rejects deactivation if active open cashier shifts exist (`cashierShift.status === 'OPEN'`). Once deactivated, `BranchAccessGuard` isolates the branch, preventing new clinical admissions, appointments, or cashier transactions while preserving historical records for compliance.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Enforced deactivation pre-checks (unclosed shift prevention) and complete operational isolation of inactive branches.
+  - [ ] **Option B**: Unrestricted deactivation without validation of open shifts or transactions.
+
+
 
 
 

@@ -22,7 +22,8 @@ import { InpatientWorkspace } from './components/InpatientWorkspace';
 import { CashierWorkspace } from './components/CashierWorkspace';
 import { StaffWorkspace } from './components/StaffWorkspace';
 import { AccountingWorkspace } from './components/AccountingWorkspace';
-import { Radio, BedDouble, DollarSign, Users, BookOpen } from 'lucide-react';
+import { SettingsWorkspace } from './components/SettingsWorkspace';
+import { Radio, BedDouble, DollarSign, Users, BookOpen, Building2, GitBranch } from 'lucide-react';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -60,7 +61,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'accounting' | 'staff' | 'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('accounting');
+  const [activeModule, setActiveModule] = useState<'settings' | 'accounting' | 'staff' | 'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('settings');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -69,6 +70,10 @@ export function App() {
   // Auth & Token simulation (Development only)
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
   const [userRole, setUserRole] = useState<'Doctor' | 'Admin' | 'Accountant' | 'Pharmacist' | 'Laboratorist' | 'Receptionist'>('Accountant');
+
+  // Multi-branch state
+  const [userBranches, setUserBranches] = useState<Array<{ id: string; name: string; code: string; active: boolean }>>([]);
+  const [activeBranchId, setActiveBranchId] = useState<string>(() => localStorage.getItem('medora_active_branch') || '1');
 
   // Form state
   const [patientId, setPatientId] = useState('1');
@@ -102,6 +107,26 @@ export function App() {
       loginAs(userRole);
     }
   }, [userRole]);
+
+  // Load user accessible branches when token changes
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE_URL}/api/v1/branches/my-branches`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        const branches = json.data || json;
+        if (Array.isArray(branches) && branches.length > 0) {
+          setUserBranches(branches);
+          if (!branches.some((b) => String(b.id) === String(activeBranchId))) {
+            setActiveBranchId(branches[0].id);
+            localStorage.setItem('medora_active_branch', branches[0].id);
+          }
+        }
+      })
+      .catch((err) => console.error('Failed to fetch user branches:', err));
+  }, [token]);
 
   const loginAs = async (role: 'Doctor' | 'Admin' | 'Accountant' | 'Pharmacist' | 'Laboratorist' | 'Receptionist') => {
     if (!isDev) {
@@ -285,7 +310,32 @@ export function App() {
           <span className="brand-badge">Rx Module</span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          {/* Active Branch Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
+            <GitBranch size={16} style={{ color: '#0284c7' }} />
+            <span style={{ fontWeight: 600 }}>Branch:</span>
+            <select
+              className="form-select"
+              style={{ width: 'auto', padding: '4px 8px', fontWeight: 600 }}
+              value={activeBranchId}
+              onChange={(e) => {
+                setActiveBranchId(e.target.value);
+                localStorage.setItem('medora_active_branch', e.target.value);
+              }}
+            >
+              {userBranches.length > 0 ? (
+                userBranches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name} [{b.code}]
+                  </option>
+                ))
+              ) : (
+                <option value="1">Main Campus [MAIN]</option>
+              )}
+            </select>
+          </div>
+
           {isDev ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
               <Shield size={16} />
@@ -296,12 +346,12 @@ export function App() {
                 value={userRole}
                 onChange={(e) => setUserRole(e.target.value as any)}
               >
+                <option value="Admin">Administrator (All Permissions & Settings)</option>
                 <option value="Accountant">Accountant (General Ledger, COA, Expenses)</option>
                 <option value="Receptionist">Receptionist / Cashier (POS & Drawer)</option>
                 <option value="Laboratorist">Laboratorist (LIS Specimen/Analysis)</option>
                 <option value="Doctor">Doctor (Prescribe/View)</option>
                 <option value="Pharmacist">Pharmacist (Catalogue/Stock)</option>
-                <option value="Admin">Administrator (All Permissions)</option>
               </select>
             </div>
           ) : (
@@ -315,6 +365,13 @@ export function App() {
 
       {/* Module Switcher Navigation */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }} className="no-print">
+        <button
+          className={`btn ${activeModule === 'settings' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('settings')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <Building2 size={18} /> Hospital Settings & Branches
+        </button>
         <button
           className={`btn ${activeModule === 'accounting' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('accounting')}
@@ -401,6 +458,18 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* Hospital Settings & Multi-Branch Management View */}
+      {activeModule === 'settings' && (
+        <SettingsWorkspace
+          token={token}
+          activeBranchId={activeBranchId}
+          onBranchChange={(newId) => {
+            setActiveBranchId(newId);
+            localStorage.setItem('medora_active_branch', newId);
+          }}
+        />
       )}
 
       {/* General Accounting, Chart of Accounts & Expense Ledger View */}

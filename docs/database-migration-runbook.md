@@ -129,6 +129,24 @@ No difference detected.
 npx prisma migrate resolve --applied <migration_name>
 ```
 
+---
+
+## 5. Applied Migration Manifest (Chronological)
+
+| Migration Directory | Domain / Phase | Scope / Key Tables | Status |
+| :--- | :--- | :--- | :--- |
+| `0_init` | Phase 11.2 Baseline | Core tables baseline snapshot | Applied |
+| `20261031120000_phase_12_medicine_catalogue` | Phase 12 | Medicine master catalogue, dosage forms, units, manufacturers | Applied |
+| `20261031140000_phase_13_pharmacy_inventory` | Phase 13 | Batches, stock movements, purchase orders, dispensations | Applied |
+| `20261031160000_phase_14_laboratory` | Phase 14 | Lab categories, tests, parameters, orders, samples, amendments | Applied |
+| `20261102160000_phase_15_radiology` | Phase 15 | Radiology procedures, orders, amendments, equipment schedules | Applied |
+| `20261102180000_phase_17_inpatient` | Phase 17 | Beds, wards, admissions, transfers, inpatient folios & charges | Applied |
+| `20261102200000_phase_18_cashier` | Phase 18 | Cash drawers, cashier shifts, cash transactions | Applied |
+| `20261102220000_phase_19_staff` | Phase 19 | Staff profiles, designations, department assignments, history | Applied |
+| `20261103140000_phase_20_accounting` | Phase 20 | Chart of accounts, journal entries, accounting periods, expenses | Applied |
+| `20261103160000_phase_21_hospital_settings_branches` | Phase 21 | `hospital_settings`, `branch_settings`, `user_branch_memberships`, `configuration_audit_logs`, `branch_document_sequences` | Applied |
+
+
 ### Mark a Failed Migration as Rolled Back:
 ```bash
 npx prisma migrate resolve --rolled-back <migration_name>

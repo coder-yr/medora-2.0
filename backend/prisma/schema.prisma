@@ -60,6 +60,12 @@ model User {
   journalsCreated        JournalEntry[]             @relation("JournalCreator")
   journalsPosted         JournalEntry[]             @relation("JournalPoster")
   periodsClosed          AccountingPeriod[]         @relation("PeriodCloser")
+  branchMemberships          UserBranchMembership[]
+  configurationAuditLogs     ConfigurationAuditLog[]
+  hospitalSettingsUpdated    HospitalSettings[]         @relation("HospitalSettingsUpdater")
+  branchSettingsUpdated      BranchSettings[]           @relation("BranchSettingsUpdater")
+  branchMembershipsAssigned  UserBranchMembership[]     @relation("MembershipAssigner")
+  branchMembershipsRevoked   UserBranchMembership[]     @relation("MembershipRevoker")
 
   @@map("users")
 }
@@ -128,8 +134,134 @@ model HospitalBranch {
   accountingPeriods AccountingPeriod[]
   journalEntries JournalEntry[]
   expenses     Expense[]
+  settings            BranchSettings?
+  userMemberships     UserBranchMembership[]
+  auditLogs           ConfigurationAuditLog[]
+  documentSequences   BranchDocumentSequence[]
 
   @@map("hospital_branch")
+}
+
+model HospitalSettings {
+  id                 BigInt    @id @default(autoincrement())
+  hospitalName       String    @map("hospital_name") @db.VarChar(150)
+  legalName          String?   @map("legal_name") @db.VarChar(150)
+  registrationNumber String?   @map("registration_number") @db.VarChar(50)
+  taxNumber          String?   @map("tax_number") @db.VarChar(50)
+  email              String?   @db.VarChar(100)
+  phone              String?   @db.VarChar(50)
+  alternatePhone     String?   @map("alternate_phone") @db.VarChar(50)
+  website            String?   @db.VarChar(150)
+  address            String?   @db.VarChar(255)
+  defaultLocale      String    @default("en") @map("default_locale") @db.VarChar(10)
+  defaultTimezone    String    @default("Asia/Karachi") @map("default_timezone") @db.VarChar(50)
+  defaultCurrency    String    @default("PKR") @map("default_currency") @db.VarChar(10)
+  dateFormat         String    @default("YYYY-MM-DD") @map("date_format") @db.VarChar(20)
+  timeFormat         String    @default("HH:mm") @map("time_format") @db.VarChar(20)
+  logoUrl            String?   @map("logo_url") @db.VarChar(500)
+  faviconUrl         String?   @map("favicon_url") @db.VarChar(500)
+  primaryColor       String    @default("#0284c7") @map("primary_color") @db.VarChar(10)
+  secondaryColor     String    @default("#0f172a") @map("secondary_color") @db.VarChar(10)
+  receiptHeader      String?   @map("receipt_header") @db.Text
+  receiptFooter      String?   @map("receipt_footer") @db.Text
+  invoiceFooter      String?   @map("invoice_footer") @db.Text
+  createdAt          DateTime? @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt          DateTime? @updatedAt @map("updated_at") @db.Timestamptz
+  updatedById        BigInt?   @map("updated_by_id")
+
+  // Relations
+  updatedBy          User?     @relation("HospitalSettingsUpdater", fields: [updatedById], references: [id])
+
+  @@map("hospital_settings")
+}
+
+model BranchSettings {
+  id                    BigInt         @id @default(autoincrement())
+  branchId              BigInt         @unique @map("branch_id")
+  operatingHours        Json?          @map("operating_hours")
+  timezoneOverride      String?        @map("timezone_override") @db.VarChar(50)
+  currencyOverride      String?        @map("currency_override") @db.VarChar(10)
+  receiptHeaderOverride String?        @map("receipt_header_override") @db.Text
+  receiptFooterOverride String?        @map("receipt_footer_override") @db.Text
+  invoicePrefix         String?        @map("invoice_prefix") @db.VarChar(20)
+  mrnPrefix             String?        @map("mrn_prefix") @db.VarChar(20)
+  appointmentPrefix     String?        @map("appointment_prefix") @db.VarChar(20)
+  admissionPrefix       String?        @map("admission_prefix") @db.VarChar(20)
+  logoUrlOverride       String?        @map("logo_url_override") @db.VarChar(500)
+  primaryColorOverride  String?        @map("primary_color_override") @db.VarChar(10)
+  createdAt             DateTime?      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime?      @updatedAt @map("updated_at") @db.Timestamptz
+  updatedById           BigInt?        @map("updated_by_id")
+
+  // Relations
+  branch                HospitalBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  updatedBy             User?          @relation("BranchSettingsUpdater", fields: [updatedById], references: [id])
+
+  @@map("branch_settings")
+}
+
+model UserBranchMembership {
+  id           BigInt         @id @default(autoincrement())
+  userId       BigInt         @map("user_id")
+  branchId     BigInt         @map("branch_id")
+  isDefault    Boolean        @default(false) @map("is_default")
+  isActive     Boolean        @default(true) @map("is_active")
+  accessRole   String?        @map("access_role") @db.VarChar(50)
+  assignedAt   DateTime       @default(now()) @map("assigned_at") @db.Timestamptz
+  assignedById BigInt?        @map("assigned_by_id")
+  revokedAt    DateTime?      @map("revoked_at") @db.Timestamptz
+  revokedById  BigInt?        @map("revoked_by_id")
+  notes        String?        @db.VarChar(255)
+
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch       HospitalBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  assignedBy   User?          @relation("MembershipAssigner", fields: [assignedById], references: [id])
+  revokedBy    User?          @relation("MembershipRevoker", fields: [revokedById], references: [id])
+
+  @@unique([userId, branchId])
+  @@index([userId])
+  @@index([branchId])
+  @@map("user_branch_memberships")
+}
+
+model ConfigurationAuditLog {
+  id            BigInt          @id @default(autoincrement())
+  actorUserId   BigInt?         @map("actor_user_id")
+  scope         String          @db.VarChar(20) // 'HOSPITAL' | 'BRANCH'
+  branchId      BigInt?         @map("branch_id")
+  settingKey    String          @map("setting_key") @db.VarChar(100)
+  previousValue String?         @map("previous_value") @db.Text
+  newValue      String?         @map("new_value") @db.Text
+  changeReason  String?         @map("change_reason") @db.VarChar(255)
+  correlationId String?         @map("correlation_id") @db.VarChar(100)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  actorUser     User?           @relation(fields: [actorUserId], references: [id])
+  branch        HospitalBranch? @relation(fields: [branchId], references: [id])
+
+  @@index([scope, settingKey])
+  @@index([branchId])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("configuration_audit_logs")
+}
+
+model BranchDocumentSequence {
+  id          BigInt         @id @default(autoincrement())
+  branchId    BigInt         @map("branch_id")
+  docType     String         @map("doc_type") @db.VarChar(30) // 'INVOICE' | 'MRN' | 'APPOINTMENT' | 'ADMISSION'
+  year        Int            @map("year")
+  sequenceNum Int            @default(0) @map("sequence_num")
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  branch      HospitalBranch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  @@unique([branchId, docType, year])
+  @@index([branchId, docType])
+  @@map("branch_document_sequences")
 }
 
 model Institute {
