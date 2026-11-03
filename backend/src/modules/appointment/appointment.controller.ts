@@ -25,6 +25,8 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { AppointmentService } from './appointment.service';
 import { AppointmentQueryDto } from './dto/appointment-query.dto';
 import {
@@ -65,7 +67,7 @@ export class AppointmentController {
     @Request() req: any,
   ): Promise<AppointmentResponseDto> {
     const userId = req.user?.id || req.user?.username || '';
-    return this.appointmentService.create(dto, userId);
+    return this.appointmentService.create(dto, userId, req.user);
   }
 
   @Get('free-slots')
@@ -103,8 +105,9 @@ export class AppointmentController {
   })
   async findAll(
     @Query() query: AppointmentQueryDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedAppointmentsDto> {
-    return this.appointmentService.findAll(query);
+    return this.appointmentService.findAll(query, user);
   }
 
   @Get(':id')
@@ -146,8 +149,9 @@ export class AppointmentController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateAppointmentDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<AppointmentResponseDto> {
-    return this.appointmentService.update(id, dto);
+    return this.appointmentService.update(id, dto, user);
   }
 
   @Delete(':id')
@@ -163,7 +167,10 @@ export class AppointmentController {
     description: 'Appointment deleted successfully.',
   })
   @ApiResponse({ status: 404, description: 'Appointment not found.' })
-  async remove(@Param('id') id: string): Promise<{ message: string }> {
-    return this.appointmentService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ message: string }> {
+    return this.appointmentService.remove(id, user);
   }
 }

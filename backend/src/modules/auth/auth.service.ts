@@ -1,4 +1,11 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  UnauthorizedException,
+  BadRequestException,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
@@ -10,6 +17,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
+import { AccountLockoutService } from './account-lockout.service';
+import { PasswordResetService } from './password-reset.service';
 
 @Injectable()
 export class AuthService {
@@ -19,6 +30,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Optional() private readonly lockoutService: AccountLockoutService = new AccountLockoutService(),
+    @Optional() private readonly passwordResetService: PasswordResetService = new PasswordResetService(prisma),
   ) {}
 
   /**
@@ -49,7 +62,7 @@ export class AuthService {
       const normalizedHash = storedHash.replace(/^\$2y\$/, '$2a$');
       try {
         const valid = await bcrypt.compare(password, normalizedHash);
-        return { valid, needsUpgrade: valid }; // Upgrade only upon successful password verification
+        return { valid, needsUpgrade: valid };
       } catch {
         return { valid: false, needsUpgrade: false };
       }
@@ -70,7 +83,7 @@ export class AuthService {
 
   /**
    * Authenticates user credentials strictly against the PostgreSQL database.
-   * Zero development backdoors: all accounts must exist with valid password hashes.
+   * Enforces brute-force account lockout protections.
    */
   async login(
     loginDto: LoginDto,
@@ -79,24 +92,46 @@ export class AuthService {
   ): Promise<AuthResponseDto> {
     const { email, password } = loginDto;
 
-    // Database lookup against users table
+    // 1. Account Lockout Check
+    const lockoutStatus = this.lockoutService.isLocked(email);
+    if (lockoutStatus.locked) {
+      throw new UnauthorizedException(
+        `Account is temporarily locked due to consecutive failed attempts. Please try again in ${lockoutStatus.remainingSeconds} seconds.`,
+      );
+    }
+
+    // 2. Database lookup against users table
     const dbUser = await this.prisma.user.findFirst({
-      where: { email },
+      where: {
+        OR: [
+          { email: { equals: email, mode: 'insensitive' } },
+          { login: { equals: email, mode: 'insensitive' } },
+        ],
+      },
     });
 
     if (!dbUser || !dbUser.password) {
-      // Safe, consistent failure response: identical status and message to prevent email enumeration
+      this.lockoutService.recordFailedAttempt(email, ipAddress);
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    // 3. Password Verification
     const { valid, needsUpgrade } = await this.verifyPassword(password, dbUser.password);
 
     if (!valid) {
-      // Safe, consistent failure response: never upgrade hash on failure
+      const lockRes = this.lockoutService.recordFailedAttempt(email, ipAddress);
+      if (lockRes.locked) {
+        throw new UnauthorizedException(
+          `Account is temporarily locked due to consecutive failed attempts. Please try again in ${lockRes.lockDurationSeconds} seconds.`,
+        );
+      }
       throw new UnauthorizedException('Invalid email or password');
     }
 
-    // Transparently upgrade legacy bcrypt hash to Argon2id upon successful authentication
+    // 4. Reset failed attempts upon successful login
+    this.lockoutService.recordSuccessfulLogin(email);
+
+    // 5. Transparently upgrade legacy bcrypt hash to Argon2id
     if (needsUpgrade) {
       try {
         const upgradedHash = await argon2.hash(password, { type: argon2.argon2id });
@@ -147,7 +182,6 @@ export class AuthService {
 
   /**
    * Refreshes access token with rotation and reuse detection.
-   * If an already rotated/revoked token is presented, the entire session family is revoked.
    */
   async refresh(
     refreshTokenDto: RefreshTokenDto,
@@ -169,7 +203,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
-    // Reuse Detection: If an already revoked token is used, revoke the entire session family
+    // Reuse Detection
     if (session.isRevoked) {
       await this.prisma.userSession.updateMany({
         where: { familyId: session.familyId },
@@ -197,7 +231,7 @@ export class AuthService {
       throw new UnauthorizedException('User associated with session not found');
     }
 
-    // Token Rotation: Invalidate current token and generate a new one within the same family
+    // Token Rotation
     const newRawRefreshToken = crypto.randomBytes(32).toString('hex');
     const newRefreshTokenHash = this.hashRefreshToken(newRawRefreshToken);
     const newExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -232,6 +266,63 @@ export class AuthService {
     };
 
     return this.generateAuthResponse(authUser, newRawRefreshToken);
+  }
+
+  /**
+   * Changes authenticated user's password and revokes all active sessions.
+   */
+  async changePassword(
+    userId: string | bigint,
+    dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: BigInt(userId) },
+    });
+
+    if (!user || !user.password) {
+      throw new NotFoundException('User account not found.');
+    }
+
+    const { valid } = await this.verifyPassword(dto.currentPassword, user.password);
+    if (!valid) {
+      throw new UnauthorizedException('Current password is incorrect.');
+    }
+
+    if (dto.currentPassword === dto.newPassword) {
+      throw new BadRequestException('New password cannot be identical to the current password.');
+    }
+
+    const upgradedHash = await argon2.hash(dto.newPassword, { type: argon2.argon2id });
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: user.id },
+        data: { password: upgradedHash },
+      });
+
+      // Revoke all active sessions
+      await tx.userSession.updateMany({
+        where: { userId: user.id },
+        data: { isRevoked: true },
+      });
+    });
+
+    this.logger.log(`User #${user.id} changed password. All active sessions invalidated.`);
+    return { message: 'Password changed successfully. All active sessions have been invalidated. Please log in again.' };
+  }
+
+  /**
+   * Request password reset token.
+   */
+  async forgotPassword(dto: ForgotPasswordDto): Promise<{ message: string; rawTokenForTest?: string }> {
+    return this.passwordResetService.requestPasswordReset(dto.email);
+  }
+
+  /**
+   * Reset password with single-use token.
+   */
+  async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
+    return this.passwordResetService.resetPassword(dto.token, dto.newPassword);
   }
 
   /**

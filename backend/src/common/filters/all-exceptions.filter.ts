@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { ApiResponse } from '../types/api-response.interface';
+import { sanitizeLogUrl } from '../utils/phi-redaction.util';
 
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
@@ -41,15 +42,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       errorName = exception.name;
     }
 
+    const cleanUrl = sanitizeLogUrl(request.originalUrl || request.url);
+
     // Structured logging with correlation ID
     if (status >= 500) {
       this.logger.error(
-        `[${correlationId}] ${request.method} ${request.url} - Error: ${message}`,
+        `[${correlationId}] ${request.method} ${cleanUrl} - Error: ${message}`,
         exception instanceof Error ? exception.stack : undefined,
       );
     } else {
       this.logger.warn(
-        `[${correlationId}] ${request.method} ${request.url} - ${status} ${Array.isArray(message) ? message.join('; ') : message}`,
+        `[${correlationId}] ${request.method} ${cleanUrl} - ${status} ${Array.isArray(message) ? message.join('; ') : message}`,
       );
     }
 

@@ -20,3 +20,4 @@ export class DashboardFilterDto {
   @IsString()
   branchId?: string;
 }
+

@@ -2,10 +2,10 @@
 
 ## Overview
 - **Project**: Medora 2.0 (Migration of ICTHospital legacy hospital management system)
-- **Current Phase**: **Phase 23: Executive Dashboard & Operational Analytics**
-- **Status**: **COMPLETED (ALL 23 FEATURE PHASES DELIVERED)**
+- **Current Phase**: **Production Remediation Stage 1: Security Hardening & Zero-Trust Multi-Branch Enforcement**
+- **Status**: **STAGE 1 COMPLETED (100% UNIT & E2E TESTS PASSED)**
 - **Date**: 2026-11-03
-- **Next Phase**: **Production Readiness Assessment & Legacy Retirement Review**
+- **Next Phase**: **Remediation Stage 2: Accounting Double-Entry Ledger Refactoring & Physical Inventory Partitioning**
 - **Approved Target Stack**:
   - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS / Modern CSS (scaffolded in `frontend/`)
   - **Backend**: NestJS 11 + TypeScript (trusted business logic boundary)
@@ -47,6 +47,7 @@
 | **Phase 21** | Hospital Settings, Branding & Multi-Branch Management (16th Module) | `HospitalSettingsModule` & `BranchModule` (hospital-wide settings & identity, multi-branch CRUD & lifecycle, 3-tier settings inheritance: Branch Override ?? Hospital Default ?? System Fallback, user branch memberships with zero-trust server-side `BranchAccessGuard`, immutable configuration audit logging, branding asset validation, concurrency-safe document sequence generation with PostgreSQL advisory locks), React 19 Settings Workspace & Top Layout Branch Switcher, Supabase migration `20261103160000_phase_21_hospital_settings_branches`, [`docs/phase-21-verification.md`](phase-21-verification.md) | **COMPLETED** |
 | **Phase 22** | Notifications, Messaging & Background Job Infrastructure (17th Module) | `NotificationModule` (transactional outbox pattern, recipient isolation, unread counter, preferences & quiet hours, provider abstractions: in-app/mock-email/mock-sms, phone normalisation, transient/permanent error classification, exponential backoff, dead-letter recovery, template engine with HTML sanitisation, ban on legacy public cron `/cronjob/payment-reminder`), React 19 Notification Center & Admin Workspace, Supabase migration `20261103180000_phase_22_notifications`, [`docs/phase-22-verification.md`](phase-22-verification.md) | **COMPLETED** |
 | **Phase 23** | Executive Dashboard & Operational Analytics (18th Module) | `DashboardModule` (unified executive analytics, date filters with inclusive UTC boundaries, role-appropriate views: Executive/Super Admin, Branch Admin, Doctor, Receptionist, Pharmacist, Laboratorist, Accountant; strict branch scoping; multi-branch comparison matrix with in-memory TTL caching; real-time actionable alerts for pending shifts, unverified labs, dead-letter notifications, and low-stock batches; zero fabricated metrics), React 19 Executive Dashboard Workspace, [`docs/phase-23-verification.md`](phase-23-verification.md) | **COMPLETED** |
+| **Stage 1 Remediation** | Security Hardening & Zero-Trust Multi-Branch Enforcement | Global `BranchAccessGuard` (`ThrottlerGuard` -> `JwtAuthGuard` -> `BranchAccessGuard`), `BranchAuthorizationService` object-level access control across 7 clinical/financial modules, brute-force sliding-window `AccountLockoutService` (5 attempts, 15m), ephemeral SHA-256 `PasswordResetService`, transparent PHI query/exception redaction (`sanitizeLogUrl`), production Swagger disablement, and test endpoint removal. All 31 unit suites (329 tests) and 4 E2E suites (50 tests) passing, [`docs/stage-1-verification.md`](stage-1-verification.md) | **COMPLETED** |
 
 ---
 

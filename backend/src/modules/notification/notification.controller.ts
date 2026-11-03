@@ -15,6 +15,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@ne
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { SkipBranchCheck } from '../../common/decorators/skip-branch.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { AuthUser } from '../../common/types/auth-user.interface';
@@ -26,6 +27,7 @@ import {
 
 @ApiTags('Notifications & Messaging')
 @ApiBearerAuth()
+@SkipBranchCheck()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('notifications')
 export class NotificationController {

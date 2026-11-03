@@ -68,7 +68,7 @@ export class CashierController {
   @ApiResponse({ status: 201, description: 'Shift successfully opened.' })
   async openShift(@Body() dto: OpenShiftDto, @Request() req: any) {
     const cashierId = req.user.id;
-    return this.cashierService.openShift(cashierId, dto);
+    return this.cashierService.openShift(cashierId, dto, req.user);
   }
 
   @Get('shifts/active')
@@ -95,7 +95,7 @@ export class CashierController {
   async listShifts(@Query() query: CashierQueryDto, @Request() req: any) {
     const requesterId = req.user.id;
     const hasCrossUser = this.hasCrossUserPermission(req);
-    return this.cashierService.listShifts(query, requesterId, hasCrossUser);
+    return this.cashierService.listShifts(query, requesterId, hasCrossUser, req.user);
   }
 
   @Get('shifts/:id')
@@ -109,7 +109,7 @@ export class CashierController {
   async getShiftDetails(@Param('id') id: string, @Request() req: any) {
     const requesterId = req.user.id;
     const hasCrossUser = this.hasCrossUserPermission(req);
-    return this.cashierService.getShiftDetails(id, requesterId, hasCrossUser);
+    return this.cashierService.getShiftDetails(id, requesterId, hasCrossUser, req.user);
   }
 
   @Post('shifts/:id/close')
@@ -129,7 +129,7 @@ export class CashierController {
   ) {
     const cashierId = req.user.id;
     const hasCrossUser = this.hasCrossUserPermission(req);
-    return this.cashierService.submitClose(id, dto, cashierId, hasCrossUser);
+    return this.cashierService.submitClose(id, dto, cashierId, hasCrossUser, req.user);
   }
 
   @Post('shifts/:id/approve')
@@ -149,7 +149,7 @@ export class CashierController {
   ) {
     const approverId = req.user.id;
     const hasCrossUser = this.hasCrossUserPermission(req);
-    return this.cashierService.approveShift(id, approverId, hasCrossUser, dto);
+    return this.cashierService.approveShift(id, approverId, hasCrossUser, dto, req.user);
   }
 
   @Post('shifts/:id/reject')
@@ -257,8 +257,9 @@ export class CashierController {
   async getDayBook(
     @Query() query: DayBookQueryDto,
     @Response({ passthrough: true }) res: any,
+    @Request() req: any,
   ) {
-    const result = await this.cashierService.getDayBook(query);
+    const result = await this.cashierService.getDayBook(query, req.user);
     if ('csv' in result) {
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', `attachment; filename="${result.filename}"`);

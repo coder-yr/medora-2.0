@@ -3,8 +3,10 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
 import { AppointmentService } from '../appointment/appointment.service';
 import { DoctorService } from '../doctor/doctor.service';
 import { PatientService } from '../patient/patient.service';
@@ -39,6 +41,7 @@ export class ConsultationService {
     private readonly patientService: PatientService,
     private readonly doctorService: DoctorService,
     private readonly appointmentService: AppointmentService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
   ) {}
 
   /**
@@ -81,12 +84,21 @@ export class ConsultationService {
    */
   async getVisitConsultationContext(
     appointmentIdOrKey: string | number,
+    user?: any,
   ): Promise<VisitConsultationContextDto> {
     const apptIdStr = String(appointmentIdOrKey);
 
     const visit = await this.appointmentService.findOne(apptIdStr);
     if (!visit) {
       throw new NotFoundException(`Visit #${apptIdStr} not found.`);
+    }
+
+    if (this.branchAuth && user) {
+      await this.branchAuth.assertResourceAccess(
+        user,
+        visit.branchId ? String(visit.branchId) : null,
+        'consultation visit',
+      );
     }
 
     const patient = await this.patientService.findById(visit.patientId);
@@ -218,8 +230,9 @@ export class ConsultationService {
    */
   async getVisitContext(
     appointmentIdOrKey: string | number,
+    user?: any,
   ): Promise<VisitConsultationContextDto> {
-    return this.getVisitConsultationContext(appointmentIdOrKey);
+    return this.getVisitConsultationContext(appointmentIdOrKey, user);
   }
 
   /**
@@ -230,12 +243,21 @@ export class ConsultationService {
     appointmentIdOrKey: string | number,
     dto: SaveConsultationDto,
     userId = '',
+    user?: any,
   ): Promise<ConsultationResponseDto> {
     const apptIdStr = String(appointmentIdOrKey);
 
     const visit = await this.appointmentService.findOne(apptIdStr);
     if (!visit) {
       throw new NotFoundException(`Visit #${apptIdStr} not found.`);
+    }
+
+    if (this.branchAuth && user) {
+      await this.branchAuth.assertResourceAccess(
+        user,
+        visit.branchId ? String(visit.branchId) : null,
+        'consultation visit',
+      );
     }
 
     const patient = await this.patientService.findById(visit.patientId);
@@ -380,7 +402,7 @@ export class ConsultationService {
   /**
    * List consultations with filtering and pagination.
    */
-  async findAll(query: ConsultationQueryDto): Promise<PaginatedConsultationsDto> {
+  async findAll(query: ConsultationQueryDto, user?: any): Promise<PaginatedConsultationsDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -412,6 +434,17 @@ export class ConsultationService {
       where.status = status;
     }
 
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (accessibleBranches) {
+        where.appointment = {
+          branchId: {
+            in: accessibleBranches,
+          },
+        };
+      }
+    }
+
     const [records, total] = await Promise.all([
       this.prisma.consultation.findMany({
         where,
@@ -439,7 +472,7 @@ export class ConsultationService {
   /**
    * Find a single consultation by ID.
    */
-  async findOne(idOrKey: string | number): Promise<ConsultationResponseDto> {
+  async findOne(idOrKey: string | number, user?: any): Promise<ConsultationResponseDto> {
     const idStr = String(idOrKey);
 
     const found = await this.prisma.consultation.findUnique({
@@ -451,14 +484,22 @@ export class ConsultationService {
       throw new NotFoundException(`Consultation #${idStr} not found.`);
     }
 
+    if (this.branchAuth && user && found.appointment?.branchId) {
+      await this.branchAuth.assertResourceAccess(
+        user,
+        String(found.appointment.branchId),
+        'consultation',
+      );
+    }
+
     return this.formatConsultation(found);
   }
 
   /**
    * Printable summary for clinical report generation.
    */
-  async printout(idOrKey: string | number): Promise<ConsultationResponseDto> {
-    return this.findOne(idOrKey);
+  async printout(idOrKey: string | number, user?: any): Promise<ConsultationResponseDto> {
+    return this.findOne(idOrKey, user);
   }
 
   // --- Reusable Note Templates ---

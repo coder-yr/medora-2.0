@@ -26,6 +26,14 @@ export class AppointmentQueryDto {
   patient?: string | number;
 
   @ApiPropertyOptional({
+    description: 'Filter by branch ID',
+    example: '1',
+  })
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @ApiPropertyOptional({
     description: 'Filter by appointment status',
     example: 'scheduled',
   })

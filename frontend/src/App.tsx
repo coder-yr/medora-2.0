@@ -120,16 +120,28 @@ export function App() {
       .then((res) => res.json())
       .then((json) => {
         const branches = json.data || json;
-        if (Array.isArray(branches) && branches.length > 0) {
+        if (Array.isArray(branches)) {
           setUserBranches(branches);
-          if (!branches.some((b) => String(b.id) === String(activeBranchId))) {
-            setActiveBranchId(branches[0].id);
-            localStorage.setItem('medora_active_branch', branches[0].id);
+          if (branches.length > 0 && !branches.some((b) => String(b.id) === String(activeBranchId))) {
+            setActiveBranchId(String(branches[0].id));
+            localStorage.setItem('medora_active_branch', String(branches[0].id));
+          } else if (branches.length === 0) {
+            setActiveBranchId('');
+            localStorage.removeItem('medora_active_branch');
           }
         }
       })
       .catch((err) => console.error('Failed to fetch user branches:', err));
   }, [token]);
+
+  const handleBranchSelect = (newBranchId: string) => {
+    if (userBranches.length > 0 && !userBranches.some((b) => String(b.id) === String(newBranchId))) {
+      console.warn(`Access denied: User does not belong to branch ${newBranchId}`);
+      return;
+    }
+    setActiveBranchId(newBranchId);
+    localStorage.setItem('medora_active_branch', newBranchId);
+  };
 
   const loginAs = async (role: 'Doctor' | 'Admin' | 'Accountant' | 'Pharmacist' | 'Laboratorist' | 'Receptionist') => {
     if (!isDev) {
@@ -322,10 +334,7 @@ export function App() {
               className="form-select"
               style={{ width: 'auto', padding: '4px 8px', fontWeight: 600 }}
               value={activeBranchId}
-              onChange={(e) => {
-                setActiveBranchId(e.target.value);
-                localStorage.setItem('medora_active_branch', e.target.value);
-              }}
+              onChange={(e) => handleBranchSelect(e.target.value)}
             >
               {userBranches.length > 0 ? (
                 userBranches.map((b) => (
@@ -505,10 +514,7 @@ export function App() {
         <SettingsWorkspace
           token={token}
           activeBranchId={activeBranchId}
-          onBranchChange={(newId) => {
-            setActiveBranchId(newId);
-            localStorage.setItem('medora_active_branch', newId);
-          }}
+          onBranchChange={handleBranchSelect}
         />
       )}
 

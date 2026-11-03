@@ -3,7 +3,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
 import { DoctorService } from '../doctor/doctor.service';
 import { PatientService } from '../patient/patient.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -23,6 +25,7 @@ export class InvoiceService {
     private readonly prisma: PrismaService,
     private readonly patientService: PatientService,
     private readonly doctorService: DoctorService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
   ) {}
 
   /**
@@ -36,10 +39,21 @@ export class InvoiceService {
    * Generates a new patient invoice with itemized line entries, discounts,
    * and tax calculations. Purely transactional against PostgreSQL.
    */
-  async create(dto: CreateInvoiceDto, userId?: string): Promise<InvoiceResponseDto> {
+  async create(dto: CreateInvoiceDto, userId?: string, user?: any): Promise<InvoiceResponseDto> {
     const patient = await this.patientService.findById(dto.patient);
     if (!patient) {
       throw new NotFoundException(`Patient #${dto.patient} not found.`);
+    }
+
+    let resolvedBranchId: string | number | bigint | null = null;
+    const branchCandidate = (dto as any).branchId ?? (dto as any).branch_id;
+    if (branchCandidate) {
+      if (this.branchAuth && user) {
+        await this.branchAuth.assertResourceAccess(user, branchCandidate, 'invoice');
+      }
+      resolvedBranchId = branchCandidate;
+    } else if (user?.branchId) {
+      resolvedBranchId = user.branchId;
     }
 
     let doctor: { id: string; name: string } | null = null;
@@ -150,6 +164,7 @@ export class InvoiceService {
           patientPhone: patient.phone ?? null,
           patientAddress: patient.address ?? null,
           doctorName: doctor ? doctor.name : null,
+          branchId: resolvedBranchId ? BigInt(resolvedBranchId) : null,
           user: userId || '',
           category: category || null,
           categoryName: categoryName || null,
@@ -192,6 +207,7 @@ export class InvoiceService {
     invoiceId: string | number,
     dto: CreatePaymentDto,
     userId?: string,
+    user?: any,
   ): Promise<InvoiceResponseDto> {
     const idStr = String(invoiceId);
     const amount = InvoiceService.round2(dto.amount);
@@ -205,11 +221,15 @@ export class InvoiceService {
     return await this.prisma.$transaction(
       async (tx) => {
         // Pessimistic lock on invoice row in PostgreSQL
-      const locked = await tx.$queryRaw<Array<{ id: bigint; gross_total: number | string | bigint }>>`
-        SELECT id, gross_total FROM payment WHERE id = ${BigInt(idStr)} FOR UPDATE
+      const locked = await tx.$queryRaw<Array<{ id: bigint; gross_total: number | string | bigint; branch_id: bigint | null }>>`
+        SELECT id, gross_total, branch_id FROM payment WHERE id = ${BigInt(idStr)} FOR UPDATE
       `;
       if (!locked || locked.length === 0) {
         throw new NotFoundException(`Invoice #${idStr} not found.`);
+      }
+
+      if (this.branchAuth && user && locked[0].branch_id) {
+        await this.branchAuth.assertResourceAccess(user, String(locked[0].branch_id), 'invoice');
       }
 
       const existingPayments = await tx.invoicePayment.findMany({
@@ -306,7 +326,7 @@ export class InvoiceService {
   /**
    * Find single invoice by numeric ID.
    */
-  async findById(idOrKey: string | number): Promise<InvoiceResponseDto> {
+  async findById(idOrKey: string | number, user?: any): Promise<InvoiceResponseDto> {
     const idStr = String(idOrKey);
 
     const invoice = await this.prisma.payment.findUnique({
@@ -322,6 +342,10 @@ export class InvoiceService {
       throw new NotFoundException(`Invoice #${idStr} not found.`);
     }
 
+    if (this.branchAuth && user && invoice.branchId) {
+      await this.branchAuth.assertResourceAccess(user, String(invoice.branchId), 'invoice');
+    }
+
     const doctor = invoice.doctor ? await this.doctorService.findById(invoice.doctor).catch(() => null) : null;
     return this.formatPayment(invoice, invoice.patient, doctor);
   }
@@ -329,14 +353,14 @@ export class InvoiceService {
   /**
    * Alias for findById.
    */
-  async findOne(idOrKey: string | number): Promise<InvoiceResponseDto> {
-    return this.findById(idOrKey);
+  async findOne(idOrKey: string | number, user?: any): Promise<InvoiceResponseDto> {
+    return this.findById(idOrKey, user);
   }
 
   /**
    * List invoices with filtering, tabs ('outstanding', 'settled', 'all'), and pagination.
    */
-  async findAll(query: InvoiceQueryDto): Promise<PaginatedInvoicesDto> {
+  async findAll(query: InvoiceQueryDto, user?: any): Promise<PaginatedInvoicesDto> {
     const show = query.show || 'outstanding';
     const patientFilter = query.patient ? String(query.patient).trim() : undefined;
     const dateFilter = query.date ? query.date.trim() : undefined;
@@ -350,6 +374,17 @@ export class InvoiceService {
     }
     if (dateFilter) {
       where.date = dateFilter;
+    }
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      const queryBranch = (query as any).branchId ?? (query as any).branch_id;
+      if (queryBranch) {
+        await this.branchAuth.assertResourceAccess(user, queryBranch, 'invoice');
+        where.branchId = BigInt(queryBranch);
+      } else if (accessibleBranches) {
+        where.branchId = { in: accessibleBranches };
+      }
     }
 
     const allRecords = await this.prisma.payment.findMany({
@@ -407,7 +442,7 @@ export class InvoiceService {
    * Deletion guard: An invoice cannot be deleted if money has been recorded against it,
    * or if a doctor share on this invoice is approved or paid.
    */
-  async remove(idOrKey: string | number): Promise<{ success: boolean; message: string }> {
+  async remove(idOrKey: string | number, user?: any): Promise<{ success: boolean; message: string }> {
     const idStr = String(idOrKey);
 
     return await this.prisma.$transaction(async (tx) => {
@@ -421,6 +456,10 @@ export class InvoiceService {
 
       if (!existing) {
         throw new NotFoundException(`Invoice #${idStr} not found.`);
+      }
+
+      if (this.branchAuth && user && existing.branchId) {
+        await this.branchAuth.assertResourceAccess(user, String(existing.branchId), 'invoice');
       }
 
       const paid = existing.payments.reduce((acc, curr) => acc + Number(curr.amount), 0);

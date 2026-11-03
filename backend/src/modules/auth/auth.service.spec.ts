@@ -16,8 +16,18 @@ describe('AuthService (Security Remediation & Parity)', () => {
   const mockPrisma: any = {
     user: {
       findFirst: jest.fn(async ({ where }: any) => {
-        if (where.email) {
-          return usersStore.find((u) => u.email.toLowerCase() === where.email.toLowerCase()) || null;
+        if (where?.email) {
+          const target = typeof where.email === 'string' ? where.email : where.email?.equals;
+          return usersStore.find((u) => u.email.toLowerCase() === (target || '').toLowerCase()) || null;
+        }
+        if (where?.OR) {
+          for (const clause of where.OR) {
+            const target = typeof clause.email === 'string' ? clause.email : clause.email?.equals;
+            if (target) {
+              const found = usersStore.find((u) => u.email.toLowerCase() === target.toLowerCase());
+              if (found) return found;
+            }
+          }
         }
         return null;
       }),

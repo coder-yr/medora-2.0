@@ -1487,6 +1487,7 @@ export class AccountingService {
     accountId: bigint,
     startDate?: string,
     endDate?: string,
+    branchId?: number,
   ) {
     const account = await this.prisma.account.findUnique({
       where: { id: accountId },
@@ -1506,6 +1507,7 @@ export class AccountingService {
         journalEntry: {
           status: 'POSTED',
           accountingDate: { lt: start },
+          ...(branchId ? { branchId: BigInt(branchId) } : {}),
         },
       },
       select: { debit: true, credit: true },
@@ -1528,6 +1530,7 @@ export class AccountingService {
         journalEntry: {
           status: 'POSTED',
           accountingDate: { gte: start, lte: end },
+          ...(branchId ? { branchId: BigInt(branchId) } : {}),
         },
       },
       include: {

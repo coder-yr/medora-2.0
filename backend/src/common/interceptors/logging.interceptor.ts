@@ -2,6 +2,7 @@ import { CallHandler, ExecutionContext, Injectable, Logger, NestInterceptor } fr
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
 import { Request, Response } from 'express';
+import { sanitizeLogUrl } from '../utils/phi-redaction.util';
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -14,7 +15,8 @@ export class LoggingInterceptor implements NestInterceptor {
 
     const correlationId = req.correlationId || 'unknown';
     const method = req.method;
-    const url = req.originalUrl || req.url;
+    const rawUrl = req.originalUrl || req.url;
+    const sanitizedUrl = sanitizeLogUrl(rawUrl);
     const startTime = Date.now();
 
     return next.handle().pipe(
@@ -22,13 +24,13 @@ export class LoggingInterceptor implements NestInterceptor {
         next: () => {
           const duration = Date.now() - startTime;
           const statusCode = res.statusCode;
-          this.logger.log(`[${correlationId}] ${method} ${url} ${statusCode} +${duration}ms`);
+          this.logger.log(`[${correlationId}] ${method} ${sanitizedUrl} ${statusCode} +${duration}ms`);
         },
         error: (err) => {
           const duration = Date.now() - startTime;
           const status = err.status || 500;
           this.logger.error(
-            `[${correlationId}] ${method} ${url} ${status} +${duration}ms - ${err.message}`,
+            `[${correlationId}] ${method} ${sanitizedUrl} ${status} +${duration}ms - ${err.message}`,
           );
         },
       }),

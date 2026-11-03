@@ -3,7 +3,10 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Optional,
 } from '@nestjs/common';
+import { HospitalPermission } from '../../common/constants/permissions.enum';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { DashboardFilterDto } from './dto/dashboard.dto';
 
@@ -22,7 +25,10 @@ export class DashboardService {
   private readonly cache = new Map<string, { expiresAt: number; data: any }>();
   private readonly CACHE_TTL_MS = 30000; // 30 seconds
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   /**
    * Standardizes date range boundaries to inclusive UTC start and end
@@ -420,18 +426,31 @@ export class DashboardService {
   // 3. MULTI-BRANCH COMPARISON ANALYTICS
   // ===========================================================================
 
-  async getBranchComparison(filterDto: DashboardFilterDto) {
+  async getBranchComparison(filterDto: DashboardFilterDto, user?: any) {
     const { start, end, startStr, endStr } = this.parseDateRange(filterDto);
 
-    // Cache lookup
-    const cacheKey = `branch_comparison_${startStr}_${endStr}`;
+    const accessibleBranches = this.branchAuth && user ? await this.branchAuth.resolveAccessibleBranchIds(user) : null;
+    const isGlobal = !accessibleBranches;
+    const canViewFinancial =
+      !user ||
+      user.group === 'Admin' ||
+      user.role === 'Admin' ||
+      user.permissions?.includes(HospitalPermission.DASHBOARD_FINANCIAL_VIEW);
+
+    const authScope = isGlobal ? 'global' : accessibleBranches.map((id) => id.toString()).sort().join('_');
+    const finScope = canViewFinancial ? 'fin' : 'nofin';
+    const cacheKey = `branch_comparison_${authScope}_${finScope}_${startStr}_${endStr}`;
+
     const cached = this.cache.get(cacheKey);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.data;
     }
 
     const branches = await this.prisma.hospitalBranch.findMany({
-      where: { active: true },
+      where: {
+        active: true,
+        ...(accessibleBranches ? { id: { in: accessibleBranches } } : {}),
+      },
       select: {
         id: true,
         name: true,
@@ -457,21 +476,23 @@ export class DashboardService {
               admissionDate: { gte: start, lte: end },
             },
           }),
-          this.prisma.payment.aggregate({
-            where: {
-              branchId: branch.id,
-              createdAt: { gte: start, lte: end },
-            },
-            _sum: {
-              grossTotal: true,
-              discount: true,
-            },
-          }),
+          canViewFinancial
+            ? this.prisma.payment.aggregate({
+                where: {
+                  branchId: branch.id,
+                  createdAt: { gte: start, lte: end },
+                },
+                _sum: {
+                  grossTotal: true,
+                  discount: true,
+                },
+              })
+            : Promise.resolve({ _sum: { grossTotal: null, discount: null } }),
         ]);
 
         const totalBilled = Number(paymentSum._sum.grossTotal || 0);
         const discount = Number(paymentSum._sum.discount || 0);
-        const netRevenue = Math.max(0, totalBilled - discount);
+        const netRevenue = canViewFinancial ? Math.max(0, totalBilled - discount) : null;
 
         return {
           branchId: branch.id.toString(),

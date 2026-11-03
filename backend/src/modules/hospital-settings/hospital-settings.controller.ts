@@ -12,6 +12,7 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagg
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { OptionalBranch } from '../../common/decorators/optional-branch.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { AuthUser } from '../../common/types/auth-user.interface';
@@ -24,6 +25,7 @@ import {
 
 @ApiTags('Hospital Settings & Branding')
 @ApiBearerAuth()
+@OptionalBranch()
 @UseGuards(JwtAuthGuard, PermissionsGuard)
 @Controller('settings')
 export class HospitalSettingsController {

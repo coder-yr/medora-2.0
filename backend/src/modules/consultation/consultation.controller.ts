@@ -56,8 +56,9 @@ export class ConsultationController {
   })
   async findAll(
     @Query() query: ConsultationQueryDto,
+    @Request() req: any,
   ): Promise<PaginatedConsultationsDto> {
-    return this.consultationService.findAll(query);
+    return this.consultationService.findAll(query, req.user);
   }
 
   @Get('templates')
@@ -126,8 +127,9 @@ export class ConsultationController {
   @ApiResponse({ status: 404, description: 'Visit or patient not found.' })
   async getVisitContext(
     @Param('appointmentId') appointmentId: string,
+    @Request() req: any,
   ): Promise<VisitConsultationContextDto> {
-    return this.consultationService.getVisitContext(appointmentId);
+    return this.consultationService.getVisitContext(appointmentId, req.user);
   }
 
   @Post('visit/:appointmentId')
@@ -151,7 +153,7 @@ export class ConsultationController {
     @Request() req: any,
   ): Promise<ConsultationResponseDto> {
     const userId = req.user?.id || req.user?.username || '';
-    return this.consultationService.saveVisitConsultation(appointmentId, dto, userId);
+    return this.consultationService.saveVisitConsultation(appointmentId, dto, userId, req.user);
   }
 
   @Get(':id')
@@ -167,8 +169,8 @@ export class ConsultationController {
     type: ConsultationResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Consultation not found.' })
-  async findOne(@Param('id') id: string): Promise<ConsultationResponseDto> {
-    return this.consultationService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req: any): Promise<ConsultationResponseDto> {
+    return this.consultationService.findOne(id, req.user);
   }
 
   @Get(':id/print')
@@ -184,7 +186,7 @@ export class ConsultationController {
     type: ConsultationResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Consultation not found.' })
-  async printout(@Param('id') id: string): Promise<ConsultationResponseDto> {
-    return this.consultationService.printout(id);
+  async printout(@Param('id') id: string, @Request() req: any): Promise<ConsultationResponseDto> {
+    return this.consultationService.printout(id, req.user);
   }
 }

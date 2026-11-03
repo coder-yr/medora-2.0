@@ -48,28 +48,34 @@ async function bootstrap() {
     exposedHeaders: ['x-correlation-id'],
   });
 
-  // OpenAPI (Swagger) Documentation
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Medora 2.0 Hospital Management API')
-    .setDescription(
-      'Trusted Clinical & Administrative REST API for Medora 2.0 (NestJS + Supabase PostgreSQL + Prisma)',
-    )
-    .setVersion('2.0.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Provide JWT access token obtained via /api/v1/auth/login',
-      },
-      'bearer',
-    )
-    .addTag('Health & Monitoring', 'Liveness and readiness probes')
-    .addTag('Authentication & Identity', 'Staff authentication and authorization credentials')
-    .build();
+  // OpenAPI (Swagger) Documentation - Enabled in development/staging, disabled in production by default
+  const enableSwagger = !isProd || configService.get<boolean>('api.enableSwagger') === true;
+  if (enableSwagger) {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Medora 2.0 Hospital Management API')
+      .setDescription(
+        'Trusted Clinical & Administrative REST API for Medora 2.0 (NestJS + Supabase PostgreSQL + Prisma)',
+      )
+      .setVersion('2.0.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Provide JWT access token obtained via /api/v1/auth/login',
+        },
+        'bearer',
+      )
+      .addTag('Health & Monitoring', 'Liveness and readiness probes')
+      .addTag('Authentication & Identity', 'Staff authentication and authorization credentials')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+    logger.log(`Swagger OpenAPI documentation: http://localhost:${port}/api/docs`);
+  } else {
+    logger.log('Swagger documentation is disabled in production mode');
+  }
 
   // Enable graceful process termination
   app.enableShutdownHooks();

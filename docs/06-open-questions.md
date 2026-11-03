@@ -642,6 +642,39 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Strict backend redaction of financial metrics (`financial: null`) for unauthorized roles.
   - [ ] **Option B**: Client-side CSS hiding while transmitting financial values in the JSON response.
 
+---
+
+## 27. Remediation Stage 1 Security Hardening & Zero-Trust Decisions
+
+### 73. Global Guard Registration Order & Zero-Trust Verification
+- **Evidence**: Production Readiness Assessment identified that `BranchAccessGuard` was not registered globally, permitting cross-branch data manipulation if controllers omitted local guards.
+- **Resolution**: Registered `BranchAccessGuard` globally as an `APP_GUARD` following `ThrottlerGuard` and `JwtAuthGuard`. Decorated endpoints with `@Public()`, `@SkipBranchCheck()`, or `@OptionalBranch()` to permit global utility routes while enforcing zero-trust membership verification on all clinical and financial operations.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Global `APP_GUARD` execution sequence (`ThrottlerGuard` -> `JwtAuthGuard` -> `BranchAccessGuard`).
+  - [ ] **Option B**: Manual controller-by-controller decorator maintenance.
+
+### 74. In-Memory Sliding-Window Account Lockout vs. Database Columns
+- **Evidence**: Legacy system was vulnerable to brute-force credential stuffing. The audit recommended implementing 5-attempt thresholds with 15-minute lockouts.
+- **Resolution**: Created `AccountLockoutService` with an atomic in-memory sliding window tracking IP and identity attempts. This avoids database schema mutations in Stage 1 while providing immediate defense. Expired locks auto-unlock without database writes.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Lightweight sliding-window in-memory tracking with auto-unlock.
+  - [ ] **Option B**: Adding `failed_attempts` and `locked_until` columns to `users` table via Prisma migration.
+
+### 75. Single-Use SHA-256 Ephemeral Password Reset
+- **Evidence**: Legacy Laravel password reset relied on Laravel's default table, which was discarded in NestJS migration.
+- **Resolution**: Implemented `PasswordResetService` issuing 32-byte cryptographically secure random tokens. Only the SHA-256 token hash is retained with a 15-minute TTL. Endpoint returns uniform 200 OK responses to defeat email enumeration. Consuming a token immediately invalidates active refresh token sessions.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Ephemeral SHA-256 token hashing with refresh token family revocation.
+  - [ ] **Option B**: Unhashed plaintext tokens or permanent storage in database tables.
+
+### 76. Deferral of Physical Pharmacy Stock Partitioning to Stage 2
+- **Evidence**: While clinical, billing, consultation, and appointment entities have been partitioned by branch, physical warehouse inventory versus clinic dispensary stock requires enterprise business rule signoff (central procurement vs. autonomous branch purchasing).
+- **Resolution**: Kept schema stable in Stage 1; full physical inventory branch partitioning is formally scoped and scheduled for Remediation Stage 2.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Enforce access control in Stage 1; refactor multi-warehouse schema in Stage 2.
+  - [ ] **Option B**: Introduce rushed schema migrations without clinical inventory stakeholder signoff.
+
+
 
 
 

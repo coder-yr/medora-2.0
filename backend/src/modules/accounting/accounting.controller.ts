@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpStatus,
+  Optional,
   Param,
   Post,
   Put,
@@ -24,6 +25,7 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
 import { AccountingService } from './accounting.service';
 import {
   AccountQueryDto,
@@ -53,7 +55,10 @@ import {
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
 @Controller('accounting')
 export class AccountingController {
-  constructor(private readonly accountingService: AccountingService) {}
+  constructor(
+    private readonly accountingService: AccountingService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   // ==========================================
   // DASHBOARD METRICS
@@ -374,21 +379,42 @@ export class AccountingController {
   @ApiOperation({ summary: 'Generate balanced Trial Balance report' })
   @Get('reports/trial-balance')
   @RequirePermissions(HospitalPermission.ACCOUNTING_REPORTS_VIEW)
-  async getTrialBalance(@Query() query: ReportQueryDto) {
+  async getTrialBalance(@Query() query: ReportQueryDto, @Request() req: any) {
+    if (this.branchAuth && req.user && !this.branchAuth.isGlobalAdmin(req.user)) {
+      if (query.branchId) {
+        await this.branchAuth.assertResourceAccess(req.user, query.branchId, 'accounting report');
+      } else {
+        query.branchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+      }
+    }
     return this.accountingService.getTrialBalance(query);
   }
 
   @ApiOperation({ summary: 'Generate Profit & Loss (Income Statement) report' })
   @Get('reports/profit-loss')
   @RequirePermissions(HospitalPermission.ACCOUNTING_REPORTS_VIEW)
-  async getProfitLoss(@Query() query: ReportQueryDto) {
+  async getProfitLoss(@Query() query: ReportQueryDto, @Request() req: any) {
+    if (this.branchAuth && req.user && !this.branchAuth.isGlobalAdmin(req.user)) {
+      if (query.branchId) {
+        await this.branchAuth.assertResourceAccess(req.user, query.branchId, 'accounting report');
+      } else {
+        query.branchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+      }
+    }
     return this.accountingService.getProfitAndLoss(query);
   }
 
   @ApiOperation({ summary: 'Generate Balance Sheet financial statement' })
   @Get('reports/balance-sheet')
   @RequirePermissions(HospitalPermission.ACCOUNTING_REPORTS_VIEW)
-  async getBalanceSheet(@Query() query: ReportQueryDto) {
+  async getBalanceSheet(@Query() query: ReportQueryDto, @Request() req: any) {
+    if (this.branchAuth && req.user && !this.branchAuth.isGlobalAdmin(req.user)) {
+      if (query.branchId) {
+        await this.branchAuth.assertResourceAccess(req.user, query.branchId, 'accounting report');
+      } else {
+        query.branchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+      }
+    }
     return this.accountingService.getBalanceSheet(query);
   }
 
@@ -400,11 +426,22 @@ export class AccountingController {
     @Param('accountId') accountId: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('branchId') branchId?: string,
+    @Request() req?: any,
   ) {
+    let resolvedBranchId = branchId ? Number(branchId) : undefined;
+    if (this.branchAuth && req?.user && !this.branchAuth.isGlobalAdmin(req.user)) {
+      if (resolvedBranchId) {
+        await this.branchAuth.assertResourceAccess(req.user, resolvedBranchId, 'general ledger');
+      } else {
+        resolvedBranchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+      }
+    }
     return this.accountingService.getGeneralLedger(
       BigInt(accountId),
       startDate,
       endDate,
+      resolvedBranchId,
     );
   }
 

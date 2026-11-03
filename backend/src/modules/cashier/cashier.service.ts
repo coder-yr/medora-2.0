@@ -4,8 +4,10 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ApproveShiftDto,
@@ -33,7 +35,10 @@ export function serializeBigInt<T>(data: T): T {
 
 @Injectable()
 export class CashierService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   private static round2(val: number): number {
     return Math.round((val + Number.EPSILON) * 100) / 100;
@@ -90,13 +95,25 @@ export class CashierService {
    * Opens a new cashier shift with optional opening float.
    * Guarantees at most one active shift per cashier.
    */
-  async openShift(cashierId: bigint | number | string, dto: OpenShiftDto) {
+  async openShift(cashierId: bigint | number | string, dto: OpenShiftDto, user?: any) {
     const cId = BigInt(cashierId);
 
     // Verify cashier exists
-    const user = await this.prisma.user.findUnique({ where: { id: cId } });
-    if (!user) {
+    const dbUser = await this.prisma.user.findUnique({ where: { id: cId } });
+    if (!dbUser) {
       throw new NotFoundException(`User #${cashierId} not found.`);
+    }
+
+    let resolvedBranchId: bigint | null = null;
+    if (dto.branchId) {
+      if (this.branchAuth && user) {
+        await this.branchAuth.assertResourceAccess(user, dto.branchId, 'cashier shift');
+      }
+      resolvedBranchId = BigInt(dto.branchId);
+    } else if (user?.branchId) {
+      resolvedBranchId = BigInt(user.branchId);
+    } else if (dbUser.branchId) {
+      resolvedBranchId = dbUser.branchId;
     }
 
     // Check for existing active shift
@@ -122,7 +139,7 @@ export class CashierService {
         data: {
           shiftNumber,
           cashierId: cId,
-          branchId: dto.branchId ? BigInt(dto.branchId) : user.branchId,
+          branchId: resolvedBranchId,
           cashDrawerId: dto.cashDrawerId ? BigInt(dto.cashDrawerId) : null,
           openingCash: new Prisma.Decimal(openingCash),
           expectedCash: new Prisma.Decimal(openingCash),
@@ -259,6 +276,7 @@ export class CashierService {
     shiftId: bigint | number | string,
     requesterId: bigint | number | string,
     hasCrossUserPerm: boolean,
+    user?: any,
   ) {
     const shift = await this.prisma.cashierShift.findUnique({
       where: { id: BigInt(shiftId) },
@@ -280,6 +298,10 @@ export class CashierService {
       throw new ForbiddenException('You can only view your own cashier shifts.');
     }
 
+    if (this.branchAuth && user && shift.branchId) {
+      await this.branchAuth.assertResourceAccess(user, shift.branchId, 'cashier shift');
+    }
+
     const liveTotals = await this.calculateShiftTotals(shift.id);
 
     return serializeBigInt({
@@ -295,6 +317,7 @@ export class CashierService {
     query: CashierQueryDto,
     requesterId: bigint | number | string,
     hasCrossUserPerm: boolean,
+    user?: any,
   ) {
     const where: Prisma.CashierShiftWhereInput = {};
 
@@ -309,7 +332,15 @@ export class CashierService {
       where.status = query.status.toUpperCase();
     }
 
-    if (query.branchId) {
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (query.branchId) {
+        await this.branchAuth.assertResourceAccess(user, query.branchId, 'cashier shifts');
+        where.branchId = BigInt(query.branchId);
+      } else if (accessibleBranches) {
+        where.branchId = { in: accessibleBranches };
+      }
+    } else if (query.branchId) {
       where.branchId = BigInt(query.branchId);
     }
 
@@ -361,12 +392,13 @@ export class CashierService {
     dto: SubmitCloseDto,
     cashierId: bigint | number | string,
     hasCrossUserPerm: boolean,
+    user?: any,
   ) {
     const sId = BigInt(shiftId);
 
     return await this.prisma.$transaction(async (tx: any) => {
-      const locked = await tx.$queryRaw<{ id: bigint; cashier_id: bigint; status: string }[]>`
-        SELECT id, cashier_id, status FROM "cashier_shift" WHERE id = ${sId} FOR UPDATE
+      const locked = await tx.$queryRaw<{ id: bigint; cashier_id: bigint; status: string; branch_id: bigint | null }[]>`
+        SELECT id, cashier_id, status, branch_id FROM "cashier_shift" WHERE id = ${sId} FOR UPDATE
       `;
 
       if (!locked || locked.length === 0) {
@@ -374,6 +406,10 @@ export class CashierService {
       }
 
       const shiftRow = locked[0];
+
+      if (this.branchAuth && user && shiftRow.branch_id) {
+        await this.branchAuth.assertResourceAccess(user, shiftRow.branch_id, 'cashier shift');
+      }
 
       if (shiftRow.cashier_id !== BigInt(cashierId) && !hasCrossUserPerm) {
         throw new ForbiddenException('You can only close your own cashier shift.');
@@ -452,6 +488,7 @@ export class CashierService {
     approverId: bigint | number | string,
     hasCrossUserPerm: boolean,
     dto?: ApproveShiftDto,
+    user?: any,
   ) {
     const sId = BigInt(shiftId);
     const aId = BigInt(approverId);
@@ -481,6 +518,10 @@ export class CashierService {
       }
 
       const shiftRow = locked[0];
+
+      if (this.branchAuth && user && shiftRow.branch_id) {
+        await this.branchAuth.assertResourceAccess(user, shiftRow.branch_id, 'cashier shift');
+      }
 
       if (shiftRow.status !== 'PENDING_APPROVAL') {
         throw new BadRequestException(
@@ -987,7 +1028,7 @@ export class CashierService {
   /**
    * Generates the financial Day Book report matching legacy CashController@dayBook.
    */
-  async getDayBook(query: DayBookQueryDto) {
+  async getDayBook(query: DayBookQueryDto, user?: any) {
     const today = new Date().toISOString().slice(0, 10);
     const from = query.from || today;
     const to = query.to || from;
@@ -1000,7 +1041,16 @@ export class CashierService {
     if (query.userId) {
       invoiceWhere.user = String(query.userId);
     }
-    if (query.branchId) {
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (query.branchId) {
+        await this.branchAuth.assertResourceAccess(user, query.branchId, 'day book');
+        invoiceWhere.branchId = BigInt(query.branchId);
+      } else if (accessibleBranches) {
+        invoiceWhere.branchId = { in: accessibleBranches };
+      }
+    } else if (query.branchId) {
       invoiceWhere.branchId = BigInt(query.branchId);
     }
 

@@ -6,15 +6,47 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../modules/prisma/prisma.service';
 import { AuthUser } from '../types/auth-user.interface';
 import { HospitalPermission } from '../constants/permissions.enum';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import { SKIP_BRANCH_KEY } from '../decorators/skip-branch.decorator';
+import { OPTIONAL_BRANCH_KEY } from '../decorators/optional-branch.decorator';
 
 @Injectable()
 export class BranchAccessGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    // 1. Bypass on public endpoints
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      return true;
+    }
+
+    // 2. Bypass on non-branch operational routes (e.g., self-profile, branch picker)
+    const skipBranch = this.reflector.getAllAndOverride<boolean>(SKIP_BRANCH_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (skipBranch) {
+      return true;
+    }
+
+    const isOptional = this.reflector.getAllAndOverride<boolean>(OPTIONAL_BRANCH_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
     const req = context.switchToHttp().getRequest();
     const user: AuthUser = req.user;
 
@@ -22,11 +54,12 @@ export class BranchAccessGuard implements CanActivate {
       throw new ForbiddenException('User context is missing');
     }
 
-    // 1. Resolve candidate branch ID from Header, Query, Params, or User profile
+    // 3. Resolve candidate branch ID from Header, Query, Params, or Body
     const rawHeader = req.headers['x-branch-id'];
     const rawQuery = req.query?.branchId;
     const rawParam = req.params?.branchId;
-    const candidateRaw = rawHeader || rawQuery || rawParam;
+    const rawBody = req.body?.branchId;
+    const candidateRaw = rawHeader || rawQuery || rawParam || rawBody;
 
     let branchIdBigInt: bigint | null = null;
 
@@ -42,11 +75,12 @@ export class BranchAccessGuard implements CanActivate {
 
     const isAdmin =
       user.group === 'Admin' ||
-      user.permissions?.includes(HospitalPermission.BRANCH_VIEW_ALL);
+      (Array.isArray(user.permissions) &&
+        user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL));
 
-    // If no branch is specified and user is Admin, allow through without scoped branch
+    // If no branch is specified:
     if (branchIdBigInt === null) {
-      if (isAdmin) {
+      if (isAdmin || isOptional) {
         req.activeBranchId = null;
         return true;
       }
@@ -55,7 +89,7 @@ export class BranchAccessGuard implements CanActivate {
       );
     }
 
-    // 2. Fetch branch from database
+    // 4. Fetch branch from database
     const branch = await this.prisma.hospitalBranch.findFirst({
       where: {
         id: branchIdBigInt,
@@ -67,13 +101,12 @@ export class BranchAccessGuard implements CanActivate {
       throw new NotFoundException(`Hospital branch #${branchIdBigInt} not found`);
     }
 
-    // 3. Check active state
+    // 5. Check active state
     if (!branch.active) {
-      // Inactive branches reject operational access
       throw new ForbiddenException(`Hospital branch "${branch.name}" is inactive`);
     }
 
-    // 4. Verify user access rights
+    // 6. Verify user access rights
     if (isAdmin) {
       req.activeBranchId = branchIdBigInt;
       req.activeBranch = branch;
@@ -81,18 +114,25 @@ export class BranchAccessGuard implements CanActivate {
     }
 
     // Check user branch memberships
-    const hasMembership = await this.prisma.userBranchMembership.findFirst({
+    const membership = await this.prisma.userBranchMembership.findFirst({
       where: {
         userId: BigInt(user.id),
         branchId: branchIdBigInt,
-        isActive: true,
       },
     });
 
+    // Explicitly revoked membership blocks access
+    if (membership && !membership.isActive) {
+      throw new ForbiddenException(
+        `Cross-branch access denied. Membership for branch "${branch.name}" has been revoked.`,
+      );
+    }
+
+    const hasActiveMembership = membership?.isActive === true;
     const isHomeBranch =
       user.branchId && BigInt(user.branchId) === branchIdBigInt;
 
-    if (!hasMembership && !isHomeBranch) {
+    if (!hasActiveMembership && !isHomeBranch) {
       throw new ForbiddenException(
         `Cross-branch access denied. You are not assigned to branch "${branch.name}" (#${branchIdBigInt}).`,
       );

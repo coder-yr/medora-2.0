@@ -53,8 +53,9 @@ export class InvoiceController {
   })
   async findAll(
     @Query() query: InvoiceQueryDto,
+    @Request() req: any,
   ): Promise<PaginatedInvoicesDto> {
-    return this.invoiceService.findAll(query);
+    return this.invoiceService.findAll(query, req.user);
   }
 
   @Post()
@@ -74,7 +75,7 @@ export class InvoiceController {
     @Request() req: any,
   ): Promise<InvoiceResponseDto> {
     const userId = req.user?.id ? String(req.user.id) : undefined;
-    return this.invoiceService.create(dto, userId);
+    return this.invoiceService.create(dto, userId, req.user);
   }
 
   @Get(':id')
@@ -90,8 +91,8 @@ export class InvoiceController {
     description: 'Detailed invoice record.',
     type: InvoiceResponseDto,
   })
-  async findOne(@Param('id') id: string): Promise<InvoiceResponseDto> {
-    return this.invoiceService.findOne(id);
+  async findOne(@Param('id') id: string, @Request() req: any): Promise<InvoiceResponseDto> {
+    return this.invoiceService.findOne(id, req.user);
   }
 
   @Post(':id/pay')
@@ -114,7 +115,7 @@ export class InvoiceController {
     @Request() req: any,
   ): Promise<InvoiceResponseDto> {
     const receivedBy = req.user?.id ? String(req.user.id) : undefined;
-    return this.invoiceService.recordPayment(id, dto, receivedBy);
+    return this.invoiceService.recordPayment(id, dto, receivedBy, req.user);
   }
 
   @Delete(':id')
@@ -129,7 +130,7 @@ export class InvoiceController {
     status: 200,
     description: 'Invoice successfully removed.',
   })
-  async remove(@Param('id') id: string): Promise<{ success: boolean; message: string }> {
-    return this.invoiceService.remove(id);
+  async remove(@Param('id') id: string, @Request() req: any): Promise<{ success: boolean; message: string }> {
+    return this.invoiceService.remove(id, req.user);
   }
 }

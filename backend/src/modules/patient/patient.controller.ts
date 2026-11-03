@@ -14,6 +14,8 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { PaginatedPatientsDto, PatientResponseDto } from './dto/patient-response.dto';
@@ -38,8 +40,11 @@ export class PatientController {
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden: Missing patient_view permission' })
-  async findAll(@Query() query: PatientQueryDto): Promise<PaginatedPatientsDto> {
-    return this.patientService.findAll(query);
+  async findAll(
+    @Query() query: PatientQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PaginatedPatientsDto> {
+    return this.patientService.findAll(query, user);
   }
 
   @Get(':id')
@@ -61,8 +66,11 @@ export class PatientController {
     description: 'Patient registered successfully',
   })
   @ApiResponse({ status: 400, description: 'Validation failed (missing name or invalid input)' })
-  async create(@Body() createPatientDto: CreatePatientDto): Promise<PatientResponseDto> {
-    return this.patientService.create(createPatientDto);
+  async create(
+    @Body() createPatientDto: CreatePatientDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PatientResponseDto> {
+    return this.patientService.create(createPatientDto, 'front desk', user);
   }
 
   @Put(':id')
@@ -77,8 +85,9 @@ export class PatientController {
   async update(
     @Param('id') id: string,
     @Body() updatePatientDto: UpdatePatientDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PatientResponseDto> {
-    return this.patientService.update(id, updatePatientDto);
+    return this.patientService.update(id, updatePatientDto, user);
   }
 
   @Delete(':id')
@@ -86,7 +95,10 @@ export class PatientController {
   @ApiOperation({ summary: 'Remove a patient record' })
   @ApiResponse({ status: 200, description: 'Patient record removed' })
   @ApiResponse({ status: 404, description: 'Patient not found' })
-  async remove(@Param('id') id: string): Promise<{ message: string }> {
-    return this.patientService.remove(id);
+  async remove(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ message: string }> {
+    return this.patientService.remove(id, user);
   }
 }

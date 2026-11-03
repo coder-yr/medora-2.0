@@ -5,6 +5,8 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
+import { AccountLockoutService } from './account-lockout.service';
+import { PasswordResetService } from './password-reset.service';
 
 @Module({
   imports: [
@@ -25,7 +27,18 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy],
-  exports: [AuthService, PassportModule, JwtModule],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    AccountLockoutService,
+    PasswordResetService,
+  ],
+  exports: [
+    AuthService,
+    AccountLockoutService,
+    PasswordResetService,
+    PassportModule,
+    JwtModule,
+  ],
 })
 export class AuthModule {}

@@ -12,6 +12,11 @@ export class PatientQueryDto {
   @IsString()
   q?: string;
 
+  @ApiPropertyOptional({ example: '1', description: 'Branch ID filter' })
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
   @ApiPropertyOptional({ example: 1, default: 1 })
   @IsOptional()
   @Type(() => Number)

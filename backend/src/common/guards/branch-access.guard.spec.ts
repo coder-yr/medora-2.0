@@ -5,6 +5,7 @@ import { HospitalPermission } from '../constants/permissions.enum';
 describe('BranchAccessGuard', () => {
   let guard: BranchAccessGuard;
   let mockPrisma: any;
+  let mockReflector: any;
 
   beforeEach(() => {
     mockPrisma = {
@@ -15,7 +16,10 @@ describe('BranchAccessGuard', () => {
         findFirst: jest.fn(),
       },
     };
-    guard = new BranchAccessGuard(mockPrisma);
+    mockReflector = {
+      getAllAndOverride: jest.fn().mockReturnValue(false),
+    };
+    guard = new BranchAccessGuard(mockPrisma, mockReflector);
   });
 
   const createMockContext = (request: any): ExecutionContext => {
@@ -27,6 +31,35 @@ describe('BranchAccessGuard', () => {
       }),
     } as any;
   };
+
+  it('bypasses guard on public endpoints', async () => {
+    mockReflector.getAllAndOverride.mockImplementation((key: string) => {
+      return key === 'isPublic';
+    });
+    const ctx = createMockContext({});
+    const result = await guard.canActivate(ctx);
+    expect(result).toBe(true);
+  });
+
+  it('bypasses guard on skipBranch endpoints', async () => {
+    mockReflector.getAllAndOverride.mockImplementation((key: string) => {
+      return key === 'skipBranch';
+    });
+    const ctx = createMockContext({ user: { id: '1' } });
+    const result = await guard.canActivate(ctx);
+    expect(result).toBe(true);
+  });
+
+  it('allows optional branch endpoints without active branch', async () => {
+    mockReflector.getAllAndOverride.mockImplementation((key: string) => {
+      return key === 'optionalBranch';
+    });
+    const req: any = { user: { id: '1', group: 'Doctor' }, headers: {} };
+    const ctx = createMockContext(req);
+    const result = await guard.canActivate(ctx);
+    expect(result).toBe(true);
+    expect(req.activeBranchId).toBeNull();
+  });
 
   it('should throw ForbiddenException if user context is missing', async () => {
     const ctx = createMockContext({});
@@ -117,6 +150,24 @@ describe('BranchAccessGuard', () => {
     const result = await guard.canActivate(ctx);
     expect(result).toBe(true);
     expect(req.activeBranchId).toBe(BigInt(2));
+  });
+
+  it('should deny cross-branch access if user membership has been revoked', async () => {
+    const mockBranch = { id: BigInt(2), name: 'City Clinic', active: true };
+    mockPrisma.hospitalBranch.findFirst.mockResolvedValue(mockBranch);
+    mockPrisma.userBranchMembership.findFirst.mockResolvedValue({
+      id: BigInt(10),
+      userId: BigInt(5),
+      branchId: BigInt(2),
+      isActive: false, // Revoked!
+    });
+
+    const req: any = {
+      user: { id: '5', group: 'Doctor', branchId: BigInt(2) },
+      headers: { 'x-branch-id': '2' },
+    };
+    const ctx = createMockContext(req);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
   });
 
   it('should deny cross-branch access if user is not assigned to target branch', async () => {

@@ -3,11 +3,14 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
 import { DoctorService } from '../doctor/doctor.service';
 import { PatientService } from '../patient/patient.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { AppointmentQueryDto } from './dto/appointment-query.dto';
 import {
   AppointmentResponseDto,
@@ -39,6 +42,7 @@ export class AppointmentService {
     private readonly prisma: PrismaService,
     private readonly patientService: PatientService,
     private readonly doctorService: DoctorService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
   ) {}
 
   /**
@@ -48,7 +52,17 @@ export class AppointmentService {
   async create(
     dto: CreateAppointmentDto,
     userId = '',
+    user?: AuthUser,
   ): Promise<AppointmentResponseDto> {
+    let targetBranchId: bigint | null = null;
+    if (dto.branchId) {
+      targetBranchId =
+        user && this.branchAuth
+          ? await this.branchAuth.assertBranchAccess(user, dto.branchId)
+          : BigInt(dto.branchId);
+    } else if (user?.branchId) {
+      targetBranchId = BigInt(user.branchId);
+    }
     let patient: { id: string; name: string };
     try {
       patient = await this.patientService.findById(dto.patient);
@@ -125,7 +139,7 @@ export class AppointmentService {
           weight: dto.weight ?? null,
           mode: isVideo ? 'video' : 'in_person',
           videoRoom,
-          branchId: dto.branchId ? BigInt(dto.branchId) : null,
+          branchId: targetBranchId,
           visitType: dto.visitType ?? 'first_visit',
         },
         include: {
@@ -141,7 +155,10 @@ export class AppointmentService {
   /**
    * List appointments with day view filtering, doctor/patient scopes, and pagination.
    */
-  async findAll(query: AppointmentQueryDto): Promise<PaginatedAppointmentsDto> {
+  async findAll(
+    query: AppointmentQueryDto,
+    user?: AuthUser,
+  ): Promise<PaginatedAppointmentsDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 50;
     const skip = (page - 1) * limit;
@@ -172,6 +189,16 @@ export class AppointmentService {
     }
     if (status) {
       where.status = status;
+    }
+
+    if (query.branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+      where.branchId = authorizedBranchId;
+    } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (accessible && accessible.length > 0) {
+        where.branchId = { in: accessible };
+      }
     }
 
     const [records, total] = await Promise.all([
@@ -219,14 +246,22 @@ export class AppointmentService {
   }
 
   /**
-   * Update appointment details with validation and schedule guards.
+   * Update appointment details with validation, schedule, and branch ownership guards.
    */
   async update(
     idOrKey: string | number,
     dto: UpdateAppointmentDto,
+    user?: AuthUser,
   ): Promise<AppointmentResponseDto> {
     const idStr = String(idOrKey);
     const existing = await this.findOne(idStr);
+
+    if (user && this.branchAuth && existing.branchId) {
+      await this.branchAuth.assertResourceAccess(user, existing.branchId, 'appointment');
+    }
+    if (dto.branchId && user && this.branchAuth) {
+      await this.branchAuth.assertBranchAccess(user, dto.branchId);
+    }
 
     const patientId = dto.patient ? String(dto.patient) : existing.patientId;
     const doctorId = dto.doctor ? String(dto.doctor) : existing.doctorId;
@@ -300,11 +335,15 @@ export class AppointmentService {
   }
 
   /**
-   * Delete an appointment record.
+   * Delete an appointment record with branch authorization guard.
    */
-  async remove(idOrKey: string | number): Promise<{ message: string }> {
+  async remove(idOrKey: string | number, user?: AuthUser): Promise<{ message: string }> {
     const idStr = String(idOrKey);
     const existing = await this.findOne(idStr);
+
+    if (user && this.branchAuth && existing.branchId) {
+      await this.branchAuth.assertResourceAccess(user, existing.branchId, 'appointment');
+    }
 
     await this.prisma.appointment.delete({
       where: { id: BigInt(idStr) },

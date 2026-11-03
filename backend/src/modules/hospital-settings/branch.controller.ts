@@ -17,6 +17,8 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@ne
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { SkipBranchCheck } from '../../common/decorators/skip-branch.decorator';
+import { OptionalBranch } from '../../common/decorators/optional-branch.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { AuthUser } from '../../common/types/auth-user.interface';
@@ -36,6 +38,7 @@ import {
 export class BranchController {
   constructor(private readonly service: HospitalSettingsService) {}
 
+  @OptionalBranch()
   @Get()
   @ApiOperation({ summary: 'List all hospital branches' })
   @ApiResponse({ status: 200, description: 'Branches list retrieved' })
@@ -51,6 +54,7 @@ export class BranchController {
     return this.service.listBranches(allowInactive);
   }
 
+  @SkipBranchCheck()
   @Get('my-branches')
   @ApiOperation({ summary: 'Get branches accessible to current user for navigation switching' })
   @ApiResponse({ status: 200, description: 'Accessible branches retrieved' })

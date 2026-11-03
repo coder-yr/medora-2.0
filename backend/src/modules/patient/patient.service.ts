@@ -3,9 +3,12 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import type { Patient } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientQueryDto } from './dto/patient-query.dto';
 import { PaginatedPatientsDto, PatientResponseDto } from './dto/patient-response.dto';
@@ -15,7 +18,10 @@ import { UpdatePatientDto } from './dto/update-patient.dto';
 export class PatientService {
   private readonly logger = new Logger(PatientService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   /**
    * Derives exact completed age in years from birthdate string.
@@ -93,24 +99,33 @@ export class PatientService {
   /**
    * List patients with single-box search and pagination directly from PostgreSQL.
    */
-  async findAll(query: PatientQueryDto): Promise<PaginatedPatientsDto> {
+  async findAll(query: PatientQueryDto, user?: AuthUser): Promise<PaginatedPatientsDto> {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 25));
     const skip = (page - 1) * limit;
     const term = (query.q || '').trim();
 
-    const whereClause = term
-      ? {
-          OR: [
-            { name: { contains: term, mode: 'insensitive' as const } },
-            { patientId: { contains: term, mode: 'insensitive' as const } },
-            { cnic: { contains: term, mode: 'insensitive' as const } },
-            { oldMrn: { contains: term, mode: 'insensitive' as const } },
-            { phone: { contains: term, mode: 'insensitive' as const } },
-            { email: { contains: term, mode: 'insensitive' as const } },
-          ],
-        }
-      : {};
+    let branchFilter: any = {};
+    if (query.branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+      branchFilter = { branchId: authorizedBranchId };
+    }
+
+    const whereClause: any = {
+      ...branchFilter,
+      ...(term
+        ? {
+            OR: [
+              { name: { contains: term, mode: 'insensitive' as const } },
+              { patientId: { contains: term, mode: 'insensitive' as const } },
+              { cnic: { contains: term, mode: 'insensitive' as const } },
+              { oldMrn: { contains: term, mode: 'insensitive' as const } },
+              { phone: { contains: term, mode: 'insensitive' as const } },
+              { email: { contains: term, mode: 'insensitive' as const } },
+            ],
+          }
+        : {}),
+    };
 
     const [items, total] = await Promise.all([
       this.prisma.patient.findMany({
@@ -164,9 +179,23 @@ export class PatientService {
   /**
    * Register a new patient with sequential ID and derived age in PostgreSQL.
    */
-  async create(dto: CreatePatientDto, howAdded = 'front desk'): Promise<PatientResponseDto> {
+  async create(
+    dto: CreatePatientDto,
+    howAdded = 'front desk',
+    user?: AuthUser,
+  ): Promise<PatientResponseDto> {
     if (!dto.name || dto.name.trim() === '') {
       throw new BadRequestException('Patient name is required');
+    }
+
+    let targetBranchId: bigint | null = null;
+    if (dto.branchId) {
+      targetBranchId =
+        user && this.branchAuth
+          ? await this.branchAuth.assertBranchAccess(user, dto.branchId)
+          : BigInt(dto.branchId);
+    } else if (user?.branchId) {
+      targetBranchId = BigInt(user.branchId);
     }
 
     const patientId = await this.nextPatientId();
@@ -198,7 +227,7 @@ export class PatientService {
         employeeNo: dto.employeeNo?.trim() || null,
         altPhone: dto.altPhone?.trim() || null,
         city: dto.city?.trim() || null,
-        branchId: dto.branchId ? BigInt(dto.branchId) : null,
+        branchId: targetBranchId,
         imageUrl: dto.photoData ? 'patients/webcam_capture.jpg' : null,
         addDate,
         registrationTime,
@@ -214,8 +243,19 @@ export class PatientService {
   /**
    * Update an existing patient record and recalculate age if birthdate changes.
    */
-  async update(idOrPatientId: string | number, dto: UpdatePatientDto): Promise<PatientResponseDto> {
+  async update(
+    idOrPatientId: string | number,
+    dto: UpdatePatientDto,
+    user?: AuthUser,
+  ): Promise<PatientResponseDto> {
     const existing = await this.findById(idOrPatientId);
+    if (user && this.branchAuth && existing.branchId) {
+      await this.branchAuth.assertResourceAccess(user, existing.branchId, 'patient');
+    }
+    if (dto.branchId && user && this.branchAuth) {
+      await this.branchAuth.assertBranchAccess(user, dto.branchId);
+    }
+
     const updateData: Record<string, unknown> = {};
 
     if (dto.name !== undefined) updateData.name = dto.name.trim();
@@ -260,8 +300,11 @@ export class PatientService {
   /**
    * Delete a patient record from PostgreSQL with active appointment constraint guard.
    */
-  async remove(idOrPatientId: string | number): Promise<{ message: string }> {
+  async remove(idOrPatientId: string | number, user?: AuthUser): Promise<{ message: string }> {
     const existing = await this.findById(idOrPatientId);
+    if (user && this.branchAuth && existing.branchId) {
+      await this.branchAuth.assertResourceAccess(user, existing.branchId, 'patient');
+    }
     const label = `${existing.patientId} ${existing.name}`;
 
     const appointments = await this.prisma.appointment.findFirst({

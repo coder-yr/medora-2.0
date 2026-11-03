@@ -6,23 +6,20 @@ import {
   HttpStatus,
   Post,
   Req,
-  UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { Request } from 'express';
-import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { Public } from '../../common/decorators/public.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { PermissionsGuard } from '../../common/guards/permissions.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
+import { SkipBranchCheck } from '../../common/decorators/skip-branch.decorator';
 import { AuthUser } from '../../common/types/auth-user.interface';
 import { AuthService } from './auth.service';
 import { AuthResponseDto, UserProfileDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
+import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
 
 @ApiTags('Authentication & Identity')
 @Controller('auth')
@@ -30,12 +27,12 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60000 } }) // Brute-force protection: 5 attempts per minute
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // Brute-force protection: 5 attempts per minute per IP
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Authenticate staff user and receive JWT access and refresh tokens' })
   @ApiResponse({ status: 200, type: AuthResponseDto, description: 'Login successful' })
-  @ApiResponse({ status: 401, description: 'Invalid email or password' })
+  @ApiResponse({ status: 401, description: 'Invalid email or password / Account locked' })
   @ApiResponse({ status: 429, description: 'Too many requests' })
   async login(
     @Body() loginDto: LoginDto,
@@ -71,6 +68,7 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
+  @SkipBranchCheck()
   @Get('me')
   @ApiOperation({ summary: 'Retrieve currently authenticated user profile and permissions' })
   @ApiResponse({ status: 200, type: UserProfileDto, description: 'Authenticated profile' })
@@ -87,31 +85,41 @@ export class AuthController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(PermissionsGuard)
-  @RequirePermissions(HospitalPermission.PATIENT_VIEW)
-  @Get('test-patient-view')
-  @ApiOperation({ summary: 'Test endpoint requiring patient_view permission' })
-  @ApiResponse({ status: 200, description: 'Permission granted' })
-  @ApiResponse({ status: 403, description: 'Forbidden: Insufficient permissions' })
-  testPatientPermission(@CurrentUser() user: AuthUser) {
-    return {
-      message: 'Access granted to patient view',
-      grantedTo: user.email,
-      role: user.group,
-    };
+  @SkipBranchCheck()
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change password for currently authenticated user' })
+  @ApiResponse({ status: 200, description: 'Password changed and active sessions invalidated' })
+  @ApiResponse({ status: 400, description: 'Invalid password format or matches current password' })
+  @ApiResponse({ status: 401, description: 'Current password incorrect' })
+  async changePassword(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.changePassword(user.id, dto);
   }
 
-  @ApiBearerAuth()
-  @UseGuards(RolesGuard)
-  @Roles('Admin')
-  @Get('test-admin-role')
-  @ApiOperation({ summary: 'Test endpoint requiring Admin role' })
-  @ApiResponse({ status: 200, description: 'Admin access verified' })
-  @ApiResponse({ status: 403, description: 'Forbidden: Requires Admin role' })
-  testAdminRole(@CurrentUser() user: AuthUser) {
-    return {
-      message: 'Admin access verified',
-      user: user.email,
-    };
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request password reset instructions (generic response to prevent enumeration)' })
+  @ApiResponse({ status: 200, description: 'Reset instructions dispatched if account exists' })
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
+    const res = await this.authService.forgotPassword(dto);
+    return { message: res.message };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset account password using single-use cryptographically secure token' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
+  async resetPassword(
+    @Body() dto: ResetPasswordDto,
+  ): Promise<{ message: string }> {
+    return this.authService.resetPassword(dto);
   }
 }

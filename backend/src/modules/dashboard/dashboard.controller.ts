@@ -67,7 +67,7 @@ export class DashboardController {
     @CurrentUser() user: AuthUser,
     @Query() filterDto: DashboardFilterDto,
   ) {
-    return this.service.getBranchComparison(filterDto);
+    return this.service.getBranchComparison(filterDto, user);
   }
 
   @Get('operational-alerts')
@@ -82,3 +82,4 @@ export class DashboardController {
     return this.service.getOperationalAlerts(userBranchId, isGlobalAdmin);
   }
 }
+

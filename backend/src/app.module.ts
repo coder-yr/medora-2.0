@@ -6,6 +6,7 @@ import configuration from './common/config/configuration';
 import { validateEnv } from './common/config/env.validation';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { BranchAccessGuard } from './common/guards/branch-access.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
@@ -75,6 +76,10 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: BranchAccessGuard,
     },
     {
       provide: APP_INTERCEPTOR,

@@ -119,3 +119,4 @@ export interface OperationalAlertsData {
   totalAlerts: number;
   checkedAt: string;
 }
+
