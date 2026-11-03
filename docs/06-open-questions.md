@@ -624,6 +624,25 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Strict recipient query isolation and PHI redaction in logs and provider payloads.
   - [ ] **Option B**: Shared multi-user notification tables without user-bound query filters.
 
+---
+
+## 26. Phase 23 Executive Dashboard & Operational Analytics Decisions
+
+### 71. Real-Time PostgreSQL Aggregations vs. Data Warehousing / BI Tools
+- **Evidence**: Legacy Laravel lacked real-time executive visibility and relied on slow client-side Blade iterations or raw SQL queries that risked database performance degradation.
+- **Resolution**: Implemented high-performance live server-side aggregations with indexed range boundaries and short-lived in-memory caching (30s TTL). Bounded custom date ranges to 366 days to protect database throughput. Avoided external BI or warehouse complexity in this phase.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: PostgreSQL live index-backed aggregations with short-lived memory TTL caching.
+  - [ ] **Option B**: Standalone external BI server / dedicated data lake.
+
+### 72. Role-Based Financial KPI Redaction
+- **Evidence**: Exposing revenue, cash collections, and accounts receivable to non-financial roles violates hospital confidentiality.
+- **Resolution**: Financial analytics are strictly gated on the backend by role/permission. If a Doctor, Nurse, or Receptionist requests the executive overview, the `financial` object is strictly returned as `null`. Frontend hides the financial cards automatically based on user permissions.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict backend redaction of financial metrics (`financial: null`) for unauthorized roles.
+  - [ ] **Option B**: Client-side CSS hiding while transmitting financial values in the JSON response.
+
+
 
 
 

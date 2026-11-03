@@ -236,6 +236,12 @@ export enum HospitalPermission {
   NOTIFICATION_TEMPLATE_MANAGE = 'notification_template_manage',
   NOTIFICATION_PROVIDER_MANAGE = 'notification_provider_manage',
   NOTIFICATION_QUEUE_MONITOR = 'notification_queue_monitor',
+
+  // Executive Dashboard & Operational Analytics (Phase 23)
+  DASHBOARD_VIEW = 'dashboard_view',
+  DASHBOARD_FINANCIAL_VIEW = 'dashboard_financial_view',
+  DASHBOARD_BRANCH_COMPARE = 'dashboard_branch_compare',
+  DASHBOARD_ALERTS_MANAGE = 'dashboard_alerts_manage',
 }
 
 /**
@@ -285,6 +291,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_VIEW,
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+    HospitalPermission.DASHBOARD_VIEW,
   ],
   Nurse: [
     HospitalPermission.PATIENT_VIEW,
@@ -358,6 +365,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_VIEW,
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+    HospitalPermission.DASHBOARD_VIEW,
   ],
   Accountant: [
     HospitalPermission.INVOICE_VIEW,
@@ -419,6 +427,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_VIEW,
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+    HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.DASHBOARD_FINANCIAL_VIEW,
   ],
   Pharmacist: [
     HospitalPermission.MEDICINE_VIEW,
@@ -440,6 +450,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_VIEW,
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+    HospitalPermission.DASHBOARD_VIEW,
   ],
   Laboratorist: [
     HospitalPermission.LAB_VIEW,
@@ -473,5 +484,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_VIEW,
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+    HospitalPermission.DASHBOARD_VIEW,
   ],
 };

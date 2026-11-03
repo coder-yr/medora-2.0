@@ -25,7 +25,8 @@ import { AccountingWorkspace } from './components/AccountingWorkspace';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
 import { NotificationCenter } from './features/notifications/NotificationCenter';
 import { NotificationAdminWorkspace } from './features/notifications/NotificationAdminWorkspace';
-import { Radio, BedDouble, DollarSign, Users, BookOpen, Building2, GitBranch, Bell } from 'lucide-react';
+import { DashboardWorkspace } from './features/dashboard/DashboardWorkspace';
+import { Radio, BedDouble, DollarSign, Users, BookOpen, Building2, GitBranch, Bell, LayoutDashboard } from 'lucide-react';
 
 interface MedicineItem {
   medicineId?: number | null;
@@ -63,7 +64,7 @@ const isDev = import.meta.env.DEV;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
 
 export function App() {
-  const [activeModule, setActiveModule] = useState<'notifications' | 'settings' | 'accounting' | 'staff' | 'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('settings');
+  const [activeModule, setActiveModule] = useState<'dashboard' | 'notifications' | 'settings' | 'accounting' | 'staff' | 'inpatient' | 'cashier' | 'radiology' | 'laboratory' | 'pharmacy' | 'medicines' | 'prescriptions'>('dashboard');
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchDrug, setSearchDrug] = useState('');
@@ -371,6 +372,13 @@ export function App() {
       {/* Module Switcher Navigation */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 20, overflowX: 'auto', paddingBottom: 4 }} className="no-print">
         <button
+          className={`btn ${activeModule === 'dashboard' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveModule('dashboard')}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
+        >
+          <LayoutDashboard size={18} /> Executive Dashboard
+        </button>
+        <button
           className={`btn ${activeModule === 'notifications' ? 'btn-primary' : 'btn-secondary'}`}
           onClick={() => setActiveModule('notifications')}
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', fontSize: 14 }}
@@ -470,6 +478,17 @@ export function App() {
           </div>
           <button onClick={() => setNotification(null)} style={{ color: 'inherit', fontWeight: 'bold' }}>×</button>
         </div>
+      )}
+
+      {/* Executive & Operational Dashboard Workspace */}
+      {activeModule === 'dashboard' && (
+        <DashboardWorkspace
+          token={token}
+          userRole={userRole}
+          activeBranchId={activeBranchId}
+          apiBaseUrl={API_BASE_URL}
+          onNavigateToModule={(mod) => setActiveModule(mod as any)}
+        />
       )}
 
       {/* Notifications & Outbox Workspace */}
