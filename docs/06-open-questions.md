@@ -699,12 +699,41 @@ The Phase 3 database discovery investigated the 104 SQLite tables, 924 columns, 
   - [x] **Option A (Adopted)**: Formal end-to-end integration test suite verifying the unbroken clinical and financial chain.
   - [ ] **Option B**: Rely solely on disparate module-level integration tests.
 
+---
 
+## 29. Remediation Stage 3 Complete Hospital Workflow Integration & System Validation Decisions
 
+### 80. Comprehensive 8-Workflow Multi-Department System Validation Suite
+- **Evidence**: Prior stages tested modules independently or tested isolated subsets (such as outpatient-only). A full hospital application requires verifying interconnected journeys across Outpatient, Pharmacy, Laboratory, Radiology, Inpatient, Cashier, General Accounting, and Administration.
+- **Resolution**: Implemented `backend/test/stage3-system-validation.e2e-spec.ts` encompassing 34 comprehensive tests covering Workflows A through H and 5 cross-cutting RBAC security checks. All tests run against PostgreSQL with zero mocked databases.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Comprehensive 8-workflow master validation suite covering all 18 hospital modules.
+  - [ ] **Option B**: Rely on disparate unit tests without cohesive multi-department workflow tests.
 
+### 81. Bed Sanitation Quarantine Invariant (`CLEANING` State)
+- **Evidence**: When patients transfer beds or are discharged, releasing a bed directly to `AVAILABLE` risks admitting a new patient before housekeeping decontaminates the bed.
+- **Resolution**: Bed transfers and patient discharges automatically transition the vacated bed to `CLEANING`. It cannot be assigned to another admission until housekeeping explicitly marks it `AVAILABLE`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Enforce mandatory `CLEANING` quarantine state on bed release and transfers.
+  - [ ] **Option B**: Return beds directly to `AVAILABLE`.
 
+### 82. Strict Double-Entry Ledger Immutability & Reversal Protocol
+- **Evidence**: Financial accounting integrity requires preventing silent tampering with posted journals while allowing legitimate ledger corrections.
+- **Resolution**: Attempting to delete a posted journal returns `403 Forbidden: Immutable Ledger Invariant`. Correcting an entry requires calling `POST /accounting/journals/:id/reverse`, which atomically creates a mirror reversal journal (`POSTED`) and updates the target journal to `REVERSED`.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict ledger immutability with signed reversal journals preserving audit history.
+  - [ ] **Option B**: Permit direct deletion or in-place modification of posted journals.
 
+### 83. Role-Based Segregation of Duties Across 10 Personas
+- **Evidence**: Clinical and financial safety requires that personas cannot perform operations reserved for other departments (e.g. Receptionist dispensing medication, Nurse posting accounting journals, Doctor signing cashier shifts).
+- **Resolution**: Enforced zero-trust RBAC at controller and guard levels, validated by automated negative tests confirming `403 Forbidden` for unauthorized roles and `401 Unauthorized` for unauthenticated requests.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: Strict granular permission checks per action with explicit 403 rejection.
+  - [ ] **Option B**: Permissive role sharing or coarse admin-only gates.
 
-
-
-
+### 84. Project Scope Boundary: System Validation vs Distributed Production Infrastructure
+- **Evidence**: Stage 3 instructions specify: *"This is a project-completion and system-validation phase. It is NOT a full production-readiness exercise. Do not implement Kubernetes, advanced disaster recovery, compliance certification or enterprise deployment infrastructure."*
+- **Resolution**: Maintained disciplined adherence to project boundaries by validating application and workflow integrity across the full stack while avoiding speculative cloud infrastructure.
+- **Decision Status**:
+  - [x] **Option A (Adopted)**: System validation and workflow integration on established Docker/PostgreSQL stack.
+  - [ ] **Option B**: Premature enterprise cloud or Kubernetes orchestration.

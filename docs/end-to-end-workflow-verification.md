@@ -82,8 +82,46 @@
 
 ---
 
-## 3. Frontend Build & Quality Metrics
+## 3. Stage 3 Master System Validation Suite (`backend/test/stage3-system-validation.e2e-spec.ts`)
 
-- **Vite Build (`npm run build` in `frontend`):** Clean compilation, 2054 modules transformed, 0 TypeScript errors.
-- **Linter (`npm run lint` in `frontend`):** 0 errors.
-- **Backend Regression Suite (`npm test` in `backend`):** 31 test suites passed, 329 tests passed, 0 failures.
+In Stage 3, the end-to-end verification was expanded to validate all 18 hospital modules across 8 comprehensive multi-department workflows and 5 cross-cutting RBAC security checks.
+
+### Workflow Execution Summary
+
+1. **Workflow A: Outpatient Visit Lifecycle (A1–A6)**:
+   - Central Registry patient enrollment, specialty doctor onboarding, free slot calculation, triage arrival check-in, clinical consultation encounter, prescription issuance, itemized invoice creation, and payment settlement.
+   - **Result:** **6 of 6 tests passed.**
+2. **Workflow B: Pharmacy Dispensing & Inventory Management (B1–B4)**:
+   - Supplier onboarding, medication catalog definition, GRN procurement with FEFO batch expiry dates, outpatient dispensation with batch stock reduction, and validation rejection of insufficient stock and expired batches.
+   - **Result:** **4 of 4 tests passed.**
+3. **Workflow C: Laboratory Diagnostics Lifecycle (C1–C4)**:
+   - Test catalogue definition with parameter reference ranges, physician CPOE requisition, phlebotomy collection, specimen rejection triage, accessioning, parameter result entry, supervisor verification, and pathologist approval.
+   - **Result:** **4 of 4 tests passed.**
+4. **Workflow D: Radiology & Diagnostic Imaging (D1–D3)**:
+   - Multi-modality imaging catalog setup, procedure requisition and collision-free room scheduling, scan acquisition, clinical impression entry, and two-stage authorization.
+   - **Result:** **3 of 3 tests passed.**
+5. **Workflow E: Inpatient Admission & Bed Management (E1–E4)**:
+   - Ward and bed configuration, admission with row-locked bed occupancy, bed transfer with automated transition of vacated bed to `CLEANING` quarantine, inpatient folio charge accrual, discharge, and folio settlement.
+   - **Result:** **4 of 4 tests passed.**
+6. **Workflow F: Cashier & Treasury Settlement (F1–F2)**:
+   - Shift opening with cash float, single active shift invariant enforcement (`409 Conflict`), cash collection, petty cash payout, denomination counting, shift close submission, and daybook query.
+   - **Result:** **2 of 2 tests passed.**
+7. **Workflow G: General Accounting & Balanced General Ledger (G1–G3)**:
+   - Chart of Accounts verification, balanced journal posting ($\sum \text{Debit} = \sum \text{Credit}$), rejection of unbalanced entries, deletion prevention on posted entries (`403 Forbidden`), signed mirror reversal entries, and financial statements (Trial Balance, P&L, Balance Sheet).
+   - **Result:** **3 of 3 tests passed.**
+8. **Workflow H: Hospital Administration & Multi-Branch Governance (H1–H3)**:
+   - Designation setup, sequential staff numbering (`EMP-YYYYMM-XXXX`) with advisory locks, multi-branch settings inheritance, transactional notification dispatch, and recipient isolation.
+   - **Result:** **3 of 3 tests passed.**
+9. **Role-Based Cross-Cutting Security (R1–R5)**:
+   - 403 Forbidden enforcement blocking unauthorized actions across Receptionist, Pharmacist, Nurse, and Doctor personas, and 401 Unauthorized rejection for unauthenticated requests.
+   - **Result:** **5 of 5 tests passed.**
+
+---
+
+## 4. Final Quality & Regression Metrics
+
+- **Stage 3 E2E Master Suite (`stage3-system-validation.e2e-spec.ts`):** 34 tests passed, 0 failed (100% pass rate).
+- **Backend Unit Test Suite (`npm test`):** 31 test suites passed, 329 tests passed, 0 failures.
+- **Frontend Linter (`oxlint`):** 0 errors.
+- **Frontend Production Build (`vite build`):** Clean build in 217ms, 2054 modules transformed, 0 errors.
+- **Backend Production Build (`nest build`):** Clean compilation, 0 TypeScript errors.
