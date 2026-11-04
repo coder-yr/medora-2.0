@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Mail, Eye, EyeOff, ShieldAlert, Stethoscope, CheckCircle2 } from 'lucide-react';
+import { Lock, Mail, Eye, EyeOff, ShieldAlert, Stethoscope, CheckCircle2, Shield, HeartPulse, Sparkles } from 'lucide-react';
 import type { AuthResponse } from '../../types/auth';
 
 interface LoginViewProps {
@@ -21,7 +21,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {
-      setError('Please enter your email and password.');
+      setError('Please enter your work email and password.');
       return;
     }
     setLoading(true);
@@ -46,7 +46,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
         setError(Array.isArray(msg) ? msg.join(', ') : msg);
       }
     } catch {
-      setError('Unable to connect to the hospital authentication server.');
+      setError('Unable to connect to the hospital authentication service.');
     } finally {
       setLoading(false);
     }
@@ -79,17 +79,45 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-      padding: 16
+      background: 'radial-gradient(ellipse at 15% 15%, #e0f2fe 0%, #f0fdf4 35%, #f8fafc 85%)',
+      padding: '24px 16px',
+      position: 'relative',
+      overflow: 'hidden'
     }}>
+      {/* Decorative Background Accents */}
       <div style={{
-        maxWidth: 440,
+        position: 'absolute',
+        top: -120,
+        right: -120,
+        width: 380,
+        height: 380,
+        borderRadius: '50%',
+        background: 'rgba(2, 132, 199, 0.08)',
+        filter: 'blur(50px)',
+        pointerEvents: 'none',
+      }} />
+      <div style={{
+        position: 'absolute',
+        bottom: -100,
+        left: -100,
+        width: 350,
+        height: 350,
+        borderRadius: '50%',
+        background: 'rgba(16, 185, 129, 0.08)',
+        filter: 'blur(50px)',
+        pointerEvents: 'none',
+      }} />
+
+      <div style={{
+        maxWidth: 460,
         width: '100%',
-        background: 'var(--bg-card, #ffffff)',
-        borderRadius: 16,
-        padding: 36,
-        boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)',
-        border: '1px solid var(--border-color, #e2e8f0)',
+        background: '#ffffff',
+        borderRadius: 20,
+        padding: '38px 36px',
+        boxShadow: '0 20px 40px -15px rgba(2, 132, 199, 0.08), 0 1px 3px 0 rgba(15, 23, 42, 0.06)',
+        border: '1px solid #e2e8f0',
+        position: 'relative',
+        zIndex: 1,
       }}>
         {/* Hospital Branding Header */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
@@ -97,22 +125,46 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 56,
-            height: 56,
-            borderRadius: 14,
-            background: '#0284c7',
-            color: '#fff',
+            width: 60,
+            height: 60,
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+            color: '#ffffff',
             marginBottom: 14,
-            boxShadow: '0 4px 12px rgba(2, 132, 199, 0.35)'
+            boxShadow: '0 8px 18px rgba(2, 132, 199, 0.3)',
           }}>
-            <Stethoscope size={30} />
+            <Stethoscope size={32} />
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, margin: '0 0 6px 0', letterSpacing: '-0.5px' }}>
-            Medora 2.0
-          </h1>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted, #64748b)' }}>
-            Hospital Information Management System
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
+            <h1 style={{ fontSize: 25, fontWeight: 800, margin: 0, color: '#0f172a', letterSpacing: '-0.02em' }}>
+              MEDORA 2.0
+            </h1>
+            <span style={{
+              background: '#e0f2fe',
+              color: '#0284c7',
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '2px 8px',
+              borderRadius: 6,
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase'
+            }}>
+              Enterprise
+            </span>
+          </div>
+          <p style={{ margin: 0, fontSize: 13, color: '#64748b' }}>
+            Hospital Clinical & Operational Management
           </p>
+
+          {/* Security & System Trust Badges */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 12, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, color: '#059669', background: '#ecfdf5', padding: '3px 8px', borderRadius: 9999, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Shield size={12} /> Zero-Trust RBAC
+            </span>
+            <span style={{ fontSize: 11, color: '#0284c7', background: '#f0f9ff', padding: '3px 8px', borderRadius: 9999, fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <HeartPulse size={12} /> Clinical Core
+            </span>
+          </div>
         </div>
 
         {/* Lockout or Error Alert */}
@@ -122,16 +174,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
             alignItems: 'flex-start',
             gap: 10,
             padding: '12px 14px',
-            borderRadius: 8,
+            borderRadius: 10,
             marginBottom: 20,
             background: isLocked ? '#fef2f2' : '#fff1f2',
             border: `1px solid ${isLocked ? '#f87171' : '#fecdd3'}`,
             color: '#991b1b',
             fontSize: 13,
+            lineHeight: 1.4,
           }}>
-            <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: 2 }} />
+            <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: 2, color: '#dc2626' }} />
             <div>
-              <div style={{ fontWeight: 600 }}>{isLocked ? 'Account Locked' : 'Authentication Error'}</div>
+              <div style={{ fontWeight: 700 }}>{isLocked ? 'Account Temporarily Locked' : 'Authentication Notice'}</div>
               <div>{error}</div>
             </div>
           </div>
@@ -139,29 +192,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
 
         <form onSubmit={handleSubmit}>
           <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="form-label" style={{ fontWeight: 600, fontSize: 13 }}>Work Email / Username</label>
+            <label className="form-label">Hospital Work Email</label>
             <div style={{ position: 'relative' }}>
               <input
-                type="text"
+                type="email"
                 className="form-input"
                 placeholder="doctor.test@medora.hospital"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 autoFocus
-                style={{ paddingLeft: 38 }}
+                style={{ paddingLeft: 40 }}
                 disabled={loading}
               />
-              <Mail size={16} style={{ position: 'absolute', left: 12, top: 11, color: '#94a3b8' }} />
+              <Mail size={17} style={{ position: 'absolute', left: 13, top: 11, color: '#94a3b8' }} />
             </div>
           </div>
 
-          <div className="form-group" style={{ marginBottom: 20 }}>
+          <div className="form-group" style={{ marginBottom: 22 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-              <label className="form-label" style={{ fontWeight: 600, fontSize: 13, margin: 0 }}>Password</label>
+              <label className="form-label" style={{ margin: 0 }}>Password</label>
               <button
                 type="button"
                 onClick={() => setForgotModal(true)}
-                style={{ fontSize: 12, color: '#0284c7', textDecoration: 'none', background: 'none' }}
+                style={{ fontSize: 12, fontWeight: 600, color: '#0284c7', textDecoration: 'none' }}
               >
                 Forgot?
               </button>
@@ -173,16 +226,17 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
                 placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                style={{ paddingLeft: 38, paddingRight: 38 }}
+                style={{ paddingLeft: 40, paddingRight: 40 }}
                 disabled={loading}
               />
-              <Lock size={16} style={{ position: 'absolute', left: 12, top: 11, color: '#94a3b8' }} />
+              <Lock size={17} style={{ position: 'absolute', left: 13, top: 11, color: '#94a3b8' }} />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                style={{ position: 'absolute', right: 12, top: 10, color: '#94a3b8', background: 'none' }}
+                style={{ position: 'absolute', right: 12, top: 10, color: '#94a3b8', padding: 2 }}
+                title={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </div>
           </div>
@@ -190,66 +244,84 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
           <button
             type="submit"
             className="btn btn-primary"
-            style={{ width: '100%', padding: '12px', fontSize: 15, fontWeight: 600 }}
+            style={{ width: '100%', padding: '12px', fontSize: 14.5, fontWeight: 700, borderRadius: 10 }}
             disabled={loading}
           >
-            {loading ? 'Verifying Identity...' : 'Sign In to Medora'}
+            {loading ? 'Verifying Credentials...' : 'Sign In to Clinical Portal'}
           </button>
         </form>
 
         {/* Development Persona Quick Links */}
-        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid var(--border-color, #e2e8f0)' }}>
-          <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 700, color: '#94a3b8', marginBottom: 8, textAlign: 'center' }}>
-            Quick Demo Sign-In
+        <div style={{ marginTop: 26, paddingTop: 20, borderTop: '1px solid #f1f5f9' }}>
+          <div style={{
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: '0.06em',
+            fontWeight: 700,
+            color: '#64748b',
+            marginBottom: 10,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6
+          }}>
+            <Sparkles size={12} style={{ color: '#0284c7' }} />
+            One-Click Demo Personas
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: 11, padding: '5px 4px' }}
+              style={{ fontSize: 12, padding: '7px 4px', background: '#f8fafc', borderColor: '#e2e8f0', color: '#1e293b' }}
               onClick={() => quickFill('admin.test@medora.hospital')}
+              title="Super Administrator"
             >
-              Admin
+              👑 Admin
             </button>
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: 11, padding: '5px 4px' }}
+              style={{ fontSize: 12, padding: '7px 4px', background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}
               onClick={() => quickFill('doctor.test@medora.hospital')}
+              title="Medical Consultant"
             >
-              Doctor
+              🩺 Doctor
             </button>
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: 11, padding: '5px 4px' }}
+              style={{ fontSize: 12, padding: '7px 4px', background: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}
               onClick={() => quickFill('accountant.test@medora.hospital')}
+              title="Chief Accountant"
             >
-              Accountant
+              📊 Accountant
             </button>
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: 11, padding: '5px 4px' }}
+              style={{ fontSize: 12, padding: '7px 4px', background: '#f0f9ff', borderColor: '#bae6fd', color: '#0369a1' }}
               onClick={() => quickFill('pharmacist.test@medora.hospital')}
+              title="Head Pharmacist"
             >
-              Pharmacist
+              💊 Pharmacist
             </button>
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: 11, padding: '5px 4px' }}
+              style={{ fontSize: 12, padding: '7px 4px', background: '#faf5ff', borderColor: '#e9d5ff', color: '#6b21a8' }}
               onClick={() => quickFill('laboratorist.test@medora.hospital')}
+              title="Chief Pathologist"
             >
-              Laboratorist
+              🔬 Laboratorist
             </button>
             <button
               type="button"
               className="btn btn-secondary"
-              style={{ fontSize: 11, padding: '5px 4px' }}
+              style={{ fontSize: 12, padding: '7px 4px', background: '#fff1f2', borderColor: '#fecdd3', color: '#9f1239' }}
               onClick={() => quickFill('receptionist.test@medora.hospital')}
+              title="OPD Receptionist"
             >
-              Receptionist
+              📋 Receptionist
             </button>
           </div>
         </div>
@@ -257,42 +329,33 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
 
       {/* Forgot Password Modal */}
       {forgotModal && (
-        <div style={{
-          position: 'fixed',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.65)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-          padding: 16
-        }}>
-          <div className="card" style={{ maxWidth: 400, width: '100%', padding: 24 }}>
-            <h3 style={{ margin: '0 0 10px 0', fontSize: 18, fontWeight: 700 }}>Reset Password</h3>
+        <div className="modal-backdrop">
+          <div className="card modal-dialog" style={{ maxWidth: 420, width: '100%', padding: 26 }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: 18, fontWeight: 700, color: '#0f172a' }}>Reset Account Password</h3>
             {forgotSent ? (
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#16a34a', marginBottom: 12 }}>
-                  <CheckCircle2 size={18} />
-                  <span>Password reset instructions sent.</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#059669', marginBottom: 12, fontWeight: 600 }}>
+                  <CheckCircle2 size={20} />
+                  <span>Password reset instructions dispatched.</span>
                 </div>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)' }}>
-                  If the account exists, you will receive an outbox recovery notice.
+                <p style={{ fontSize: 13, color: '#64748b', lineHeight: 1.5 }}>
+                  If your email is registered with Medora, an outbox recovery notice with verification credentials has been queued.
                 </p>
                 <button
                   className="btn btn-secondary"
-                  style={{ width: '100%', marginTop: 12 }}
+                  style={{ width: '100%', marginTop: 16 }}
                   onClick={() => { setForgotModal(false); setForgotSent(false); }}
                 >
-                  Close
+                  Return to Sign In
                 </button>
               </div>
             ) : (
               <form onSubmit={handleForgotPassword}>
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-                  Enter your hospital registered email to request a reset link.
+                <p style={{ fontSize: 13, color: '#64748b', marginBottom: 18, lineHeight: 1.5 }}>
+                  Enter your registered hospital work email address to receive password recovery instructions.
                 </p>
                 <div className="form-group">
-                  <label className="form-label">Email Address</label>
+                  <label className="form-label">Hospital Work Email</label>
                   <input
                     type="email"
                     required
@@ -302,12 +365,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
                     placeholder="user@medora.hospital"
                   />
                 </div>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 22 }}>
                   <button type="button" className="btn btn-secondary" onClick={() => setForgotModal(false)}>
                     Cancel
                   </button>
                   <button type="submit" className="btn btn-primary">
-                    Send Link
+                    Send Reset Link
                   </button>
                 </div>
               </form>

@@ -12,7 +12,6 @@ import {
   BedDouble,
   DollarSign,
   Building2,
-  GitBranch,
   Shield,
   Bell,
   Key,
@@ -237,13 +236,27 @@ export function App() {
       <aside className={`medora-sidebar ${sidebarOpen ? 'open' : 'closed'} no-print`}>
         {/* Sidebar Brand Header */}
         <div className="sidebar-header">
-          <div style={{ background: '#0284c7', color: '#fff', padding: 8, borderRadius: 8, display: 'flex' }}>
+          <div className="sidebar-brand-icon">
             <Stethoscope size={22} />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <h1 style={{ fontSize: 16, margin: 0, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.3px' }}>
-              MEDORA 2.0
-            </h1>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <h1 style={{ fontSize: 16, margin: 0, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
+                MEDORA 2.0
+              </h1>
+              <span style={{
+                background: 'var(--primary-light)',
+                color: 'var(--primary)',
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '1px 6px',
+                borderRadius: 4,
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em'
+              }}>
+                Pro
+              </span>
+            </div>
             <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               Hospital Clinical Core
             </p>
@@ -408,19 +421,48 @@ export function App() {
         </div>
 
         {/* Sidebar Footer User Info */}
-        <div style={{ padding: '14px 16px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-subtle)' }}>
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-              {currentUser?.name || 'Administrator'}
+        <div className="sidebar-footer">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+            <div style={{
+              width: 36,
+              height: 36,
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: 14,
+              flexShrink: 0,
+              boxShadow: '0 2px 5px rgba(2, 132, 199, 0.25)'
+            }}>
+              {(currentUser?.name || userRole || 'A').charAt(0).toUpperCase()}
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              {userRole}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                {currentUser?.name || 'Administrator'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--primary)',
+                  background: 'var(--primary-light)',
+                  padding: '1px 6px',
+                  borderRadius: 4
+                }}>
+                  {userRole}
+                </span>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} title="Online & Authorized" />
+              </div>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            title="Sign Out"
-            style={{ color: '#ef4444', padding: 6, borderRadius: 6, display: 'flex' }}
+            title="Sign Out from Medora"
+            className="btn btn-secondary"
+            style={{ color: '#dc2626', padding: '6px 8px', borderRadius: 6, borderColor: '#fecdd3', background: '#fff1f2' }}
           >
             <LogOut size={16} />
           </button>
@@ -434,24 +476,46 @@ export function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              style={{ color: 'var(--text-muted)', display: 'flex', alignItems: 'center', padding: 6, borderRadius: 6 }}
               className="btn btn-secondary"
+              style={{ padding: '7px 9px', borderRadius: 8, display: 'flex', alignItems: 'center', color: '#475569' }}
+              title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
             >
               <Menu size={18} />
             </button>
-            <div style={{ fontSize: 14, fontWeight: 700, textTransform: 'capitalize', color: 'var(--text-main)' }}>
-              {activeModule.replace('-', ' ')}
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '-0.01em' }}>
+                <span>{activeModule.replace('-', ' ').toUpperCase()}</span>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '2px 8px', borderRadius: 9999 }}>
+                  Workspace
+                </span>
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {/* Active Branch Switcher */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: 'var(--text-muted)' }}>
-              <GitBranch size={16} style={{ color: '#0284c7' }} />
-              <span style={{ fontWeight: 600 }}>Branch:</span>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              background: '#ffffff',
+              border: '1px solid #e2e8f0',
+              padding: '5px 12px',
+              borderRadius: 9999,
+              boxShadow: 'var(--shadow-xs)'
+            }}>
+              <Building2 size={15} style={{ color: 'var(--primary)' }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Branch:</span>
               <select
-                className="form-select"
-                style={{ width: 'auto', padding: '4px 8px', fontWeight: 600, fontSize: 12 }}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  fontWeight: 700,
+                  fontSize: 12.5,
+                  color: '#0f172a',
+                  outline: 'none',
+                  cursor: 'pointer'
+                }}
                 value={activeBranchId}
                 onChange={(e) => handleBranchSelect(e.target.value)}
               >
@@ -472,12 +536,28 @@ export function App() {
 
             {/* Dev Persona Switcher */}
             {isDev && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-muted)' }}>
-                <Shield size={14} />
-                <span>Persona:</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                padding: '5px 12px',
+                borderRadius: 9999,
+                boxShadow: 'var(--shadow-xs)'
+              }}>
+                <Shield size={14} style={{ color: '#059669' }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Role:</span>
                 <select
-                  className="form-select"
-                  style={{ width: 'auto', padding: '3px 6px', fontSize: 12 }}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    color: '#0f172a',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
                   value={userRole}
                   onChange={(e) => {
                     setUserRole(e.target.value);
@@ -497,11 +577,11 @@ export function App() {
             {/* Change Password Button */}
             <button
               className="btn btn-secondary"
-              style={{ padding: '6px 10px', fontSize: 12 }}
+              style={{ padding: '6px 12px', fontSize: 12.5, borderRadius: 8 }}
               onClick={() => setShowChangePassword(true)}
               title="Change Account Password"
             >
-              <Key size={14} /> Password
+              <Key size={14} style={{ color: '#0284c7' }} /> Password
             </button>
           </div>
         </header>
@@ -510,22 +590,29 @@ export function App() {
         {notification && (
           <div
             style={{
-              margin: '16px 24px 0 24px',
-              padding: '12px 16px',
-              borderRadius: 8,
-              background: notification.type === 'success' ? '#dcfce7' : '#fee2e2',
-              color: notification.type === 'success' ? '#166534' : '#b91c1c',
+              margin: '16px 28px 0 28px',
+              padding: '12px 18px',
+              borderRadius: 10,
+              background: notification.type === 'success' ? '#ecfdf5' : '#fef2f2',
+              color: notification.type === 'success' ? '#065f46' : '#991b1b',
+              border: `1px solid ${notification.type === 'success' ? '#a7f3d0' : '#fecdd3'}`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              fontSize: 13,
+              fontSize: 13.5,
+              fontWeight: 500,
+              boxShadow: 'var(--shadow-sm)'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              {notification.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              {notification.type === 'success' ? (
+                <CheckCircle size={18} style={{ color: '#059669' }} />
+              ) : (
+                <AlertCircle size={18} style={{ color: '#dc2626' }} />
+              )}
               <span>{notification.message}</span>
             </div>
-            <button onClick={() => setNotification(null)} style={{ color: 'inherit' }}>
+            <button onClick={() => setNotification(null)} style={{ color: 'inherit', padding: 2 }} title="Dismiss">
               <X size={16} />
             </button>
           </div>
