@@ -193,7 +193,7 @@ export class DoctorService {
       department: dto.department?.trim() || null,
       profile: dto.profile?.trim() || null,
       procedureId: dto.procedureId?.trim() || null,
-      branchId: dto.branchId ? BigInt(dto.branchId) : null,
+      branchId: dto.branchId && !isNaN(Number(dto.branchId)) ? BigInt(dto.branchId) : null,
       ionUserId,
       imageUrl: null,
       x: '',

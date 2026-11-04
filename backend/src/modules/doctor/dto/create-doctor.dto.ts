@@ -73,8 +73,7 @@ export class CreateDoctorDto {
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
-  @IsInt()
-  branchId?: number;
+  branchId?: any;
 
   @ApiPropertyOptional({
     example: 'sana.riaz',

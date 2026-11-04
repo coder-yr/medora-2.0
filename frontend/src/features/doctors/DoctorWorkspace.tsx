@@ -125,7 +125,6 @@ export const DoctorWorkspace: React.FC<DoctorWorkspaceProps> = ({
         payload.loginUsername = formData.loginUsername.trim();
         payload.loginPassword = formData.loginPassword || 'DoctorPass123!';
       }
-      if (activeBranchId) payload.branchId = Number(activeBranchId);
 
       const res = await fetch(`${apiBaseUrl}/api/v1/doctors`, {
         method: 'POST',
