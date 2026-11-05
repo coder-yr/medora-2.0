@@ -630,12 +630,12 @@ export const DoctorWorkspace: React.FC<DoctorWorkspaceProps> = ({
                 filteredDoctors.map((doc) => {
                   const initials = doc.name
                     ? doc.name
-                        .replace(/^Dr\.?\s+/i, '')
-                        .split(' ')
-                        .map((n) => n[0])
-                        .slice(0, 2)
-                        .join('')
-                        .toUpperCase()
+                      .replace(/^Dr\.?\s+/i, '')
+                      .split(' ')
+                      .map((n) => n[0])
+                      .slice(0, 2)
+                      .join('')
+                      .toUpperCase()
                     : 'DR';
 
                   return (
@@ -1151,12 +1151,12 @@ export const DoctorWorkspace: React.FC<DoctorWorkspaceProps> = ({
               >
                 {viewingDoctor.name
                   ? viewingDoctor.name
-                      .replace(/^Dr\.?\s+/i, '')
-                      .split(' ')
-                      .map((n) => n[0])
-                      .slice(0, 2)
-                      .join('')
-                      .toUpperCase()
+                    .replace(/^Dr\.?\s+/i, '')
+                    .split(' ')
+                    .map((n) => n[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase()
                   : 'DR'}
               </div>
               <div>
