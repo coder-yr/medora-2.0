@@ -17,6 +17,7 @@ interface PatientWorkspaceProps {
   activeBranchId?: string;
   onBookAppointment?: (patient: Patient) => void;
   onRaiseInvoice?: (patient: Patient) => void;
+  initialAction?: 'register' | null;
 }
 
 export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
@@ -25,6 +26,7 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
   activeBranchId,
   onBookAppointment,
   onRaiseInvoice,
+  initialAction,
 }) => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [total, setTotal] = useState(0);
@@ -57,6 +59,12 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
   });
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (initialAction === 'register') {
+      setShowRegisterModal(true);
+    }
+  }, [initialAction]);
 
   const fetchPatients = useCallback(async (q = searchQuery, p = page) => {
     if (!token) return;

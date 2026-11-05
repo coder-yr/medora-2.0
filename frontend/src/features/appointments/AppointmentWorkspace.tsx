@@ -21,6 +21,7 @@ interface AppointmentWorkspaceProps {
   initialPatient?: Patient | null;
   initialDoctor?: Doctor | null;
   onStartConsultation?: (appointment: Appointment) => void;
+  initialAction?: 'book' | null;
 }
 
 export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
@@ -30,6 +31,7 @@ export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
   initialPatient,
   initialDoctor,
   onStartConsultation,
+  initialAction,
 }) => {
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -66,7 +68,7 @@ export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
 
-  // Open book modal automatically if initial patient or doctor is provided
+  // Open book modal automatically if initial patient or doctor is provided or initialAction is 'book'
   useEffect(() => {
     if (initialPatient) {
       setSelectedPatient(initialPatient);
@@ -76,7 +78,10 @@ export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
       setSelectedDoctorId(initialDoctor.id);
       setShowBookModal(true);
     }
-  }, [initialPatient, initialDoctor]);
+    if (initialAction === 'book') {
+      setShowBookModal(true);
+    }
+  }, [initialPatient, initialDoctor, initialAction]);
 
   // Load doctors for dropdowns
   const fetchDoctors = useCallback(async () => {

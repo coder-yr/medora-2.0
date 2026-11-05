@@ -22,6 +22,7 @@ import {
   UserCheck,
   CheckCircle,
   AlertCircle,
+  Plus,
 } from 'lucide-react';
 
 // Feature Workspaces
@@ -105,6 +106,12 @@ export function App() {
 
   // Notifications
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Quick Action Menu State
+  const [quickActionMenuOpen, setQuickActionMenuOpen] = useState(false);
+  const [initialDoctorAction, setInitialDoctorAction] = useState<'add' | null>(null);
+  const [initialPatientAction, setInitialPatientAction] = useState<'register' | null>(null);
+  const [initialAppointmentAction, setInitialAppointmentAction] = useState<'book' | null>(null);
 
   // Cross-module state passing
   const [navState, setNavState] = useState<{
@@ -574,6 +581,201 @@ export function App() {
               </div>
             )}
 
+            {/* Quick Action "+ Add New" Dropdown */}
+            <div style={{ position: 'relative' }}>
+              <button
+                className="btn btn-primary"
+                style={{
+                  padding: '6px 14px',
+                  fontSize: 12.5,
+                  borderRadius: 9999,
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  boxShadow: 'var(--shadow-xs)',
+                }}
+                onClick={() => setQuickActionMenuOpen(!quickActionMenuOpen)}
+              >
+                <Plus size={15} /> Add New
+              </button>
+
+              {quickActionMenuOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '115%',
+                    right: 0,
+                    width: 220,
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: 12,
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                    padding: '6px 0',
+                    zIndex: 60,
+                  }}
+                  onMouseLeave={() => setQuickActionMenuOpen(false)}
+                >
+                  <div style={{ padding: '6px 14px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
+                    Quick Actions
+                  </div>
+
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => {
+                      setActiveModule('doctors');
+                      setInitialDoctorAction('add');
+                      setQuickActionMenuOpen(false);
+                    }}
+                  >
+                    <Stethoscope size={16} style={{ color: '#0284c7' }} />
+                    <span>Register Doctor</span>
+                  </button>
+
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => {
+                      setActiveModule('departments');
+                      setQuickActionMenuOpen(false);
+                    }}
+                  >
+                    <Building2 size={16} style={{ color: '#059669' }} />
+                    <span>New Department</span>
+                  </button>
+
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => {
+                      setActiveModule('patients');
+                      setInitialPatientAction('register');
+                      setQuickActionMenuOpen(false);
+                    }}
+                  >
+                    <Users size={16} style={{ color: '#d97706' }} />
+                    <span>Register Patient</span>
+                  </button>
+
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => {
+                      setActiveModule('appointments');
+                      setInitialAppointmentAction('book');
+                      setQuickActionMenuOpen(false);
+                    }}
+                  >
+                    <Calendar size={16} style={{ color: '#7c3aed' }} />
+                    <span>Book Appointment</span>
+                  </button>
+
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => {
+                      setActiveModule('staff');
+                      setQuickActionMenuOpen(false);
+                    }}
+                  >
+                    <UserCheck size={16} style={{ color: '#0284c7' }} />
+                    <span>Onboard Staff</span>
+                  </button>
+
+                  <button
+                    style={{
+                      width: '100%',
+                      padding: '8px 14px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'transparent',
+                      border: 'none',
+                      fontSize: 13,
+                      color: '#0f172a',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                    onClick={() => {
+                      setActiveModule('billing');
+                      setQuickActionMenuOpen(false);
+                    }}
+                  >
+                    <CreditCard size={16} style={{ color: '#dc2626' }} />
+                    <span>Raise Invoice</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Change Password Button */}
             <button
               className="btn btn-secondary"
@@ -639,6 +841,7 @@ export function App() {
               activeBranchId={activeBranchId}
               onBookAppointment={handleBookAppointment}
               onRaiseInvoice={handleRaiseInvoice}
+              initialAction={initialPatientAction}
             />
           )}
 
@@ -651,6 +854,7 @@ export function App() {
               initialPatient={navState.patient}
               initialDoctor={navState.doctor}
               onStartConsultation={handleStartConsultation}
+              initialAction={initialAppointmentAction}
             />
           )}
 
@@ -693,6 +897,8 @@ export function App() {
               apiBaseUrl={API_BASE_URL}
               activeBranchId={activeBranchId}
               onBookAppointmentWithDoctor={handleDoctorSchedule}
+              onNavigateToDepartments={() => setActiveModule('departments')}
+              initialAction={initialDoctorAction}
             />
           )}
 
@@ -701,6 +907,10 @@ export function App() {
             <DepartmentWorkspace
               token={token}
               apiBaseUrl={API_BASE_URL}
+              onViewDepartmentDoctors={() => {
+                setActiveModule('doctors');
+              }}
+              onNavigateToDoctors={() => setActiveModule('doctors')}
             />
           )}
 
