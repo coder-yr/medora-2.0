@@ -607,10 +607,10 @@ export function PharmacyWorkspace({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => setActiveTab('dispense')}
-              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white font-medium rounded-xl shadow-lg shadow-emerald-900/40 transition flex items-center gap-2 text-sm"
+              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-semibold rounded-xl shadow-lg shadow-emerald-950/30 transition flex items-center gap-2 text-sm border border-emerald-400/30 cursor-pointer"
             >
               <Receipt className="w-4 h-4" />
               Dispense Rx
@@ -618,7 +618,7 @@ export function PharmacyWorkspace({
             {canManage && (
               <button
                 onClick={() => setShowCreateGRNModal(true)}
-                className="px-4 py-2.5 bg-slate-800/80 hover:bg-slate-700 text-white font-medium rounded-xl border border-emerald-500/30 transition flex items-center gap-2 text-sm"
+                className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-700 text-white font-semibold rounded-xl border border-emerald-400/30 shadow-md transition flex items-center gap-2 text-sm cursor-pointer"
               >
                 <Plus className="w-4 h-4 text-emerald-400" />
                 Receive GRN
@@ -628,7 +628,7 @@ export function PharmacyWorkspace({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-emerald-600/30">
+        <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-emerald-700/40">
           {[
             { id: 'overview', label: 'Dashboard', icon: TrendingUp },
             { id: 'dispense', label: 'Dispense Workspace', icon: Receipt },
@@ -643,10 +643,10 @@ export function PharmacyWorkspace({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition ${
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition border cursor-pointer ${
                   isActive
-                    ? 'bg-white text-emerald-950 shadow-md font-semibold'
-                    : 'text-emerald-100/90 hover:bg-emerald-800/50'
+                    ? 'bg-white text-emerald-950 shadow-md border-white'
+                    : 'bg-emerald-950/40 text-emerald-100 hover:bg-emerald-800/50 border-emerald-600/30'
                 }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-700' : 'text-emerald-300'}`} />
@@ -725,7 +725,7 @@ export function PharmacyWorkspace({
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Recent Movements */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
                     <h3 className="font-bold text-slate-900 flex items-center gap-2">
                       <Sliders className="w-4 h-4 text-emerald-600" />
                       Recent Stock Movements
@@ -735,9 +735,9 @@ export function PharmacyWorkspace({
                         setActiveTab('reports');
                         setReportsSubTab('movements');
                       }}
-                      className="text-xs text-emerald-700 hover:underline font-medium"
+                      className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1 cursor-pointer"
                     >
-                      View complete ledger
+                      View complete ledger &rarr;
                     </button>
                   </div>
                   <div className="divide-y divide-slate-100">
@@ -747,30 +747,36 @@ export function PharmacyWorkspace({
                       </div>
                     ) : (
                       dashboard.recentMovements.map((m) => (
-                        <div key={m.id} className="py-3 flex items-center justify-between text-sm">
-                          <div>
-                            <div className="font-semibold text-slate-800">
+                        <div key={m.id} className="py-3 flex items-center justify-between gap-3 text-sm">
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-slate-900 truncate">
                               {m.medicine?.name || 'Medication'}
                             </div>
-                            <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                              <span>Lot: {m.batch?.batchNumber || 'N/A'}</span>
-                              <span>•</span>
-                              <span>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                              <span>•</span>
-                              <span className="italic">{m.reason || m.movementType}</span>
+                            <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
+                              <span className="font-mono text-[11px] font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
+                                Lot: {m.batch?.batchNumber || 'N/A'}
+                              </span>
+                              <span className="text-slate-300">•</span>
+                              <span className="whitespace-nowrap text-[11px] text-slate-500">
+                                {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <span className="text-slate-300">•</span>
+                              <span className="italic text-slate-600 truncate max-w-[220px]" title={m.reason || m.movementType}>
+                                {m.reason || m.movementType}
+                              </span>
                             </div>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right flex-shrink-0">
                             <span
-                              className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                              className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${
                                 m.quantity > 0
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-rose-50 text-rose-700'
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : 'bg-rose-100 text-rose-800 border border-rose-200'
                               }`}
                             >
                               {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
                             </span>
-                            <div className="text-xs text-slate-400 mt-0.5">
+                            <div className="text-xs text-slate-500 mt-1 font-medium whitespace-nowrap">
                               Bal: {m.balanceAfter}
                             </div>
                           </div>
@@ -782,16 +788,16 @@ export function PharmacyWorkspace({
 
                 {/* Pending Purchase Orders */}
                 <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
                     <h3 className="font-bold text-slate-900 flex items-center gap-2">
                       <ShoppingCart className="w-4 h-4 text-blue-600" />
                       Pending Purchase Orders
                     </h3>
                     <button
                       onClick={() => setActiveTab('purchases')}
-                      className="text-xs text-blue-700 hover:underline font-medium"
+                      className="text-xs text-blue-700 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
                     >
-                      Manage orders
+                      Manage orders &rarr;
                     </button>
                   </div>
                   <div className="divide-y divide-slate-100">

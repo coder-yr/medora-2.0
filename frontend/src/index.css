@@ -100,8 +100,6 @@ html, body {
 button {
   font-family: inherit;
   cursor: pointer;
-  border: none;
-  background: none;
   outline: none;
   user-select: none;
 }
