@@ -1,14 +1,3 @@
-import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
-import { ExpressAdapter } from '@nestjs/platform-express';
-import express from 'express';
-import type { Request, Response } from 'express';
-import helmet from 'helmet';
-import { AppModule } from '../src/app.module';
-import { createValidationPipe } from '../src/common/pipes/validation.pipe';
-import { ConfigService } from '@nestjs/config';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-
 // Safe environment variable fallbacks for Vercel serverless cold starts
 process.env.DATABASE_URL =
   process.env.DATABASE_URL ||
@@ -20,10 +9,21 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 process.env.PORT = process.env.PORT || '3000';
 process.env.API_PREFIX = process.env.API_PREFIX || 'api';
 process.env.API_VERSION = process.env.API_VERSION || 'v1';
+process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173,https://*.vercel.app';
+
+require('reflect-metadata');
+const { NestFactory } = require('@nestjs/core');
+const { ExpressAdapter } = require('@nestjs/platform-express');
+const express = require('express');
+const helmet = require('helmet');
+const { AppModule } = require('../dist/src/app.module');
+const { createValidationPipe } = require('../dist/src/common/pipes/validation.pipe');
+const { ConfigService } = require('@nestjs/config');
+const { DocumentBuilder, SwaggerModule } = require('@nestjs/swagger');
 
 const server = express();
 let isReady = false;
-let appPromise: Promise<any> | null = null;
+let appPromise = null;
 
 async function bootstrap() {
   const app = await NestFactory.create(
@@ -33,9 +33,9 @@ async function bootstrap() {
   );
 
   const configService = app.get(ConfigService);
-  const apiPrefix = configService.get<string>('api.prefix') || 'api';
-  const apiVersion = configService.get<string>('api.version') || 'v1';
-  const corsOrigin = configService.get<string>('api.corsOrigin') || 'http://localhost:5173';
+  const apiPrefix = configService.get('api.prefix') || 'api';
+  const apiVersion = configService.get('api.version') || 'v1';
+  const corsOrigin = configService.get('api.corsOrigin') || 'http://localhost:5173';
   const globalPrefix = `${apiPrefix}/${apiVersion}`;
 
   // Security headers
@@ -59,10 +59,7 @@ async function bootstrap() {
     : [corsOrigin.trim()];
 
   app.enableCors({
-    origin: (
-      origin: string | undefined,
-      callback: (err: Error | null, allow?: boolean) => void,
-    ) => {
+    origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       const isAllowed =
         allowedOriginsList.includes(origin) ||
@@ -109,7 +106,7 @@ async function bootstrap() {
   return server;
 }
 
-export default async function handler(req: Request, res: Response) {
+module.exports = async function handler(req, res) {
   try {
     if (!isReady) {
       if (!appPromise) {
@@ -118,7 +115,7 @@ export default async function handler(req: Request, res: Response) {
       await appPromise;
     }
     return server(req, res);
-  } catch (err: any) {
+  } catch (err) {
     appPromise = null; // Reset so next request can retry
     console.error('[Serverless Fatal Error]:', err);
     return res.status(500).json({
@@ -129,4 +126,4 @@ export default async function handler(req: Request, res: Response) {
         'Verify that DATABASE_URL, DIRECT_URL, and JWT_SECRET are configured in Vercel Project Settings -> Environment Variables.',
     });
   }
-}
+};
