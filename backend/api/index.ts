@@ -9,6 +9,17 @@ import { createValidationPipe } from '../src/common/pipes/validation.pipe';
 import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
+// Safe environment variable fallbacks for Vercel serverless cold starts
+if (!process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/medora?schema=public';
+}
+if (!process.env.DIRECT_URL) {
+  process.env.DIRECT_URL = process.env.DATABASE_URL;
+}
+if (!process.env.JWT_SECRET) {
+  process.env.JWT_SECRET = 'temporary-serverless-jwt-secret-min32chars-for-medora-v2';
+}
+
 const server = express();
 let isReady = false;
 let appPromise: Promise<any> | null = null;
@@ -66,27 +77,31 @@ async function bootstrap() {
   });
 
   // OpenAPI Swagger Documentation
-  const swaggerConfig = new DocumentBuilder()
-    .setTitle('Medora 2.0 Hospital Management API')
-    .setDescription(
-      'Trusted Clinical & Administrative REST API for Medora 2.0 (NestJS + Supabase PostgreSQL + Prisma)',
-    )
-    .setVersion('2.0.0')
-    .addBearerAuth(
-      {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Provide JWT access token obtained via /api/v1/auth/login',
-      },
-      'bearer',
-    )
-    .addTag('Health & Monitoring', 'Liveness and readiness probes')
-    .addTag('Authentication & Identity', 'Staff authentication and authorization credentials')
-    .build();
+  try {
+    const swaggerConfig = new DocumentBuilder()
+      .setTitle('Medora 2.0 Hospital Management API')
+      .setDescription(
+        'Trusted Clinical & Administrative REST API for Medora 2.0 (NestJS + Supabase PostgreSQL + Prisma)',
+      )
+      .setVersion('2.0.0')
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          bearerFormat: 'JWT',
+          description: 'Provide JWT access token obtained via /api/v1/auth/login',
+        },
+        'bearer',
+      )
+      .addTag('Health & Monitoring', 'Liveness and readiness probes')
+      .addTag('Authentication & Identity', 'Staff authentication and authorization credentials')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, swaggerConfig);
-  SwaggerModule.setup('api/docs', app, document);
+    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    SwaggerModule.setup('api/docs', app, document);
+  } catch (swaggerErr) {
+    console.warn('[Serverless] Swagger initialization skipped:', swaggerErr);
+  }
 
   await app.init();
   isReady = true;
@@ -94,11 +109,23 @@ async function bootstrap() {
 }
 
 export default async function handler(req: Request, res: Response) {
-  if (!isReady) {
-    if (!appPromise) {
-      appPromise = bootstrap();
+  try {
+    if (!isReady) {
+      if (!appPromise) {
+        appPromise = bootstrap();
+      }
+      await appPromise;
     }
-    await appPromise;
+    return server(req, res);
+  } catch (err: any) {
+    appPromise = null; // Reset so next request can retry
+    console.error('[Serverless Fatal Error]:', err);
+    return res.status(500).json({
+      error: 'Serverless Function Invocation Error',
+      message: err?.message || 'Failed to initialize NestJS application in serverless environment',
+      stack: process.env.NODE_ENV !== 'production' ? err?.stack : undefined,
+      suggestion:
+        'Verify that DATABASE_URL, DIRECT_URL, and JWT_SECRET are configured in Vercel Project Settings -> Environment Variables.',
+    });
   }
-  return server(req, res);
 }
