@@ -19,12 +19,18 @@ async function bootstrap() {
   const corsOrigin = configService.get<string>('api.corsOrigin') || 'http://localhost:5173';
   const isProd = configService.get<string>('environment') === 'production';
 
-  // Security Headers: Helmet
-  app.use(helmet());
+  // Security Headers: Helmet (Permit inline styling for Swagger docs and Status landing page)
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+    }),
+  );
 
-  // Global versioned route prefix: e.g. /api/v1
+  // Global versioned route prefix: e.g. /api/v1 (exclude root / and /status landing pages)
   const globalPrefix = `${apiPrefix}/${apiVersion}`;
-  app.setGlobalPrefix(globalPrefix);
+  app.setGlobalPrefix(globalPrefix, {
+    exclude: ['/', 'status'],
+  });
 
   // Global strict request validation
   app.useGlobalPipes(createValidationPipe());

@@ -31,6 +31,7 @@ import { HospitalSettingsModule } from './modules/hospital-settings/hospital-set
 import { NotificationModule } from './modules/notification/notification.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { PrismaModule } from './modules/prisma/prisma.module';
     NotificationModule,
     DashboardModule,
   ],
+  controllers: [AppController],
   providers: [
     {
       provide: APP_GUARD,

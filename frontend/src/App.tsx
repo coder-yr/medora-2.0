@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard,
   Users,
@@ -23,6 +23,8 @@ import {
   CheckCircle,
   AlertCircle,
   Plus,
+  Activity,
+  ExternalLink,
 } from 'lucide-react';
 
 // Feature Workspaces
@@ -112,6 +114,32 @@ export function App() {
   const [initialDoctorAction, setInitialDoctorAction] = useState<'add' | null>(null);
   const [initialPatientAction, setInitialPatientAction] = useState<'register' | null>(null);
   const [initialAppointmentAction, setInitialAppointmentAction] = useState<'book' | null>(null);
+
+  // Backend Health State
+  const [backendStatus, setBackendStatus] = useState<'online' | 'checking' | 'offline'>('checking');
+  const [backendLatency, setBackendLatency] = useState<number | null>(null);
+  const [showStatusModal, setShowStatusModal] = useState(false);
+
+  const checkBackendHealth = useCallback(async () => {
+    const start = performance.now();
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v1/health`);
+      if (res.ok) {
+        setBackendLatency(Math.round(performance.now() - start));
+        setBackendStatus('online');
+      } else {
+        setBackendStatus('offline');
+      }
+    } catch {
+      setBackendStatus('offline');
+    }
+  }, []);
+
+  useEffect(() => {
+    checkBackendHealth();
+    const interval = setInterval(checkBackendHealth, 30000);
+    return () => clearInterval(interval);
+  }, [checkBackendHealth]);
 
   // Cross-module state passing
   const [navState, setNavState] = useState<{
@@ -500,6 +528,48 @@ export function App() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Live Backend Connection Indicator */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 7,
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                padding: '5px 12px',
+                borderRadius: 9999,
+                boxShadow: 'var(--shadow-xs)',
+                cursor: 'pointer',
+              }}
+              onClick={() => setShowStatusModal(true)}
+              title="Click to view Backend Status & Diagnostics"
+            >
+              <div
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 9999,
+                  backgroundColor:
+                    backendStatus === 'online'
+                      ? '#22c55e'
+                      : backendStatus === 'checking'
+                        ? '#eab308'
+                        : '#ef4444',
+                  boxShadow:
+                    backendStatus === 'online'
+                      ? '0 0 0 2px rgba(34, 197, 94, 0.2)'
+                      : 'none',
+                }}
+              />
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#334155' }}>
+                {backendStatus === 'online'
+                  ? `API Live${backendLatency ? ` (${backendLatency}ms)` : ''}`
+                  : backendStatus === 'checking'
+                    ? 'Connecting...'
+                    : 'API Offline'}
+              </span>
+            </div>
+
             {/* Active Branch Switcher */}
             <div style={{
               display: 'flex',
@@ -1010,6 +1080,95 @@ export function App() {
           apiBaseUrl={API_BASE_URL}
           onClose={() => setShowChangePassword(false)}
         />
+      )}
+
+      {/* Backend Status Diagnostics Modal */}
+      {showStatusModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 110,
+            padding: 16,
+            backdropFilter: 'blur(2px)',
+          }}
+        >
+          <div className="card" style={{ maxWidth: 480, width: '100%', padding: 24, position: 'relative' }}>
+            <button
+              onClick={() => setShowStatusModal(false)}
+              style={{ position: 'absolute', right: 16, top: 16, color: '#94a3b8', background: 'transparent', border: 'none', cursor: 'pointer' }}
+            >
+              <X size={20} />
+            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  background: backendStatus === 'online' ? '#dcfce7' : '#fee2e2',
+                  color: backendStatus === 'online' ? '#16a34a' : '#dc2626',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Activity size={20} />
+              </div>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Medora Backend Service</h3>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Real-time Connection Diagnostics</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, background: 'var(--bg-subtle)', padding: 16, borderRadius: 8, marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+                <span style={{ fontWeight: 700, color: backendStatus === 'online' ? '#16a34a' : '#dc2626' }}>
+                  {backendStatus === 'online' ? '● Operational (200 OK)' : '○ Unreachable'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Endpoint:</span>
+                <code style={{ fontSize: 12 }}>{API_BASE_URL || window.location.origin}</code>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Latency (Ping):</span>
+                <span style={{ fontWeight: 600 }}>{backendLatency !== null ? `${backendLatency} ms` : '-'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: 'var(--text-muted)' }}>API Version:</span>
+                <span style={{ fontWeight: 600 }}>v2.0.0 (NestJS 11 + Prisma)</span>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <button
+                className="btn btn-secondary"
+                onClick={checkBackendHealth}
+                style={{ fontSize: 12.5 }}
+              >
+                Re-check
+              </button>
+
+              <a
+                href={`${API_BASE_URL}/status`}
+                target="_blank"
+                rel="noreferrer"
+                className="btn btn-primary"
+                style={{ fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+              >
+                <span>Open Backend Status Page</span>
+                <ExternalLink size={14} />
+              </a>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
