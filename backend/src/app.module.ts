@@ -1,6 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR, Reflector } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import configuration from './common/config/configuration';
 import { validateEnv } from './common/config/env.validation';
@@ -71,6 +71,7 @@ import { AppController } from './app.controller';
   ],
   controllers: [AppController],
   providers: [
+    Reflector,
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
