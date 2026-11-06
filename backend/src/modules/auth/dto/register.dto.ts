@@ -46,3 +46,4 @@ export class RegisterDto {
   @IsString()
   branchId?: string;
 }
+
