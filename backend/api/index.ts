@@ -3,7 +3,6 @@ import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
 import type { Request, Response } from 'express';
-import '../src/common/types/express';
 import helmet from 'helmet';
 import { AppModule } from '../src/app.module';
 import { createValidationPipe } from '../src/common/pipes/validation.pipe';
