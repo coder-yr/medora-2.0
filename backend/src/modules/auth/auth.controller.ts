@@ -17,6 +17,7 @@ import { AuthUser } from '../../common/types/auth-user.interface';
 import { AuthService } from './auth.service';
 import { AuthResponseDto, UserProfileDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
@@ -41,6 +42,23 @@ export class AuthController {
     const ip = req.ip || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'] as string | undefined;
     return this.authService.login(loginDto, ip, userAgent);
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Post('register')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Register a new clinical or administrative staff member' })
+  @ApiResponse({ status: 201, type: AuthResponseDto, description: 'Staff registration successful' })
+  @ApiResponse({ status: 409, description: 'Staff account already exists with this email' })
+  @ApiResponse({ status: 429, description: 'Too many requests' })
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Req() req: Request,
+  ): Promise<AuthResponseDto> {
+    const ip = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'] as string | undefined;
+    return this.authService.register(registerDto, ip, userAgent);
   }
 
   @Public()
@@ -79,6 +97,7 @@ export class AuthController {
       email: user.email,
       name: user.name,
       group: user.group,
+      role: user.group,
       permissions: user.permissions,
       branchId: user.branchId ? String(user.branchId) : null,
     };

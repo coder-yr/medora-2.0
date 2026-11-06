@@ -31,6 +31,21 @@ describe('AuthService (Security Remediation & Parity)', () => {
         }
         return null;
       }),
+      findUnique: jest.fn(async ({ where }: any) => {
+        if (where?.login) {
+          return usersStore.find((u) => u.login === where.login) || null;
+        }
+        if (where?.id) {
+          return usersStore.find((u) => u.id === where.id) || null;
+        }
+        return null;
+      }),
+      create: jest.fn(async ({ data }: any) => {
+        const id = BigInt(usersStore.length + 1);
+        const newUser = { id, uuid: crypto.randomUUID(), ...data };
+        usersStore.push(newUser);
+        return newUser;
+      }),
       update: jest.fn(async ({ where, data }: any) => {
         const idx = usersStore.findIndex((u) => u.id === where.id);
         if (idx !== -1) {
@@ -310,6 +325,47 @@ describe('AuthService (Security Remediation & Parity)', () => {
       await expect(
         service.refresh({ refreshToken: token }),
       ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('registers a new doctor with correct role, group, and permissions', async () => {
+      const res = await service.register({
+        name: 'Dr. Jane Smith',
+        email: 'jane.smith@medora.hospital',
+        password: 'SecurePassword123!',
+        role: 'Doctor',
+      });
+
+      expect(res.accessToken).toBeDefined();
+      expect(res.user.role).toBe('Doctor');
+      expect(res.user.group).toBe('Doctor');
+      expect(res.user.name).toBe('Dr. Jane Smith');
+      expect(res.user.permissions).toContain('prescription_add');
+    });
+
+    it('registers an accountant with correct role and accounting permissions', async () => {
+      const res = await service.register({
+        name: 'Bob Accountant',
+        email: 'bob.accountant@medora.hospital',
+        password: 'SecurePassword123!',
+        role: 'Accountant',
+      });
+
+      expect(res.accessToken).toBeDefined();
+      expect(res.user.role).toBe('Accountant');
+      expect(res.user.group).toBe('Accountant');
+      expect(res.user.name).toBe('Bob Accountant');
+      expect(res.user.permissions).toContain('invoice_view');
+    });
+
+    it('rejects duplicate registration with ConflictException', async () => {
+      await expect(
+        service.register({
+          name: 'Doctor Duplicate',
+          email: 'doctor.test@medora.hospital',
+          password: 'SecurePassword123!',
+          role: 'Doctor',
+        }),
+      ).rejects.toThrow('A staff account with this email address already exists.');
     });
   });
 });

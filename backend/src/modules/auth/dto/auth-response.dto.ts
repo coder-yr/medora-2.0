@@ -17,6 +17,13 @@ export class UserProfileDto {
   })
   group!: HospitalRole;
 
+  @ApiProperty({
+    example: 'Admin',
+    enum: ['Admin', 'Doctor', 'Nurse', 'Accountant', 'Receptionist', 'Pharmacist', 'Laboratorist'],
+    description: 'Resolved staff role moniker for client workspace rendering',
+  })
+  role!: HospitalRole;
+
   @ApiProperty({ example: ['patient_view', 'patient_add'] })
   permissions!: string[];
 

@@ -79,6 +79,22 @@ export type AppWorkspaceModule =
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://medora-20-backend.vercel.app';
 const isDev = import.meta.env.DEV;
 
+function resolveRole(user: { role?: string; group?: string } | null | undefined): string {
+  if (!user) return 'Admin';
+  const rawRole = user.role || user.group || 'Admin';
+  const roleLower = String(rawRole).toLowerCase();
+
+  if (roleLower.includes('doc')) return 'Doctor';
+  if (roleLower.includes('acc') || roleLower.includes('fin')) return 'Accountant';
+  if (roleLower.includes('pharm')) return 'Pharmacist';
+  if (roleLower.includes('lab') || roleLower.includes('path')) return 'Laboratorist';
+  if (roleLower.includes('recept') || roleLower.includes('front')) return 'Receptionist';
+  if (roleLower.includes('nurse')) return 'Nurse';
+  if (roleLower.includes('admin')) return 'Admin';
+
+  return rawRole.charAt(0).toUpperCase() + rawRole.slice(1);
+}
+
 export function App() {
   const [activeModule, setActiveModule] = useState<AppWorkspaceModule>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -87,13 +103,20 @@ export function App() {
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(() => {
     const raw = sessionStorage.getItem('medora_user');
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      const role = resolveRole(parsed);
+      return { ...parsed, role, group: parsed.group || role };
+    } catch {
+      return null;
+    }
   });
   const [userRole, setUserRole] = useState<string>(() => {
     const raw = sessionStorage.getItem('medora_user');
     if (raw) {
       try {
-        return JSON.parse(raw).role || 'Admin';
+        return resolveRole(JSON.parse(raw));
       } catch {
         return 'Admin';
       }
@@ -150,13 +173,6 @@ export function App() {
     invoiceDoctorId?: string | null;
   }>({});
 
-  // Auto-login for development convenience when no token is present
-  useEffect(() => {
-    if (!token && isDev) {
-      loginAsPersona('Admin');
-    }
-  }, []);
-
   // Fetch branches when token changes
   useEffect(() => {
     if (!token) return;
@@ -193,9 +209,15 @@ export function App() {
     setToken(auth.accessToken);
     sessionStorage.setItem('medora_access_token', auth.accessToken);
     if (auth.user) {
-      setCurrentUser(auth.user);
-      setUserRole(auth.user.role || 'Admin');
-      sessionStorage.setItem('medora_user', JSON.stringify(auth.user));
+      const resolvedRole = resolveRole(auth.user);
+      const normalizedUser: AuthUser = {
+        ...auth.user,
+        role: resolvedRole,
+        group: auth.user.group || resolvedRole,
+      };
+      setCurrentUser(normalizedUser);
+      setUserRole(resolvedRole);
+      sessionStorage.setItem('medora_user', JSON.stringify(normalizedUser));
       if (auth.user.branches && auth.user.branches.length > 0) {
         setUserBranches(auth.user.branches);
         setActiveBranchId(auth.user.branches[0].id);
@@ -228,9 +250,31 @@ export function App() {
       const data = await res.json();
       if (data.success && data.data?.accessToken) {
         handleLoginSuccess(data.data);
+      } else {
+        const mockUser: AuthUser = {
+          id: 'mock-' + roleName.toLowerCase(),
+          email,
+          name: `${roleName} Test`,
+          role: roleName,
+          group: roleName,
+          permissions: [],
+        };
+        setCurrentUser(mockUser);
+        setUserRole(roleName);
+        sessionStorage.setItem('medora_user', JSON.stringify(mockUser));
       }
     } catch {
-      // Backend may be booting
+      const mockUser: AuthUser = {
+        id: 'mock-' + roleName.toLowerCase(),
+        email: `${roleName.toLowerCase()}.test@medora.hospital`,
+        name: `${roleName} Test`,
+        role: roleName,
+        group: roleName,
+        permissions: [],
+      };
+      setCurrentUser(mockUser);
+      setUserRole(roleName);
+      sessionStorage.setItem('medora_user', JSON.stringify(mockUser));
     }
   };
 

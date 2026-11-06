@@ -3,6 +3,7 @@ import {
   Logger,
   UnauthorizedException,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Optional,
 } from '@nestjs/common';
@@ -16,6 +17,7 @@ import { AuthUser, HospitalRole, JwtPayload } from '../../common/types/auth-user
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto, ResetPasswordDto } from './dto/password-reset.dto';
@@ -169,6 +171,96 @@ export class AuthService {
     await this.prisma.userSession.create({
       data: {
         userId: dbUser.id,
+        refreshTokenHash,
+        familyId,
+        expiresAt,
+        userAgent: userAgent || null,
+        ipAddress: ipAddress || null,
+      },
+    });
+
+    return this.generateAuthResponse(authUser, rawRefreshToken);
+  }
+
+  /**
+   * Registers a new clinical or administrative staff member, securely hashes their password,
+   * assigns proper role-based permissions, and issues an authenticated session.
+   */
+  async register(
+    registerDto: RegisterDto,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
+    const { email, password, name, role, branchId } = registerDto;
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // 1. Conflict check: prevent duplicate accounts by email or login
+    const existing = await this.prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: { equals: normalizedEmail, mode: 'insensitive' } },
+          { login: { equals: normalizedEmail, mode: 'insensitive' } },
+        ],
+      },
+    });
+
+    if (existing) {
+      throw new ConflictException('A staff account with this email address already exists.');
+    }
+
+    // 2. Hash password using Argon2id
+    const hashedPassword = await argon2.hash(password, { type: argon2.argon2id });
+
+    // 3. Parse first and last name
+    const nameParts = (name || '').trim().split(' ');
+    const firstName = nameParts[0] || 'Staff';
+    const lastName = nameParts.slice(1).join(' ') || (role || 'Member');
+
+    // 4. Determine role & permissions
+    const assignedRole = (role || 'Doctor') as HospitalRole;
+    const permissions = DEFAULT_ROLE_PERMISSIONS[assignedRole] || [];
+
+    // 5. Derive unique login handle
+    const rawLogin = normalizedEmail.split('@')[0].replace(/[^a-z0-9._-]/g, '') || 'staff';
+    let finalLogin = rawLogin;
+    const clash = await this.prisma.user.findUnique({ where: { login: finalLogin } });
+    if (clash) {
+      finalLogin = `${rawLogin}_${Date.now().toString().slice(-4)}`;
+    }
+
+    // 6. Persist user in database
+    const createdUser = await this.prisma.user.create({
+      data: {
+        login: finalLogin,
+        email: normalizedEmail,
+        password: hashedPassword,
+        firstName: firstName.slice(0, 50),
+        lastName: lastName.slice(0, 50),
+        group: assignedRole,
+        description: `${assignedRole} staff registration for ${name}`,
+        branchId: branchId ? BigInt(branchId) : 1n,
+      },
+    });
+
+    const fullName = `${createdUser.firstName} ${createdUser.lastName}`.trim() || createdUser.email;
+    const authUser: AuthUser = {
+      id: String(createdUser.id),
+      email: createdUser.email,
+      name: fullName,
+      group: assignedRole,
+      permissions,
+      branchId: createdUser.branchId ? BigInt(createdUser.branchId) : null,
+    };
+
+    // 7. Generate refresh token & session record
+    const rawRefreshToken = crypto.randomBytes(32).toString('hex');
+    const refreshTokenHash = this.hashRefreshToken(rawRefreshToken);
+    const familyId = crypto.randomUUID();
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    await this.prisma.userSession.create({
+      data: {
+        userId: createdUser.id,
         refreshTokenHash,
         familyId,
         expiresAt,
@@ -367,6 +459,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         group: user.group,
+        role: user.group,
         permissions: user.permissions,
         branchId: user.branchId ? String(user.branchId) : null,
       },

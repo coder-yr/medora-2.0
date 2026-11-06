@@ -10,6 +10,7 @@ export interface AuthUser {
   email: string;
   name: string;
   role: string;
+  group?: string;
   permissions?: string[];
   branches?: UserBranch[];
   branchId?: string;
