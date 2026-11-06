@@ -80,38 +80,40 @@
 /* ==============================================================================
    Base Resets & Typography
    ============================================================================== */
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
 
-html, body {
-  font-family: var(--font-sans);
-  background-color: var(--bg-main);
-  color: var(--text-main);
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color-scheme: light !important;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-}
+  html, body {
+    font-family: var(--font-sans);
+    background-color: var(--bg-main);
+    color: var(--text-main);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color-scheme: light !important;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
 
-button {
-  font-family: inherit;
-  cursor: pointer;
-  outline: none;
-  user-select: none;
-}
+  button {
+    font-family: inherit;
+    cursor: pointer;
+    outline: none;
+    user-select: none;
+  }
 
-input, textarea, select {
-  font-family: inherit;
-  font-size: 14px;
-}
+  input, textarea, select {
+    font-family: inherit;
+    font-size: 14px;
+  }
 
-a {
-  color: var(--primary);
-  text-decoration: none;
+  a {
+    color: var(--primary);
+    text-decoration: none;
+  }
 }
 
 /* Custom Light Scrollbar */

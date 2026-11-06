@@ -587,30 +587,31 @@ export function PharmacyWorkspace({
 
   return (
     <div className="space-y-6">
-      {/* Workspace Header */}
-      <div className="bg-gradient-to-r from-emerald-800 via-teal-900 to-slate-900 text-white rounded-2xl p-6 shadow-xl border border-emerald-700/40 relative overflow-hidden">
-        <div className="absolute right-0 top-0 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 relative z-10">
+      {/* Workspace Header - Modern Clinical Light Aesthetic */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 relative overflow-hidden">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <span className="px-2.5 py-1 text-xs font-semibold uppercase tracking-wider bg-emerald-500/30 text-emerald-300 rounded-full border border-emerald-400/30">
-                Phase 13 • Inventory & Dispensing
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold uppercase tracking-wider bg-emerald-50 text-emerald-700 rounded-full border border-emerald-200/80">
+                <Boxes className="w-3.5 h-3.5 text-emerald-600" />
+                Inventory & Dispensary
               </span>
-              <span className="text-xs text-emerald-200/70">
+              <span className="text-xs text-slate-500 font-medium">
                 Authoritative Batch Ledger & FEFO Engine
               </span>
             </div>
-            <h1 className="text-3xl font-extrabold tracking-tight">Pharmacy Operations</h1>
-            <p className="text-emerald-100/80 text-sm mt-1 max-w-2xl">
-              Transactional batch-level inventory tracking, FEFO prescription dispensing, Goods
-              Receipts (GRN), multi-batch physical counts, returns reconciliation, and live valuation.
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+              Pharmacy Operations
+            </h1>
+            <p className="text-slate-500 text-sm mt-1 max-w-2xl leading-relaxed">
+              Batch-level inventory tracking, FEFO prescription dispensing, Goods Receipts (GRN), multi-batch counts, and real-time ledger valuation.
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 shrink-0">
             <button
               onClick={() => setActiveTab('dispense')}
-              className="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white font-semibold rounded-xl shadow-lg shadow-emerald-950/30 transition flex items-center gap-2 text-sm border border-emerald-400/30 cursor-pointer"
+              className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-semibold rounded-xl shadow-sm transition flex items-center gap-2 text-sm cursor-pointer"
             >
               <Receipt className="w-4 h-4" />
               Dispense Rx
@@ -618,43 +619,43 @@ export function PharmacyWorkspace({
             {canManage && (
               <button
                 onClick={() => setShowCreateGRNModal(true)}
-                className="px-4 py-2.5 bg-slate-800/90 hover:bg-slate-700 text-white font-semibold rounded-xl border border-emerald-400/30 shadow-md transition flex items-center gap-2 text-sm cursor-pointer"
+                className="px-4 py-2.5 bg-slate-50 hover:bg-slate-100 active:scale-95 text-slate-700 font-semibold rounded-xl border border-slate-300 transition flex items-center gap-2 text-sm cursor-pointer"
               >
-                <Plus className="w-4 h-4 text-emerald-400" />
+                <Plus className="w-4 h-4 text-emerald-600" />
                 Receive GRN
               </button>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mt-6 pt-4 border-t border-emerald-700/40">
-          {[
-            { id: 'overview', label: 'Dashboard', icon: TrendingUp },
-            { id: 'dispense', label: 'Dispense Workspace', icon: Receipt },
-            { id: 'inventory', label: 'Batch Inventory', icon: Boxes },
-            { id: 'purchases', label: 'Purchases & GRN', icon: ShoppingCart },
-            { id: 'adjustments', label: 'Returns & Adjustments', icon: RotateCcw },
-            { id: 'reports', label: 'Valuation & Ledger', icon: FileSpreadsheet },
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition border cursor-pointer ${
-                  isActive
-                    ? 'bg-white text-emerald-950 shadow-md border-white'
-                    : 'bg-emerald-950/40 text-emerald-100 hover:bg-emerald-800/50 border-emerald-600/30'
-                }`}
-              >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-700' : 'text-emerald-300'}`} />
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* Navigation Tabs - Modern Segmented Pill Bar */}
+      <div className="bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/80 flex flex-wrap gap-1.5">
+        {[
+          { id: 'overview', label: 'Dashboard', icon: TrendingUp },
+          { id: 'dispense', label: 'Dispense Workspace', icon: Receipt },
+          { id: 'inventory', label: 'Batch Inventory', icon: Boxes },
+          { id: 'purchases', label: 'Purchases & GRN', icon: ShoppingCart },
+          { id: 'adjustments', label: 'Returns & Adjustments', icon: RotateCcw },
+          { id: 'reports', label: 'Valuation & Ledger', icon: FileSpreadsheet },
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer ${
+                isActive
+                  ? 'bg-white text-emerald-800 shadow-sm border border-slate-200/60'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+              }`}
+            >
+              <Icon className={`w-4 h-4 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* ========================================================================= */}
@@ -666,56 +667,71 @@ export function PharmacyWorkspace({
             <>
               {/* Metric KPI Cards */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition">
-                  <div className="flex items-center justify-between text-slate-500 text-sm">
-                    <span>Retail Valuation</span>
-                    <DollarSign className="w-4 h-4 text-emerald-600" />
+                {/* Card 1: Retail Valuation */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Retail Valuation</span>
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                      <DollarSign className="w-5 h-5" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 mt-2">
+                  <div className="text-2xl font-black text-slate-900 mt-2">
                     ${dashboard.totalRetailValuation.toLocaleString()}
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">
-                    Cost: ${dashboard.totalCostValuation.toLocaleString()} (Margin: $
-                    {(dashboard.totalRetailValuation - dashboard.totalCostValuation).toLocaleString()})
+                  <div className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5 flex-wrap">
+                    <span>Cost: ${dashboard.totalCostValuation.toLocaleString()}</span>
+                    <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px]">
+                      +${(dashboard.totalRetailValuation - dashboard.totalCostValuation).toLocaleString()} Margin
+                    </span>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition">
-                  <div className="flex items-center justify-between text-slate-500 text-sm">
-                    <span>Active Formulary</span>
-                    <Package className="w-4 h-4 text-blue-600" />
+                {/* Card 2: Active Formulary */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Active Formulary</span>
+                    <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100">
+                      <Package className="w-5 h-5" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 mt-2">
-                    {dashboard.totalMedicines} Medicines
+                  <div className="text-2xl font-black text-slate-900 mt-2">
+                    {dashboard.totalMedicines} <span className="text-base font-semibold text-slate-500">Medicines</span>
                   </div>
-                  <div className="text-xs text-amber-600 font-medium mt-1 flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" />
-                    {dashboard.lowStockCount} below stock threshold
-                  </div>
-                </div>
-
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition">
-                  <div className="flex items-center justify-between text-slate-500 text-sm">
-                    <span>Expiring (30 Days)</span>
-                    <Clock className="w-4 h-4 text-amber-600" />
-                  </div>
-                  <div className="text-2xl font-bold text-amber-700 mt-2">
-                    {dashboard.expiringWithin30Days} Batches
-                  </div>
-                  <div className="text-xs text-rose-600 mt-1">
-                    {dashboard.expiredBatchesCount} expired (dispense locked)
+                  <div className="text-xs text-amber-700 font-medium mt-1.5 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>{dashboard.lowStockCount} below minimum stock threshold</span>
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm hover:shadow transition">
-                  <div className="flex items-center justify-between text-slate-500 text-sm">
-                    <span>Today's Takings</span>
-                    <Receipt className="w-4 h-4 text-emerald-600" />
+                {/* Card 3: Expiring Batches */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Expiring (30 Days)</span>
+                    <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100">
+                      <Clock className="w-5 h-5" />
+                    </div>
                   </div>
-                  <div className="text-2xl font-bold text-slate-900 mt-2">
+                  <div className="text-2xl font-black text-amber-700 mt-2">
+                    {dashboard.expiringWithin30Days} <span className="text-base font-semibold text-slate-500">Batches</span>
+                  </div>
+                  <div className="text-xs text-rose-600 font-medium mt-1.5 flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
+                    <span>{dashboard.expiredBatchesCount} expired (dispense locked)</span>
+                  </div>
+                </div>
+
+                {/* Card 4: Today's Takings */}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition">
+                  <div className="flex items-center justify-between text-slate-500">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Today's Takings</span>
+                    <div className="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100">
+                      <Receipt className="w-5 h-5" />
+                    </div>
+                  </div>
+                  <div className="text-2xl font-black text-slate-900 mt-2">
                     ${dashboard.todayTakings.toLocaleString()}
                   </div>
-                  <div className="text-xs text-slate-500 mt-1">
+                  <div className="text-xs text-slate-500 mt-1.5">
                     {dashboard.todayDispensationsCount} prescriptions dispensed today
                   </div>
                 </div>
@@ -724,9 +740,9 @@ export function PharmacyWorkspace({
               {/* Recent Movements & Pending Orders */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Recent Movements */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                       <Sliders className="w-4 h-4 text-emerald-600" />
                       Recent Stock Movements
                     </h3>
@@ -735,92 +751,109 @@ export function PharmacyWorkspace({
                         setActiveTab('reports');
                         setReportsSubTab('movements');
                       }}
-                      className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       View complete ledger &rarr;
                     </button>
                   </div>
-                  <div className="divide-y divide-slate-100">
+                  <div className="space-y-2.5">
                     {dashboard.recentMovements.length === 0 ? (
-                      <div className="py-8 text-center text-slate-400 text-sm">
+                      <div className="py-12 text-center text-slate-400 text-sm">
                         No recent stock movements recorded.
                       </div>
                     ) : (
-                      dashboard.recentMovements.map((m) => (
-                        <div key={m.id} className="py-3 flex items-center justify-between gap-3 text-sm">
-                          <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-slate-900 truncate">
-                              {m.medicine?.name || 'Medication'}
+                      dashboard.recentMovements.map((m) => {
+                        const isInbound = m.quantity > 0;
+                        return (
+                          <div
+                            key={m.id}
+                            className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition flex items-center justify-between gap-4"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-sm font-black ${
+                                  isInbound ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'
+                                }`}
+                              >
+                                {isInbound ? '↓' : '↑'}
+                              </div>
+                              <div className="min-w-0">
+                                <div className="font-bold text-slate-900 text-sm truncate">
+                                  {m.medicine?.name || 'Medication'}
+                                </div>
+                                <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5 flex-wrap">
+                                  <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200 text-slate-600">
+                                    Lot: {m.batch?.batchNumber || 'N/A'}
+                                  </span>
+                                  <span>•</span>
+                                  <span>{new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                  <span>•</span>
+                                  <span className="text-slate-400 truncate max-w-[200px]" title={m.reason || m.movementType}>
+                                    {m.reason || m.movementType}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                            <div className="text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
-                              <span className="font-mono text-[11px] font-medium text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 whitespace-nowrap">
-                                Lot: {m.batch?.batchNumber || 'N/A'}
+                            <div className="text-right shrink-0">
+                              <span
+                                className={`inline-block px-2.5 py-1 rounded-full text-xs font-black ${
+                                  isInbound
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                    : 'bg-rose-100 text-rose-800 border border-rose-200'
+                                }`}
+                              >
+                                {isInbound ? `+${m.quantity}` : m.quantity}
                               </span>
-                              <span className="text-slate-300">•</span>
-                              <span className="whitespace-nowrap text-[11px] text-slate-500">
-                                {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                              <span className="text-slate-300">•</span>
-                              <span className="italic text-slate-600 truncate max-w-[220px]" title={m.reason || m.movementType}>
-                                {m.reason || m.movementType}
-                              </span>
+                              <div className="text-xs text-slate-500 font-medium mt-1">
+                                Bal: <strong className="text-slate-800">{m.balanceAfter}</strong>
+                              </div>
                             </div>
                           </div>
-                          <div className="text-right flex-shrink-0">
-                            <span
-                              className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                                m.quantity > 0
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-rose-100 text-rose-800 border border-rose-200'
-                              }`}
-                            >
-                              {m.quantity > 0 ? `+${m.quantity}` : m.quantity}
-                            </span>
-                            <div className="text-xs text-slate-500 mt-1 font-medium whitespace-nowrap">
-                              Bal: {m.balanceAfter}
-                            </div>
-                          </div>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
 
                 {/* Pending Purchase Orders */}
-                <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+                <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
                   <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
-                    <h3 className="font-bold text-slate-900 flex items-center gap-2">
+                    <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                       <ShoppingCart className="w-4 h-4 text-blue-600" />
                       Pending Purchase Orders
                     </h3>
                     <button
                       onClick={() => setActiveTab('purchases')}
-                      className="text-xs text-blue-700 hover:text-blue-800 font-semibold flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-bold text-blue-700 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
                     >
                       Manage orders &rarr;
                     </button>
                   </div>
-                  <div className="divide-y divide-slate-100">
+                  <div className="space-y-2.5">
                     {dashboard.pendingPurchaseOrders.length === 0 ? (
-                      <div className="py-8 text-center text-slate-400 text-sm">
+                      <div className="py-12 text-center text-slate-400 text-sm">
+                        <ShoppingCart className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                         No pending purchase orders waiting for delivery.
                       </div>
                     ) : (
                       dashboard.pendingPurchaseOrders.map((po) => (
-                        <div key={po.id} className="py-3 flex items-center justify-between text-sm">
+                        <div
+                          key={po.id}
+                          className="p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition flex items-center justify-between gap-4"
+                        >
                           <div>
-                            <div className="font-semibold text-slate-800 flex items-center gap-2">
+                            <div className="font-bold text-slate-900 text-sm flex items-center gap-2">
                               <span>{po.poNumber}</span>
-                              <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-md">
+                              <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-bold rounded-md border border-amber-200">
                                 {po.status}
                               </span>
                             </div>
-                            <div className="text-xs text-slate-400 mt-0.5">
-                              Supplier: {po.supplier?.name || 'Direct'} • Order Date: {po.orderDate}
+                            <div className="text-xs text-slate-500 mt-1">
+                              Supplier: <span className="font-semibold text-slate-700">{po.supplier?.name || 'Direct'}</span> • {po.orderDate}
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-bold text-slate-900">${po.totalAmount}</div>
+                          <div className="text-right shrink-0">
+                            <div className="font-extrabold text-slate-900 text-sm">${po.totalAmount}</div>
                             {canManage && (
                               <button
                                 onClick={() => {
@@ -833,8 +866,9 @@ export function PharmacyWorkspace({
                                     purchaseOrderId: po.id,
                                   }));
                                 }}
-                                className="text-xs text-emerald-700 font-semibold hover:underline mt-1"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 hover:bg-emerald-100 text-xs font-bold border border-emerald-200 mt-1.5 transition cursor-pointer"
                               >
+                                <Plus className="w-3 h-3" />
                                 Receive GRN
                               </button>
                             )}
@@ -847,7 +881,7 @@ export function PharmacyWorkspace({
               </div>
             </>
           ) : (
-            <div className="bg-white p-12 text-center text-slate-400 rounded-2xl border">
+            <div className="bg-white p-12 text-center text-slate-400 rounded-2xl border border-slate-200">
               Loading pharmacy dashboard metrics...
             </div>
           )}
