@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
 import express from 'express';
@@ -10,15 +11,16 @@ import { ConfigService } from '@nestjs/config';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 // Safe environment variable fallbacks for Vercel serverless cold starts
-if (!process.env.DATABASE_URL) {
-  process.env.DATABASE_URL = 'postgresql://postgres:postgres@localhost:5432/medora?schema=public';
-}
-if (!process.env.DIRECT_URL) {
-  process.env.DIRECT_URL = process.env.DATABASE_URL;
-}
-if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = 'temporary-serverless-jwt-secret-min32chars-for-medora-v2';
-}
+process.env.DATABASE_URL =
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@localhost:5432/medora?schema=public';
+process.env.DIRECT_URL = process.env.DIRECT_URL || process.env.DATABASE_URL;
+process.env.JWT_SECRET =
+  process.env.JWT_SECRET || 'temporary-serverless-jwt-secret-min32chars-for-medora-v2';
+process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+process.env.PORT = process.env.PORT || '3000';
+process.env.API_PREFIX = process.env.API_PREFIX || 'api';
+process.env.API_VERSION = process.env.API_VERSION || 'v1';
 
 const server = express();
 let isReady = false;
@@ -46,7 +48,7 @@ async function bootstrap() {
 
   // Global prefix with status and root exclusions
   app.setGlobalPrefix(globalPrefix, {
-    exclude: ['/', 'status'],
+    exclude: ['/', 'status', 'api'],
   });
 
   // Strict request validation

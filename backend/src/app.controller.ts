@@ -24,6 +24,14 @@ export class AppController {
     return this.renderStatusPage(req, res);
   }
 
+  @Public()
+  @Get('api')
+  @ApiOperation({ summary: 'API Entrypoint Status (HTML / JSON)' })
+  @ApiResponse({ status: 200, description: 'Returns system operational status' })
+  async getApiStatus(@Req() req: Request, @Res() res: Response) {
+    return this.renderStatusPage(req, res);
+  }
+
   private async renderStatusPage(req: Request, res: Response) {
     const liveness = this.healthService.getLiveness();
     const { report: readiness } = await this.healthService.getReadiness();

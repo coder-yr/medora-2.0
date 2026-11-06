@@ -26,10 +26,10 @@ async function bootstrap() {
     }),
   );
 
-  // Global versioned route prefix: e.g. /api/v1 (exclude root / and /status landing pages)
+  // Global versioned route prefix: e.g. /api/v1 (exclude root /, /status, and /api landing pages)
   const globalPrefix = `${apiPrefix}/${apiVersion}`;
   app.setGlobalPrefix(globalPrefix, {
-    exclude: ['/', 'status'],
+    exclude: ['/', 'status', 'api'],
   });
 
   // Global strict request validation

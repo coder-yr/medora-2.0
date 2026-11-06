@@ -88,5 +88,25 @@ describe('AppController', () => {
       }),
     );
   });
+
+  it('should render HTML status page on getApiStatus', async () => {
+    const mockReq: any = {
+      headers: {},
+      query: {},
+      get: jest.fn().mockReturnValue('localhost:3000'),
+      protocol: 'http',
+    };
+    const mockRes: any = {
+      status: jest.fn().mockReturnThis(),
+      type: jest.fn().mockReturnThis(),
+      send: jest.fn(),
+    };
+
+    await controller.getApiStatus(mockReq, mockRes);
+
+    expect(mockRes.status).toHaveBeenCalledWith(200);
+    expect(mockRes.type).toHaveBeenCalledWith('text/html');
+    expect(mockRes.send).toHaveBeenCalledWith(expect.stringContaining('Medora 2.0 Backend'));
+  });
 });
 

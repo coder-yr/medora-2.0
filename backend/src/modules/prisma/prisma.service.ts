@@ -18,13 +18,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly pool?: Pool;
 
   constructor() {
-    const connectionString = process.env.DATABASE_URL;
-    let adapter: PrismaPg | undefined;
+    // In Prisma 7 with driver adapters, adapter is mandatory in constructor.
+    // Guarantee a valid Pool/PrismaPg instance so instantiation never throws during DI bootstrap.
+    const connectionString =
+      process.env.DATABASE_URL ||
+      'postgresql://postgres:postgres@localhost:5432/medora?schema=public';
     let pool: Pool | undefined;
+    let adapter: PrismaPg | undefined;
 
-    if (connectionString) {
+    try {
       pool = new Pool({ connectionString });
       adapter = new PrismaPg(pool);
+    } catch {
+      // Fallback in edge cases
     }
 
     super(
@@ -47,14 +53,19 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       return;
     }
 
+    const dbUrl = process.env.DATABASE_URL;
+    if (!dbUrl || dbUrl.includes('localhost:5432/medora')) {
+      this.isConnected = false;
+      this.logger.warn(
+        'DATABASE_URL is not configured or using offline fallback; Prisma initialized in standalone mode',
+      );
+      return;
+    }
+
     try {
-      if (process.env.DATABASE_URL) {
-        await this.$connect();
-        this.isConnected = true;
-        this.logger.log('Prisma Client connected to database engine successfully');
-      } else {
-        this.logger.warn('DATABASE_URL is not set; Prisma is in offline/unconnected mode');
-      }
+      await this.$connect();
+      this.isConnected = true;
+      this.logger.log('Prisma Client connected to database engine successfully');
     } catch (error: any) {
       this.isConnected = false;
       this.logger.warn(
