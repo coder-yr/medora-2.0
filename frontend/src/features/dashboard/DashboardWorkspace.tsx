@@ -34,7 +34,7 @@ export const DashboardWorkspace: React.FC<DashboardWorkspaceProps> = ({
   token,
   userRole = 'Admin',
   activeBranchId,
-  apiBaseUrl = 'http://localhost:3000',
+  apiBaseUrl = 'https://medora-20-backend.vercel.app',
   onNavigateToModule,
 }) => {
   const [period, setPeriod] = useState<DashboardPeriod>('today');

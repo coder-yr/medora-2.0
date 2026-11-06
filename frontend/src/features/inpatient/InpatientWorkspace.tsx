@@ -32,7 +32,7 @@ interface InpatientWorkspaceProps {
 }
 
 export function InpatientWorkspace({
-  apiBaseUrl = 'http://localhost:3000',
+  apiBaseUrl = 'https://medora-20-backend.vercel.app',
   token,
   userRole: _userRole = 'Doctor',
   onNotification,

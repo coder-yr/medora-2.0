@@ -42,12 +42,28 @@ async function bootstrap() {
     );
   }
 
-  const allowedOrigins = corsOrigin.includes(',')
+  const allowedOriginsList = corsOrigin.includes(',')
     ? corsOrigin.split(',').map((origin) => origin.trim())
-    : corsOrigin;
+    : [corsOrigin.trim()];
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
+      // Allow requests with no origin (like curl, mobile apps, or server-to-server)
+      if (!origin) return callback(null, true);
+
+      const isAllowed =
+        allowedOriginsList.includes(origin) ||
+        origin.endsWith('.vercel.app') ||
+        origin.startsWith('http://localhost:');
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+      return callback(new Error(`[CORS] Origin "${origin}" is not authorized`), false);
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id', 'x-request-id'],

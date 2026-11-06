@@ -37,8 +37,7 @@ interface AccountingWorkspaceProps {
   token: string;
 }
 
-const isDev = import.meta.env.DEV;
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (isDev ? 'http://localhost:3000' : '');
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://medora-20-backend.vercel.app';
 
 export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'journals' | 'expenses' | 'reports' | 'periods'>('dashboard');
