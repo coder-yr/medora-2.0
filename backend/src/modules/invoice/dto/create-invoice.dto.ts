@@ -134,6 +134,20 @@ export class CreateInvoiceDto {
   @IsIn(['opd', 'ipd'], { message: 'care_setting must be either "opd" or "ipd".' })
   care_setting?: 'opd' | 'ipd';
 
+  @ApiPropertyOptional({
+    description: 'Hospital branch ID where invoice is issued',
+    example: 1,
+  })
+  @IsOptional()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({
+    description: 'Hospital branch ID where invoice is issued (snake_case alias)',
+    example: 1,
+  })
+  @IsOptional()
+  branch_id?: string | number;
+
   @ApiProperty({
     description: 'Line items charged on the invoice (at least 1 item required)',
     type: [CreateInvoiceItemDto],

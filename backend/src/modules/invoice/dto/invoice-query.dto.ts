@@ -42,6 +42,22 @@ export class InvoiceQueryDto {
   page?: number = 1;
 
   @ApiPropertyOptional({
+    description: 'Filter invoices by hospital branch ID',
+    example: '1',
+  })
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Filter invoices by hospital branch ID (snake_case alias)',
+    example: '1',
+  })
+  @IsOptional()
+  @IsString()
+  branch_id?: string;
+
+  @ApiPropertyOptional({
     description: 'Number of invoices per page (max 200)',
     example: 50,
     default: 50,

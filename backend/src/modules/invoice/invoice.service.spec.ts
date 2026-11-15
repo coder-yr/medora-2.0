@@ -394,6 +394,22 @@ describe('InvoiceService (Legacy Parity & Financial Rules)', () => {
       expect(invoice.items[1].lineTotal).toBe('1200.00');
     });
 
+    it('creates an invoice with branchId supplied in the payload', async () => {
+      const invoice = await service.create({
+        patient: Number(patient1.id),
+        doctor: Number(doctor1.id),
+        date: '2026-10-28',
+        branchId: 2,
+        items: [
+          { name: 'Consultation - OPD', quantity: 1, unit_price: 500 },
+        ],
+      });
+
+      expect(invoice).toBeDefined();
+      expect(invoice.id).toBeDefined();
+      expect(invoice.grossTotal).toBe('500.00');
+    });
+
     it('rejects invoice without charge items', async () => {
       await expect(
         service.create({
