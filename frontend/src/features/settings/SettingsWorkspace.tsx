@@ -29,7 +29,7 @@ interface SettingsWorkspaceProps {
   onBranchChange?: (branchId: string) => void;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://medora-20-backend.vercel.app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
   token,

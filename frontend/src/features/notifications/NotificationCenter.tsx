@@ -9,7 +9,7 @@ interface NotificationCenterProps {
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   token,
-  apiBaseUrl = 'https://medora-20-backend.vercel.app',
+  apiBaseUrl = 'http://localhost:3000',
 }) => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(false);

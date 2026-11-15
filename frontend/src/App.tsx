@@ -76,7 +76,7 @@ export type AppWorkspaceModule =
   | 'settings'
   | 'notifications';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://medora-20-backend.vercel.app';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 const isDev = import.meta.env.DEV;
 
 function resolveRole(user: { role?: string; group?: string } | null | undefined): string {

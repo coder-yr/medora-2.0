@@ -20,7 +20,7 @@ interface NotificationAdminWorkspaceProps {
 export const NotificationAdminWorkspace: React.FC<NotificationAdminWorkspaceProps> = ({
   token,
   activeBranchId,
-  apiBaseUrl = 'https://medora-20-backend.vercel.app',
+  apiBaseUrl = 'http://localhost:3000',
 }) => {
   const [activeTab, setActiveTab] = useState<'outbox' | 'templates' | 'health'>('outbox');
   const [health, setHealth] = useState<QueueHealth | null>(null);
