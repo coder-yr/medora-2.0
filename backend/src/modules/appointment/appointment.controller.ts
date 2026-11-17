@@ -77,7 +77,8 @@ export class AppointmentController {
     description:
       'Generates free booking slots from the weekly clinic schedule, subtracting existing appointments and blocked leaves.',
   })
-  @ApiQuery({ name: 'doctor', required: true, example: '1' })
+  @ApiQuery({ name: 'doctor', required: false, example: '1' })
+  @ApiQuery({ name: 'doctorId', required: false, example: '1' })
   @ApiQuery({ name: 'date', required: true, example: '2026-10-01' })
   @ApiResponse({
     status: 200,
@@ -85,10 +86,15 @@ export class AppointmentController {
     type: [FreeSlotDto],
   })
   async getFreeSlots(
-    @Query('doctor') doctor: string | number,
+    @Query('doctor') doctor: string | number | undefined,
+    @Query('doctorId') doctorId: string | number | undefined,
     @Query('date') date: string,
   ): Promise<FreeSlotDto[]> {
-    return this.appointmentService.getFreeSlots(doctor, date);
+    const doc = doctor || doctorId;
+    if (!doc || !date) {
+      return [];
+    }
+    return this.appointmentService.getFreeSlots(doc, date);
   }
 
   @Get()

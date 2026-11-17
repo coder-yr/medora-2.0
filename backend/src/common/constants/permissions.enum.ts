@@ -292,6 +292,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
     HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.DEPARTMENT_VIEW,
   ],
   Nurse: [
     HospitalPermission.PATIENT_VIEW,
@@ -325,6 +326,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_VIEW,
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+    HospitalPermission.DEPARTMENT_VIEW,
   ],
   Receptionist: [
     HospitalPermission.PATIENT_VIEW,
@@ -366,6 +368,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
     HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.DEPARTMENT_VIEW,
   ],
   Accountant: [
     HospitalPermission.INVOICE_VIEW,
@@ -429,6 +432,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
     HospitalPermission.DASHBOARD_VIEW,
     HospitalPermission.DASHBOARD_FINANCIAL_VIEW,
+    HospitalPermission.DEPARTMENT_VIEW,
+    HospitalPermission.DOCTOR_VIEW,
   ],
   Pharmacist: [
     HospitalPermission.MEDICINE_VIEW,
@@ -451,6 +456,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
     HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.DEPARTMENT_VIEW,
+    HospitalPermission.DOCTOR_VIEW,
+    HospitalPermission.PATIENT_VIEW,
   ],
   Laboratorist: [
     HospitalPermission.LAB_VIEW,
@@ -485,5 +493,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
     HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.DEPARTMENT_VIEW,
+    HospitalPermission.DOCTOR_VIEW,
   ],
 };

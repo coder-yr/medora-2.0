@@ -361,7 +361,14 @@ export class AppointmentService {
     doctorId: string | number,
     date: string,
   ): Promise<FreeSlotDto[]> {
-    const docIdStr = String(doctorId);
+    if (!doctorId || !date) {
+      return [];
+    }
+    const docIdNum = Number(doctorId);
+    if (!docIdNum || isNaN(docIdNum)) {
+      return [];
+    }
+    const docIdStr = String(docIdNum);
     const [y, m, d] = date.split('-').map(Number);
     const day = new Date(y, (m || 1) - 1, d || 1);
     const weekday = day.getDay(); // 0=Sunday .. 6=Saturday
