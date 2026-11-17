@@ -293,6 +293,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
     HospitalPermission.DASHBOARD_VIEW,
     HospitalPermission.DEPARTMENT_VIEW,
+    HospitalPermission.INVOICE_VIEW,
+    HospitalPermission.INVOICE_ADD,
+    HospitalPermission.PAYMENT_VIEW,
   ],
   Nurse: [
     HospitalPermission.PATIENT_VIEW,
@@ -327,6 +330,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.NOTIFICATION_MARK_READ,
     HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
     HospitalPermission.DEPARTMENT_VIEW,
+    HospitalPermission.INVOICE_VIEW,
+    HospitalPermission.PAYMENT_VIEW,
   ],
   Receptionist: [
     HospitalPermission.PATIENT_VIEW,
@@ -459,6 +464,9 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.DEPARTMENT_VIEW,
     HospitalPermission.DOCTOR_VIEW,
     HospitalPermission.PATIENT_VIEW,
+    HospitalPermission.INVOICE_VIEW,
+    HospitalPermission.INVOICE_ADD,
+    HospitalPermission.PAYMENT_VIEW,
   ],
   Laboratorist: [
     HospitalPermission.LAB_VIEW,
@@ -495,5 +503,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.DASHBOARD_VIEW,
     HospitalPermission.DEPARTMENT_VIEW,
     HospitalPermission.DOCTOR_VIEW,
+    HospitalPermission.INVOICE_VIEW,
+    HospitalPermission.INVOICE_ADD,
+    HospitalPermission.PAYMENT_VIEW,
   ],
 };
