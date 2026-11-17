@@ -95,6 +95,23 @@ function resolveRole(user: { role?: string; group?: string } | null | undefined)
   return rawRole.charAt(0).toUpperCase() + rawRole.slice(1);
 }
 
+const getInitialModuleForRole = (role: string): AppWorkspaceModule => {
+  switch (role) {
+    case 'Doctor':
+      return 'consultations';
+    case 'Pharmacist':
+      return 'pharmacy';
+    case 'Laboratorist':
+      return 'laboratory';
+    case 'Accountant':
+      return 'billing';
+    case 'Receptionist':
+      return 'appointments';
+    default:
+      return 'dashboard';
+  }
+};
+
 export function App() {
   const [activeModule, setActiveModule] = useState<AppWorkspaceModule>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -217,6 +234,7 @@ export function App() {
       };
       setCurrentUser(normalizedUser);
       setUserRole(resolvedRole);
+      setActiveModule(getInitialModuleForRole(resolvedRole));
       sessionStorage.setItem('medora_user', JSON.stringify(normalizedUser));
       if (auth.user.branches && auth.user.branches.length > 0) {
         setUserBranches(auth.user.branches);
@@ -261,6 +279,7 @@ export function App() {
         };
         setCurrentUser(mockUser);
         setUserRole(roleName);
+        setActiveModule(getInitialModuleForRole(roleName));
         sessionStorage.setItem('medora_user', JSON.stringify(mockUser));
       }
     } catch {
@@ -274,6 +293,7 @@ export function App() {
       };
       setCurrentUser(mockUser);
       setUserRole(roleName);
+      setActiveModule(getInitialModuleForRole(roleName));
       sessionStorage.setItem('medora_user', JSON.stringify(mockUser));
     }
   };
