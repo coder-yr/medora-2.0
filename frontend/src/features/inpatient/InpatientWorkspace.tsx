@@ -593,7 +593,9 @@ export function InpatientWorkspace({
             <Activity size={18} color="#0284c7" />
           </div>
           <div style={{ fontSize: 28, fontWeight: 700, margin: '8px 0 4px', color: '#0f172a' }}>
-            {metrics ? `${metrics.occupancyPercentage}%` : '0%'}
+            {metrics
+              ? `${metrics.occupancyPercentage ?? metrics.occupancyRate ?? (metrics.totalBeds > 0 ? Math.round(((metrics.occupiedBeds || 0) / metrics.totalBeds) * 100 * 10) / 10 : 0)}%`
+              : '0%'}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
             {metrics?.occupiedBeds || 0} of {metrics?.totalBeds || 0} active beds
@@ -631,7 +633,7 @@ export function InpatientWorkspace({
             <Users size={18} color="#6366f1" />
           </div>
           <div style={{ fontSize: 28, fontWeight: 700, margin: '8px 0 4px', color: '#6366f1' }}>
-            {metrics?.activeAdmissionsCount || 0}
+            {metrics?.activeAdmissionsCount ?? metrics?.activeAdmissions ?? 0}
           </div>
           <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Currently admitted patients</div>
         </div>

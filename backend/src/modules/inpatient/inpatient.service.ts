@@ -96,11 +96,14 @@ export class InpatientService {
       maintenanceBeds,
       reservedBeds,
       activeAdmissions,
+      activeAdmissionsCount: activeAdmissions,
       pendingAdmissions,
       pendingDischarges,
       expectedDischargesToday,
+      expectedDischargesTodayCount: expectedDischargesToday,
       totalWards,
       occupancyRate,
+      occupancyPercentage: occupancyRate,
     };
   }
 

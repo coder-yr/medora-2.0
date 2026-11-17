@@ -173,11 +173,16 @@ export interface InpatientDashboardMetrics {
   availableBeds: number;
   cleaningBeds: number;
   maintenanceBeds: number;
-  otherBeds: number;
-  occupancyPercentage: number;
-  activeAdmissionsCount: number;
-  expectedDischargesTodayCount: number;
-  wards: Array<{
+  otherBeds?: number;
+  reservedBeds?: number;
+  occupancyPercentage?: number;
+  occupancyRate?: number;
+  activeAdmissionsCount?: number;
+  activeAdmissions?: number;
+  expectedDischargesTodayCount?: number;
+  expectedDischargesToday?: number;
+  totalWards?: number;
+  wards?: Array<{
     id: number | string;
     name: string;
     total: number;
