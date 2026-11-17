@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  Allow,
   IsEmail,
   IsInt,
   IsNotEmpty,
@@ -73,12 +74,12 @@ export class CreateDoctorDto {
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
-  @IsString()
+  @Allow()
   branchId?: string | number;
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
-  @IsString()
+  @Allow()
   branch_id?: string | number;
 
   @ApiPropertyOptional({

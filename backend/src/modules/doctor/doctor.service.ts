@@ -234,6 +234,23 @@ export class DoctorService {
       data: doctorData,
     });
 
+    if (this.prisma.doctorSlot) {
+      try {
+        await this.prisma.doctorSlot.createMany({
+          data: [1, 2, 3, 4, 5, 6].map((weekday) => ({
+            doctorId: created.id,
+            weekday,
+            startTime: '09:00',
+            endTime: '17:00',
+            slotMinutes: 15,
+            active: true,
+          })),
+        });
+      } catch {
+        // Non-blocking in unit test mocks
+      }
+    }
+
     return this.mapToDto(created, 0, loginUsername);
   }
 

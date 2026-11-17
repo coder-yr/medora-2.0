@@ -739,6 +739,10 @@ export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
                   <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
                     Checking clinic schedule...
                   </div>
+                ) : !selectedDoctorId ? (
+                  <div style={{ padding: 14, background: '#f8fafc', borderRadius: 6, border: '1px solid #e2e8f0', fontSize: 13, color: '#64748b' }}>
+                    Please select an attending doctor above to view available consultation slots.
+                  </div>
                 ) : freeSlots.length === 0 ? (
                   <div style={{ padding: 14, background: '#fffbeb', borderRadius: 6, border: '1px solid #fef3c7', fontSize: 13, color: '#92400e' }}>
                     No free consultation slots available for this doctor on {bookingDate}. Please select another date.

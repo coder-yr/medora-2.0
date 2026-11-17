@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  Allow,
   IsArray,
   IsBoolean,
   IsDateString,
@@ -241,11 +242,11 @@ export class SaveConsultationDto {
 
   @ApiPropertyOptional({ description: 'Branch ID', example: '1' })
   @IsOptional()
-  @IsString()
+  @Allow()
   branchId?: string | number;
 
   @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)', example: '1' })
   @IsOptional()
-  @IsString()
+  @Allow()
   branch_id?: string | number;
 }

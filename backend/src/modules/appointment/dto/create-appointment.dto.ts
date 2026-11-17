@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  Allow,
   IsBoolean,
   IsDateString,
   IsIn,
@@ -152,7 +153,7 @@ export class CreateAppointmentDto {
     example: '1',
   })
   @IsOptional()
-  @IsString()
+  @Allow()
   branchId?: string | number;
 
   @ApiPropertyOptional({
@@ -160,6 +161,6 @@ export class CreateAppointmentDto {
     example: '1',
   })
   @IsOptional()
-  @IsString()
+  @Allow()
   branch_id?: string | number;
 }

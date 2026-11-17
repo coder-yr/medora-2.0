@@ -362,11 +362,12 @@ export class AppointmentService {
     date: string,
   ): Promise<FreeSlotDto[]> {
     const docIdStr = String(doctorId);
-    const day = new Date(date);
+    const [y, m, d] = date.split('-').map(Number);
+    const day = new Date(y, (m || 1) - 1, d || 1);
     const weekday = day.getDay(); // 0=Sunday .. 6=Saturday
 
     // 1. Get weekly doctor slots
-    const dbSlots = await this.prisma.doctorSlot.findMany({
+    let dbSlots = await this.prisma.doctorSlot.findMany({
       where: {
         doctorId: BigInt(docIdStr),
         weekday,
@@ -376,7 +377,28 @@ export class AppointmentService {
     });
 
     if (dbSlots.length === 0) {
-      return [];
+      // Check if this doctor has any custom slots configured across any weekday
+      const hasCustomConfig = await this.prisma.doctorSlot.findFirst({
+        where: { doctorId: BigInt(docIdStr) },
+      });
+      if (!hasCustomConfig) {
+        // Fallback standard outpatient clinic schedule: 09:00 - 17:00 (15m intervals)
+        dbSlots = [
+          {
+            id: 0n,
+            doctorId: BigInt(docIdStr),
+            weekday,
+            startTime: '09:00',
+            endTime: '17:00',
+            slotMinutes: 15,
+            active: true,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          },
+        ];
+      } else {
+        return [];
+      }
     }
 
     // 2. Get booked appointments for that doctor on that date (not cancelled or no show)

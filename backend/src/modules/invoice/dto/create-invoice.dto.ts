@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  Allow,
   ArrayMinSize,
   IsArray,
   IsIn,
@@ -139,6 +140,7 @@ export class CreateInvoiceDto {
     example: 1,
   })
   @IsOptional()
+  @Allow()
   branchId?: string | number;
 
   @ApiPropertyOptional({
@@ -146,6 +148,7 @@ export class CreateInvoiceDto {
     example: 1,
   })
   @IsOptional()
+  @Allow()
   branch_id?: string | number;
 
   @ApiProperty({

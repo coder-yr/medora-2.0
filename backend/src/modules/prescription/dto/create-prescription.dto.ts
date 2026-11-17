@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
+  Allow,
   IsArray,
   IsDateString,
   IsInt,
@@ -148,11 +149,11 @@ export class CreatePrescriptionDto {
 
   @ApiPropertyOptional({ description: 'Branch ID', example: '1' })
   @IsOptional()
-  @IsString()
+  @Allow()
   branchId?: string | number;
 
   @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)', example: '1' })
   @IsOptional()
-  @IsString()
+  @Allow()
   branch_id?: string | number;
 }
