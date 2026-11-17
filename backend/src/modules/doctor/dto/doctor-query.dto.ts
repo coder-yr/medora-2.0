@@ -25,4 +25,14 @@ export class DoctorQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 25;
+
+  @ApiPropertyOptional({ example: '1', description: 'Branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ example: '1', description: 'Branch ID' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

@@ -55,7 +55,7 @@ export class DoctorService {
     const term = (query.q || '').trim();
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    const whereClause = term
+    let whereClause: any = term
       ? {
           OR: [
             { name: { contains: term, mode: 'insensitive' as const } },
@@ -66,12 +66,31 @@ export class DoctorService {
         }
       : {};
 
+    const rawBranchId = query.branchId || query.branch_id;
+    if (rawBranchId) {
+      try {
+        const bId = BigInt(String(rawBranchId));
+        const branchCondition = {
+          OR: [{ branchId: bId }, { branchId: null }],
+        };
+        if (term) {
+          whereClause = {
+            AND: [whereClause, branchCondition],
+          };
+        } else {
+          whereClause = branchCondition;
+        }
+      } catch {
+        // ignore invalid bigint
+      }
+    }
+
     const [doctors, total] = await Promise.all([
       this.prisma.doctor.findMany({
         where: whereClause,
         skip,
         take: limit,
-        orderBy: { name: 'asc' },
+        orderBy: [{ id: 'desc' }],
       }),
       this.prisma.doctor.count({ where: whereClause }),
     ]);
@@ -190,6 +209,12 @@ export class DoctorService {
       loginUsername = username;
     }
 
+    const rawBranchId = dto.branchId ?? dto.branch_id;
+    const branchId =
+      rawBranchId !== undefined && rawBranchId !== null && rawBranchId !== '' && !isNaN(Number(rawBranchId))
+        ? BigInt(rawBranchId)
+        : null;
+
     const doctorData = {
       name,
       email,
@@ -198,7 +223,7 @@ export class DoctorService {
       department: dto.department?.trim() || null,
       profile: dto.profile?.trim() || null,
       procedureId: dto.procedureId?.trim() || null,
-      branchId: dto.branchId && !isNaN(Number(dto.branchId)) ? BigInt(dto.branchId) : null,
+      branchId,
       ionUserId,
       imageUrl: null,
       x: '',

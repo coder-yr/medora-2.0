@@ -243,6 +243,39 @@ export class AuthService {
     });
 
     const fullName = `${createdUser.firstName} ${createdUser.lastName}`.trim() || createdUser.email;
+
+    // 6b. Automatically link or create Doctor profile if registered as Doctor
+    if (assignedRole === 'Doctor' && (this.prisma as any).doctor) {
+      try {
+        const existingDoc = await (this.prisma as any).doctor.findFirst({
+          where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
+        });
+        if (existingDoc) {
+          await (this.prisma as any).doctor.update({
+            where: { id: existingDoc.id },
+            data: {
+              ionUserId: createdUser.id.toString(),
+              branchId: createdUser.branchId,
+            },
+          });
+        } else {
+          await (this.prisma as any).doctor.create({
+            data: {
+              name: fullName.startsWith('Dr') ? fullName : `Dr. ${fullName}`,
+              email: normalizedEmail,
+              ionUserId: createdUser.id.toString(),
+              branchId: createdUser.branchId,
+              department: 'General Practice',
+              x: '',
+              y: '',
+            },
+          });
+        }
+      } catch (docErr) {
+        this.logger.warn(`Failed to auto-create doctor record during registration: ${docErr}`);
+      }
+    }
+
     const authUser: AuthUser = {
       id: String(createdUser.id),
       email: createdUser.email,

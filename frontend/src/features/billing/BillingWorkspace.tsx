@@ -115,7 +115,8 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setDoctorsList(data.data.data || []);
+        const docList = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+        setDoctorsList(docList);
       }
     } catch {
       // Ignore background doctor lookup error

@@ -234,6 +234,7 @@ export const DoctorWorkspace: React.FC<DoctorWorkspaceProps> = ({
       if (addFormData.address?.trim()) payload.address = addFormData.address.trim();
       if (addFormData.profile?.trim()) payload.profile = addFormData.profile.trim();
       if (addFormData.procedureId?.trim()) payload.procedureId = addFormData.procedureId.trim();
+      if (activeBranchId) payload.branchId = activeBranchId;
       if (addFormData.loginUsername?.trim()) {
         payload.loginUsername = addFormData.loginUsername.trim();
         payload.loginPassword = addFormData.loginPassword || 'DoctorPass123!';
@@ -263,6 +264,10 @@ export const DoctorWorkspace: React.FC<DoctorWorkspaceProps> = ({
           loginPassword: '',
         });
         setSuccessMessage(`Dr. ${data.data.name} successfully registered in roster.`);
+        if (data.data) {
+          setDoctors((prev) => [data.data, ...prev.filter((d) => String(d.id) !== String(data.data.id))]);
+          setViewingDoctor(data.data);
+        }
         fetchDoctors('', 1, '');
         fetchDepartments();
       } else {
