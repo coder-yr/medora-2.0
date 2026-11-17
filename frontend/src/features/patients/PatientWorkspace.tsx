@@ -83,9 +83,15 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setPatients(data.data.data || []);
-        setTotal(data.data.total || 0);
-        setTotalPages(data.data.totalPages || 1);
+        const patientItems = Array.isArray(data.data)
+          ? data.data
+          : (data.data?.items || data.data?.data || []);
+        const totalCount = data.data?.meta?.total ?? data.data?.total ?? patientItems.length;
+        const totalPageCount = data.data?.meta?.totalPages ?? data.data?.totalPages ?? 1;
+
+        setPatients(patientItems);
+        setTotal(totalCount);
+        setTotalPages(totalPageCount);
       } else {
         setError(data.error?.message || data.message || 'Failed to load patients.');
       }
@@ -162,8 +168,11 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
           guardianMrn: '',
           mlc: false,
         });
+        if (data.data) {
+          setPatients((prev) => [data.data, ...prev.filter((p) => String(p.id) !== String(data.data.id))]);
+          setSelectedPatient(data.data);
+        }
         fetchPatients('', 1);
-        setSelectedPatient(data.data);
       } else {
         const msg = data.error?.message || data.message || 'Registration failed.';
         setFormError(Array.isArray(msg) ? msg.join(', ') : msg);

@@ -107,6 +107,15 @@ export class PaginatedPatientsDto {
   @ApiProperty({ type: [PatientResponseDto] })
   items!: PatientResponseDto[];
 
+  @ApiProperty({ type: [PatientResponseDto], required: false })
+  data?: PatientResponseDto[];
+
+  @ApiProperty({ example: 10, required: false })
+  total?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  totalPages?: number;
+
   @ApiProperty({ type: PaginationMetaDto })
   meta!: PaginationMetaDto;
 }

@@ -108,7 +108,12 @@ export class PatientService {
     let branchFilter: any = {};
     if (query.branchId && user && this.branchAuth) {
       const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
-      branchFilter = { branchId: authorizedBranchId };
+      branchFilter = {
+        OR: [
+          { branchId: authorizedBranchId },
+          { branchId: null },
+        ],
+      };
     }
 
     const whereClause: any = {
@@ -137,8 +142,12 @@ export class PatientService {
       this.prisma.patient.count({ where: whereClause }),
     ]);
 
+    const mapped = items.map((p) => this.mapToDto(p));
     return {
-      items: items.map((p) => this.mapToDto(p)),
+      items: mapped,
+      data: mapped,
+      total,
+      totalPages: Math.ceil(total / limit) || 1,
       meta: {
         total,
         page,

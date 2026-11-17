@@ -115,9 +115,15 @@ export const DoctorWorkspace: React.FC<DoctorWorkspaceProps> = ({
         const data = await res.json();
 
         if (res.ok && data.success) {
-          setDoctors(data.data.data || []);
-          setTotal(data.data.total || 0);
-          setTotalPages(data.data.totalPages || 1);
+          const doctorList = Array.isArray(data.data)
+            ? data.data
+            : (data.data?.items || data.data?.data || []);
+          const totalCount = data.data?.meta?.total ?? data.data?.total ?? doctorList.length;
+          const totalPageCount = data.data?.meta?.totalPages ?? data.data?.totalPages ?? 1;
+
+          setDoctors(doctorList);
+          setTotal(totalCount);
+          setTotalPages(totalPageCount);
         } else {
           setError(data.error?.message || data.message || 'Failed to load doctors.');
         }

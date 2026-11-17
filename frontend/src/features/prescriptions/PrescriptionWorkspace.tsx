@@ -66,10 +66,11 @@ export const PrescriptionWorkspace: React.FC<PrescriptionWorkspaceProps> = ({
     })
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.data?.data) {
-          setDoctorsList(data.data.data);
-          if (!selectedDoctorId && data.data.data.length > 0) {
-            setSelectedDoctorId(String(data.data.data[0].id));
+        if (data.success && data.data) {
+          const docList = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+          setDoctorsList(docList);
+          if (!selectedDoctorId && docList.length > 0) {
+            setSelectedDoctorId(String(docList[0].id));
           }
         }
       })
@@ -104,8 +105,9 @@ export const PrescriptionWorkspace: React.FC<PrescriptionWorkspaceProps> = ({
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        if (data.success && data.data?.data) {
-          setPatientsList(data.data.data);
+        if (data.success && data.data) {
+          const patList = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+          setPatientsList(patList);
         }
       } catch {
         setPatientsList([]);
@@ -147,8 +149,9 @@ export const PrescriptionWorkspace: React.FC<PrescriptionWorkspaceProps> = ({
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
-      if (data.success && data.data?.data) {
-        setPrescriptions(data.data.data);
+      if (data.success && data.data) {
+        const rxList = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+        setPrescriptions(rxList);
       }
     } catch {
       // Ignore network errors

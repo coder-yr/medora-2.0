@@ -54,6 +54,15 @@ export class PaginatedDoctorsDto {
   @ApiProperty({ type: [DoctorResponseDto] })
   items!: DoctorResponseDto[];
 
+  @ApiProperty({ type: [DoctorResponseDto], required: false })
+  data?: DoctorResponseDto[];
+
+  @ApiProperty({ example: 10, required: false })
+  total?: number;
+
+  @ApiProperty({ example: 1, required: false })
+  totalPages?: number;
+
   @ApiProperty({
     example: {
       total: 10,

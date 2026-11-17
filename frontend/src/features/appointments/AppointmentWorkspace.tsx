@@ -96,7 +96,8 @@ export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setDoctorsList(data.data.data || []);
+        const docList = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+        setDoctorsList(docList);
       }
     } catch {
       // Ignore background doctor lookup errors
@@ -122,9 +123,10 @@ export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
       const data = await res.json();
 
       if (res.ok && data.success) {
-        setAppointments(data.data.data || []);
-        setTotal(data.data.total || 0);
-        setTotalPages(data.data.totalPages || 1);
+        const apptList = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+        setAppointments(apptList);
+        setTotal(data.data?.meta?.total ?? data.data?.total ?? apptList.length);
+        setTotalPages(data.data?.meta?.totalPages ?? data.data?.totalPages ?? 1);
       } else {
         setError(data.error?.message || data.message || 'Failed to fetch appointments.');
       }
@@ -159,7 +161,8 @@ export const AppointmentWorkspace: React.FC<AppointmentWorkspaceProps> = ({
         });
         const data = await res.json();
         if (res.ok && data.success) {
-          setSearchedPatients(data.data.data || []);
+          const patList = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+          setSearchedPatients(patList);
         }
       } catch {
         setSearchedPatients([]);

@@ -93,8 +93,13 @@ export class DoctorService {
 
     const countMap = new Map(upcomingCounts.map((u) => [u.docId.toString(), u.count]));
 
+    const mapped = doctors.map((d) => this.mapToDto(d, countMap.get(d.id.toString()) || 0));
+
     return {
-      items: doctors.map((d) => this.mapToDto(d, countMap.get(d.id.toString()) || 0)),
+      items: mapped,
+      data: mapped,
+      total,
+      totalPages: Math.ceil(total / limit) || 1,
       meta: {
         total,
         page,
