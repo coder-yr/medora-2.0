@@ -57,6 +57,16 @@ export class QueryRadiologyOrderDto {
   @Type(() => Number)
   @IsNumber()
   limit?: number = 50;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class QueryRadiologyExamDto {
@@ -81,4 +91,14 @@ export class QueryRadiologyExamDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

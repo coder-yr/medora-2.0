@@ -100,10 +100,14 @@ export class CreateAccountDto {
   currency?: string;
 
   @ApiPropertyOptional({ description: 'Branch ID' })
-  @IsInt()
-  @Type(() => Number)
   @IsOptional()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class UpdateAccountDto {
@@ -164,6 +168,16 @@ export class AccountQueryDto {
   @Type(() => Number)
   @IsOptional()
   limit?: number = 50;
+
+  @ApiPropertyOptional({ description: 'Branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 // ==========================================
@@ -190,10 +204,14 @@ export class CreateAccountingPeriodDto {
   endDate!: string;
 
   @ApiPropertyOptional({ description: 'Branch ID' })
-  @IsInt()
-  @Type(() => Number)
   @IsOptional()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class CloseAccountingPeriodDto {
@@ -229,6 +247,16 @@ export class PeriodQueryDto {
   @Type(() => Number)
   @IsOptional()
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 // ==========================================
@@ -308,10 +336,14 @@ export class CreateJournalEntryDto {
   postImmediately?: boolean;
 
   @ApiPropertyOptional({ description: 'Branch ID' })
-  @IsInt()
-  @Type(() => Number)
   @IsOptional()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class ReverseJournalEntryDto {
@@ -371,6 +403,16 @@ export class JournalQueryDto {
   @Type(() => Number)
   @IsOptional()
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 // ==========================================
@@ -465,10 +507,14 @@ export class CreateExpenseDto {
   paymentMethod?: string = 'CASH';
 
   @ApiPropertyOptional({ description: 'Branch ID' })
-  @IsInt()
-  @Type(() => Number)
   @IsOptional()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @ApiPropertyOptional({ description: 'Notes or internal remarks' })
   @IsString()
@@ -586,6 +632,16 @@ export class ExpenseQueryDto {
   @Type(() => Number)
   @IsOptional()
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 // ==========================================
@@ -609,10 +665,14 @@ export class ReportQueryDto {
   endDate?: string;
 
   @ApiPropertyOptional({ description: 'Branch ID' })
-  @IsInt()
-  @Type(() => Number)
   @IsOptional()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @ApiPropertyOptional({ description: 'Account ID filter for General Ledger' })
   @IsInt()

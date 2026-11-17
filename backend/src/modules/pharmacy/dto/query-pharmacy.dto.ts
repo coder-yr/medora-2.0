@@ -48,6 +48,16 @@ export class QueryBatchDto {
   @Min(1)
   @Max(100)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class QueryStockMovementDto {
@@ -104,6 +114,16 @@ export class QueryStockMovementDto {
   @Min(1)
   @Max(100)
   limit?: number = 25;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class QueryDispensationDto {
@@ -143,4 +163,14 @@ export class QueryDispensationDto {
   @Min(1)
   @Max(100)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

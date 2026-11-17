@@ -152,5 +152,14 @@ export class CreateAppointmentDto {
     example: '1',
   })
   @IsOptional()
+  @IsString()
   branchId?: string | number;
+
+  @ApiPropertyOptional({
+    description: 'Branch ID (snake_case alias)',
+    example: '1',
+  })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

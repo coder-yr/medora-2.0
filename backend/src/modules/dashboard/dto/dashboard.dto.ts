@@ -19,5 +19,9 @@ export class DashboardFilterDto {
   @IsOptional()
   @IsString()
   branchId?: string;
+
+  @IsOptional()
+  @IsString()
+  branch_id?: string;
 }
 

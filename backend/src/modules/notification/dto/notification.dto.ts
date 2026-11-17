@@ -169,6 +169,14 @@ export class QueryNotificationsDto {
 
   @IsOptional()
   offset?: string | number;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class AdminQueryNotificationsDto {
@@ -183,7 +191,12 @@ export class AdminQueryNotificationsDto {
   status?: string;
 
   @IsOptional()
+  @IsString()
   branchId?: string | number;
+
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @IsString()
   @IsOptional()

@@ -20,7 +20,7 @@ export class DoctorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly departmentService: DepartmentService,
-  ) {}
+  ) { }
 
   /**
    * Get merged department suggestion list from database.
@@ -57,13 +57,13 @@ export class DoctorService {
 
     let whereClause: any = term
       ? {
-          OR: [
-            { name: { contains: term, mode: 'insensitive' as const } },
-            { department: { contains: term, mode: 'insensitive' as const } },
-            { phone: { contains: term, mode: 'insensitive' as const } },
-            { email: { contains: term, mode: 'insensitive' as const } },
-          ],
-        }
+        OR: [
+          { name: { contains: term, mode: 'insensitive' as const } },
+          { department: { contains: term, mode: 'insensitive' as const } },
+          { phone: { contains: term, mode: 'insensitive' as const } },
+          { email: { contains: term, mode: 'insensitive' as const } },
+        ],
+      }
       : {};
 
     const rawBranchId = query.branchId || query.branch_id;

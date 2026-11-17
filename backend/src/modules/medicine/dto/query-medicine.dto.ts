@@ -90,4 +90,14 @@ export class QueryMedicineDto {
   @IsString()
   @IsIn(['asc', 'desc'])
   sortOrder: 'asc' | 'desc' = 'asc';
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

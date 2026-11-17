@@ -46,6 +46,16 @@ export class QueryAdmissionDto {
   @IsNumber()
   @Min(1)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Filter by hospital branch ID' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by hospital branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }
 
 export class QueryBedDto {
@@ -62,7 +72,11 @@ export class QueryBedDto {
 
   @ApiPropertyOptional({ description: 'Filter by hospital branch ID' })
   @IsOptional()
-  @Type(() => Number)
-  @IsNumber()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by hospital branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

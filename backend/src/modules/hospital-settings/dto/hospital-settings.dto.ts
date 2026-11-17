@@ -249,7 +249,12 @@ export class AssignUserBranchDto {
   userId!: string | number;
 
   @IsOptional()
+  @IsString()
   branchId?: string | number;
+
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @IsBoolean()
   @IsOptional()
@@ -273,7 +278,12 @@ export class QueryAuditLogsDto {
   scope?: string;
 
   @IsOptional()
+  @IsString()
   branchId?: string | number;
+
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @IsString()
   @IsOptional()

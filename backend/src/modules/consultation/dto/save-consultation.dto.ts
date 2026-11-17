@@ -238,4 +238,14 @@ export class SaveConsultationDto {
   @IsString()
   @MaxLength(100)
   template_name?: string;
+
+  @ApiPropertyOptional({ description: 'Branch ID', example: '1' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID (snake_case alias)', example: '1' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

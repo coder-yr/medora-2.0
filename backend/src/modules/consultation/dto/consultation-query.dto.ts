@@ -16,6 +16,7 @@ export class ConsultationQueryDto {
     example: '1',
   })
   @IsOptional()
+  @IsString()
   doctor?: string | number;
 
   @ApiPropertyOptional({
@@ -23,7 +24,24 @@ export class ConsultationQueryDto {
     example: '1',
   })
   @IsOptional()
+  @IsString()
   patient?: string | number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by branch ID',
+    example: '1',
+  })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({
+    description: 'Filter by branch ID (snake_case alias)',
+    example: '1',
+  })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @ApiPropertyOptional({
     description: 'Filter by status (e.g. draft, completed)',

@@ -259,10 +259,14 @@ export class StaffQueryDto {
   category?: string;
 
   @ApiPropertyOptional({ description: 'Filter by Hospital Branch ID' })
-  @IsNumber()
   @IsOptional()
-  @Type(() => Number)
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by Hospital Branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @ApiPropertyOptional({ enum: StaffStatus, description: 'Filter by Employment Status' })
   @IsEnum(StaffStatus)

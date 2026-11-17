@@ -52,4 +52,14 @@ export class PrescriptionQueryDto {
   @Min(1)
   @Max(100)
   limit?: number = 25;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID', example: '1' })
+  @IsOptional()
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Filter by branch ID (snake_case alias)', example: '1' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 }

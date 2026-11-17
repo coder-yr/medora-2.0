@@ -215,9 +215,13 @@ export class CashDrawerDto {
 
   @ApiPropertyOptional({ description: 'Hospital branch ID' })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Hospital branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @ApiPropertyOptional({ description: 'Assigned cashier user ID' })
   @IsOptional()
@@ -248,9 +252,13 @@ export class CashierQueryDto {
 
   @ApiPropertyOptional({ description: 'Branch ID filter' })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Branch ID filter (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @ApiPropertyOptional({ description: 'Date range start (YYYY-MM-DD)' })
   @IsOptional()
@@ -296,9 +304,13 @@ export class DayBookQueryDto {
 
   @ApiPropertyOptional({ description: 'Hospital branch ID' })
   @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  branchId?: number;
+  @IsString()
+  branchId?: string | number;
+
+  @ApiPropertyOptional({ description: 'Hospital branch ID (snake_case alias)' })
+  @IsOptional()
+  @IsString()
+  branch_id?: string | number;
 
   @ApiPropertyOptional({
     description: 'Patient group filter',
