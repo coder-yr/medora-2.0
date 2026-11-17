@@ -1071,6 +1071,7 @@ export function App() {
               token={token}
               userRole={userRole}
               onNotification={(type, message) => setNotification({ type, message })}
+              activeBranchId={activeBranchId}
             />
           )}
 

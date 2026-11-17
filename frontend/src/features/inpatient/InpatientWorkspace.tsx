@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Bed as BedIcon,
   Activity,
@@ -14,6 +14,9 @@ import {
   Printer,
   Clock,
   Building2,
+  Stethoscope,
+  User,
+  AlertCircle,
 } from 'lucide-react';
 import type {
   Ward,
@@ -23,12 +26,15 @@ import type {
   InpatientDashboardMetrics,
   BedStatus,
 } from '../../types/inpatient';
+import type { Doctor } from '../../types/doctor';
+import type { Patient } from '../../types/patient';
 
 interface InpatientWorkspaceProps {
   apiBaseUrl?: string;
   token?: string;
   userRole?: string;
   onNotification?: (type: 'success' | 'error', message: string) => void;
+  activeBranchId?: string;
 }
 
 export function InpatientWorkspace({
@@ -36,6 +42,7 @@ export function InpatientWorkspace({
   token,
   userRole: _userRole = 'Doctor',
   onNotification,
+  activeBranchId,
 }: InpatientWorkspaceProps) {
   // Navigation tabs
   const [activeTab, setActiveTab] = useState<'overview' | 'admissions' | 'wards'>('overview');
@@ -65,10 +72,19 @@ export function InpatientWorkspace({
   // Form states: New Admission
   const [admitPatientId, setAdmitPatientId] = useState<string>('');
   const [admitBedId, setAdmitBedId] = useState<string>('');
-  const [admitDoctorId, setAdmitDoctorId] = useState<string>('1');
+  const [admitDoctorId, setAdmitDoctorId] = useState<string>('');
   const [admitType, setAdmitType] = useState<string>('ELECTIVE');
   const [admitReason, setAdmitReason] = useState<string>('');
   const [admitDiagnosis, setAdmitDiagnosis] = useState<string>('');
+
+  // Searchable Patient & Doctors for Admission
+  const [doctorsList, setDoctorsList] = useState<Doctor[]>([]);
+  const [isDoctorsLoading, setIsDoctorsLoading] = useState<boolean>(false);
+  const [patientSearchQuery, setPatientSearchQuery] = useState<string>('');
+  const [searchedPatients, setSearchedPatients] = useState<Patient[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [isSearchingPatients, setIsSearchingPatients] = useState<boolean>(false);
+  const [isSubmittingAdmission, setIsSubmittingAdmission] = useState<boolean>(false);
 
   // Form states: Transfer
   const [transferTargetBedId, setTransferTargetBedId] = useState<string>('');
@@ -180,17 +196,70 @@ export function InpatientWorkspace({
     }
   };
 
+  // 5. Fetch Doctors Catalogue
+  const fetchDoctors = useCallback(async () => {
+    if (!token) return;
+    setIsDoctorsLoading(true);
+    try {
+      const url = new URL(`${apiBaseUrl}/api/v1/doctors`);
+      url.searchParams.set('limit', '100');
+      if (activeBranchId) url.searchParams.set('branchId', activeBranchId);
+      const res = await fetch(url.toString(), { headers: authHeaders });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const list = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+        setDoctorsList(list);
+        if (list.length > 0) {
+          setAdmitDoctorId((prev) => (prev ? prev : String(list[0].id)));
+        }
+      }
+    } catch {
+      // non-blocking
+    } finally {
+      setIsDoctorsLoading(false);
+    }
+  }, [token, apiBaseUrl, activeBranchId, authHeaders]);
+
+  // Patient search in modal
+  useEffect(() => {
+    if (!token || !patientSearchQuery.trim() || patientSearchQuery.length < 2) {
+      setSearchedPatients([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingPatients(true);
+      try {
+        const url = new URL(`${apiBaseUrl}/api/v1/patients`);
+        url.searchParams.set('q', patientSearchQuery.trim());
+        url.searchParams.set('limit', '6');
+        if (activeBranchId) url.searchParams.set('branchId', activeBranchId);
+        const res = await fetch(url.toString(), { headers: authHeaders });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          const list = Array.isArray(data.data) ? data.data : (data.data?.items || data.data?.data || []);
+          setSearchedPatients(list);
+        }
+      } catch {
+        setSearchedPatients([]);
+      } finally {
+        setIsSearchingPatients(false);
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [token, apiBaseUrl, patientSearchQuery, activeBranchId, authHeaders]);
+
   // Reload everything
   const reloadAll = () => {
     fetchMetrics();
     fetchWards();
     fetchBeds();
     fetchAdmissions();
+    fetchDoctors();
   };
 
   useEffect(() => {
     reloadAll();
-  }, [token, selectedWardFilter, admissionStatusFilter]);
+  }, [token, selectedWardFilter, admissionStatusFilter, activeBranchId]);
 
   // Fetch Folio for Admission
   const loadFolio = async (admissionId: number | string) => {
@@ -213,38 +282,52 @@ export function InpatientWorkspace({
   // Handlers
   const handleCreateAdmission = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!admitPatientId || !admitBedId) {
-      notify('error', 'Please enter Patient ID and choose an available bed.');
+    const finalPatientId = selectedPatient ? selectedPatient.id : admitPatientId;
+    if (!finalPatientId) {
+      notify('error', 'Please search and select a patient to admit.');
+      return;
+    }
+    if (!admitBedId) {
+      notify('error', 'Please choose an available bed for admission.');
+      return;
+    }
+    if (!admitDoctorId) {
+      notify('error', 'Please choose an attending doctor.');
       return;
     }
 
+    setIsSubmittingAdmission(true);
     try {
       const res = await fetch(`${apiBaseUrl}/api/v1/inpatient/admissions`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
-          patientId: Number(admitPatientId),
+          patientId: Number(finalPatientId),
           bedId: Number(admitBedId),
           attendingDoctorId: Number(admitDoctorId),
           admissionType: admitType,
-          admissionReason: admitReason,
-          diagnosis: admitDiagnosis,
+          admissionReason: admitReason.trim() || undefined,
+          diagnosis: admitDiagnosis.trim() || undefined,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        notify('success', `Patient successfully admitted (#${data.data.admissionNumber}).`);
+        notify('success', `Patient successfully admitted (#${data.data.admissionNumber || data.data.id}).`);
         setShowAdmitModal(false);
+        setSelectedPatient(null);
+        setPatientSearchQuery('');
         setAdmitPatientId('');
         setAdmitBedId('');
         setAdmitReason('');
         setAdmitDiagnosis('');
         reloadAll();
       } else {
-        notify('error', data.error?.message || 'Failed to admit patient.');
+        notify('error', data.error?.message || data.message || 'Failed to admit patient.');
       }
     } catch {
       notify('error', 'Network error creating admission.');
+    } finally {
+      setIsSubmittingAdmission(false);
     }
   };
 
@@ -1032,74 +1115,212 @@ export function InpatientWorkspace({
       {/* MODAL: Admit Patient */}
       {showAdmitModal && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ maxWidth: 520, width: '100%' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Inpatient Admission</h3>
+          <div className="modal-card" style={{ maxWidth: 580, width: '100%', borderRadius: 12, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, borderBottom: '1px solid #f1f5f9', paddingBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ width: 42, height: 42, borderRadius: 10, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0284c7' }}>
+                  <BedIcon size={22} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: 'var(--text-main, #0f172a)' }}>Inpatient Admission</h3>
+                  <p style={{ margin: '2px 0 0 0', fontSize: 13, color: 'var(--text-muted, #64748b)' }}>
+                    Allocate a vacant bed, assign attending clinician, and admit patient.
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowAdmitModal(false)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer' }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted, #94a3b8)', padding: 4 }}
               >
                 <X size={20} />
               </button>
             </div>
+
             <form onSubmit={handleCreateAdmission}>
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Patient ID (Numeric)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="e.g. 1"
-                  required
-                  value={admitPatientId}
-                  onChange={(e) => setAdmitPatientId(e.target.value)}
-                />
+              {/* Step 1: Search & Select Inpatient */}
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <User size={15} style={{ color: '#0284c7' }} />
+                  <span>Admitting Patient *</span>
+                </label>
+
+                {selectedPatient ? (
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    padding: '12px 14px',
+                    background: '#f0f9ff',
+                    borderRadius: 8,
+                    border: '1px solid #bae6fd',
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: '#0369a1', fontSize: 14 }}>
+                        {selectedPatient.name}
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 4, fontSize: 12, color: '#0284c7' }}>
+                        <span>MRN: <strong>#{selectedPatient.patientId || selectedPatient.id}</strong></span>
+                        {selectedPatient.phone && <span>• Phone: {selectedPatient.phone}</span>}
+                        {selectedPatient.sex && <span>• Gender: {selectedPatient.sex}</span>}
+                        {selectedPatient.age && <span>• Age: {selectedPatient.age} yrs</span>}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPatient(null);
+                        setAdmitPatientId('');
+                      }}
+                      className="btn btn-secondary"
+                      style={{ fontSize: 12, padding: '4px 10px', height: 'auto', color: '#0369a1' }}
+                    >
+                      Change Patient
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ position: 'relative' }}>
+                    <div style={{ position: 'relative' }}>
+                      <Search size={16} style={{ position: 'absolute', left: 12, top: 12, color: 'var(--text-muted)' }} />
+                      <input
+                        type="text"
+                        className="form-input"
+                        style={{ paddingLeft: 36 }}
+                        placeholder="Search patient by MRN, name, or phone number..."
+                        value={patientSearchQuery}
+                        onChange={(e) => setPatientSearchQuery(e.target.value)}
+                        autoFocus
+                      />
+                      {isSearchingPatients && (
+                        <div style={{ position: 'absolute', right: 12, top: 12, fontSize: 12, color: 'var(--text-muted)' }}>
+                          Searching...
+                        </div>
+                      )}
+                    </div>
+
+                    {searchedPatients.length > 0 && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        background: 'var(--bg-card, #ffffff)',
+                        border: '1px solid var(--border-color, #e2e8f0)',
+                        borderRadius: 8,
+                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.15)',
+                        zIndex: 50,
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        marginTop: 4,
+                      }}>
+                        {searchedPatients.map((p) => (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              setSelectedPatient(p);
+                              setAdmitPatientId(String(p.id));
+                              setPatientSearchQuery('');
+                              setSearchedPatients([]);
+                            }}
+                            style={{
+                              padding: '10px 14px',
+                              borderBottom: '1px solid var(--border-color, #f1f5f9)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                            className="hover-bg-slate"
+                          >
+                            <div>
+                              <strong style={{ color: 'var(--text-main, #0f172a)' }}>{p.name}</strong>
+                              <span style={{ fontSize: 12, color: 'var(--text-muted, #64748b)', marginLeft: 8 }}>
+                                MRN #{p.patientId || p.id}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 12, color: 'var(--text-muted, #64748b)' }}>
+                              {p.phone || p.sex || 'Patient'}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Attending Doctor ID</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="e.g. 1"
+              {/* Step 2: Attending Doctor Selection */}
+              <div className="form-group" style={{ marginBottom: 14 }}>
+                <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <Stethoscope size={15} style={{ color: '#0284c7' }} />
+                  <span>Attending Consultant / Doctor *</span>
+                </label>
+                <select
+                  className="form-select"
                   required
                   value={admitDoctorId}
                   onChange={(e) => setAdmitDoctorId(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Target Available Bed</label>
-                <select
-                  className="form-select"
-                  required
-                  value={admitBedId}
-                  onChange={(e) => setAdmitBedId(e.target.value)}
+                  disabled={isDoctorsLoading}
                 >
-                  <option value="">-- Choose Vacant Bed --</option>
-                  {availableBeds.map((b) => (
-                    <option key={String(b.id)} value={String(b.id)}>
-                      {b.number} - {b.category?.category || 'Ward'} (PKR {b.category?.baseRate}/day)
-                    </option>
-                  ))}
+                  <option value="">-- Choose Attending Doctor --</option>
+                  {doctorsList.map((d) => {
+                    const cleanDept = d.department ? d.department.replace(/_\d{10,}/g, '').replace(/\s+\d{10,}/g, '') : 'General Medicine';
+                    return (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({cleanDept})
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
-              <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Admission Type</label>
-                <select
-                  className="form-select"
-                  value={admitType}
-                  onChange={(e) => setAdmitType(e.target.value)}
-                >
-                  <option value="ELECTIVE">Elective / Scheduled</option>
-                  <option value="EMERGENCY">Emergency Admission</option>
-                  <option value="OBSERVATION">Day Care / Observation</option>
-                  <option value="TRANSFER">Inter-Hospital Transfer</option>
-                </select>
+              {/* Step 3: Bed & Admission Type Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <BedIcon size={15} style={{ color: '#0284c7' }} />
+                    <span>Target Vacant Bed *</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    required
+                    value={admitBedId}
+                    onChange={(e) => setAdmitBedId(e.target.value)}
+                  >
+                    <option value="">-- Choose Vacant Bed --</option>
+                    {availableBeds.map((b) => {
+                      const cleanCategory = (b.category?.category || 'Ward').replace(/_\d{10,}/g, '').replace(/\s+\d{10,}/g, '');
+                      const rate = b.category?.baseRate ? ` • PKR ${Number(b.category.baseRate).toLocaleString()}/day` : '';
+                      return (
+                        <option key={String(b.id)} value={String(b.id)}>
+                          Bed {b.number} — {cleanCategory}{rate}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <Activity size={15} style={{ color: '#0284c7' }} />
+                    <span>Admission Type *</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    value={admitType}
+                    onChange={(e) => setAdmitType(e.target.value)}
+                  >
+                    <option value="ELECTIVE">Elective / Scheduled</option>
+                    <option value="EMERGENCY">Emergency Admission</option>
+                    <option value="OBSERVATION">Day Care / Observation</option>
+                    <option value="TRANSFER">Inter-Hospital Transfer</option>
+                  </select>
+                </div>
               </div>
 
+              {/* Step 4: Diagnosis & Notes */}
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Provisional Diagnosis</label>
+                <label className="form-label" style={{ fontWeight: 600 }}>Provisional Diagnosis</label>
                 <input
                   type="text"
                   className="form-input"
@@ -1109,18 +1330,18 @@ export function InpatientWorkspace({
                 />
               </div>
 
-              <div className="form-group" style={{ marginBottom: 16 }}>
-                <label className="form-label">Admission Reason & Clinical Notes</label>
+              <div className="form-group" style={{ marginBottom: 18 }}>
+                <label className="form-label" style={{ fontWeight: 600 }}>Admission Reason & Clinical Notes</label>
                 <textarea
                   className="form-input"
                   rows={3}
-                  placeholder="Clinical indication for inpatient stay..."
+                  placeholder="Clinical indication for inpatient stay, vitals at admission, care plan..."
                   value={admitReason}
                   onChange={(e) => setAdmitReason(e.target.value)}
                 />
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, borderTop: '1px solid #f1f5f9', paddingTop: 14 }}>
                 <button
                   type="button"
                   className="btn btn-secondary"
@@ -1128,8 +1349,13 @@ export function InpatientWorkspace({
                 >
                   Cancel
                 </button>
-                <button type="submit" className="btn btn-primary" style={{ background: '#0284c7' }}>
-                  Confirm Admission
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  style={{ background: '#0284c7', display: 'flex', alignItems: 'center', gap: 6 }}
+                  disabled={isSubmittingAdmission}
+                >
+                  {isSubmittingAdmission ? 'Admitting Patient...' : 'Confirm Admission'}
                 </button>
               </div>
             </form>
@@ -1140,7 +1366,7 @@ export function InpatientWorkspace({
       {/* MODAL: Transfer Bed */}
       {selectedAdmissionForTransfer && (
         <div className="modal-backdrop">
-          <div className="modal-card" style={{ maxWidth: 480, width: '100%' }}>
+          <div className="modal-card" style={{ maxWidth: 480, width: '100%', borderRadius: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>Bed Transfer</h3>
               <button
@@ -1156,7 +1382,7 @@ export function InpatientWorkspace({
                   {selectedAdmissionForTransfer.patient?.name || 'Patient'}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  Current Bed: {selectedAdmissionForTransfer.bed?.number} ({selectedAdmissionForTransfer.ward?.category})
+                  Current Bed: {selectedAdmissionForTransfer.bed?.number} ({selectedAdmissionForTransfer.ward?.category ? selectedAdmissionForTransfer.ward.category.replace(/_\d{10,}/g, '') : 'Ward'})
                 </div>
               </div>
 
@@ -1169,11 +1395,15 @@ export function InpatientWorkspace({
                   onChange={(e) => setTransferTargetBedId(e.target.value)}
                 >
                   <option value="">-- Choose New Bed --</option>
-                  {availableBeds.map((b) => (
-                    <option key={String(b.id)} value={String(b.id)}>
-                      {b.number} - {b.category?.category || 'Ward'} (PKR {b.category?.baseRate}/day)
-                    </option>
-                  ))}
+                  {availableBeds.map((b) => {
+                    const cleanCategory = (b.category?.category || 'Ward').replace(/_\d{10,}/g, '').replace(/\s+\d{10,}/g, '');
+                    const rate = b.category?.baseRate ? ` • PKR ${Number(b.category.baseRate).toLocaleString()}/day` : '';
+                    return (
+                      <option key={String(b.id)} value={String(b.id)}>
+                        Bed {b.number} — {cleanCategory}{rate}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 
