@@ -135,24 +135,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
       if (res.ok && data.success && data.data?.accessToken) {
         onLoginSuccess(data.data);
         return;
+      } else {
+        const msg = data.error?.message || data.message || `Authentication failed for ${roleName}.`;
+        setError(Array.isArray(msg) ? msg.join(', ') : msg);
       }
     } catch {
-      // Backend offline or local fallback
+      setError(`Unable to connect to the hospital authentication server to sign in as ${roleName}.`);
+    } finally {
+      setLoading(false);
     }
-
-    // Direct fallback for instant demo persona access
-    onLoginSuccess({
-      accessToken: 'demo-token-' + roleName.toLowerCase(),
-      user: {
-        id: 'demo-' + roleName.toLowerCase(),
-        email: roleEmail,
-        name: `${roleName} Test`,
-        role: roleName,
-        group: roleName,
-        permissions: [],
-      },
-    });
-    setLoading(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -501,80 +492,82 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
           </form>
         )}
 
-        {/* Development Persona Quick Links */}
-        <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #f1f5f9' }}>
-          <div style={{
-            fontSize: 11,
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            fontWeight: 700,
-            color: '#64748b',
-            marginBottom: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 6
-          }}>
-            <Sparkles size={12} style={{ color: '#0284c7' }} />
-            One-Click Instant Demo Personas
+        {/* Development Persona Quick Links (Development / Staging Only) */}
+        {import.meta.env.DEV && (
+          <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #f1f5f9' }}>
+            <div style={{
+              fontSize: 11,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              fontWeight: 700,
+              color: '#64748b',
+              marginBottom: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6
+            }}>
+              <Sparkles size={12} style={{ color: '#0284c7' }} />
+              Authorized Test Account Quick Fill
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '7px 4px', background: '#f8fafc', borderColor: '#e2e8f0', color: '#1e293b' }}
+                onClick={() => instantLogin('admin.test@medora.hospital', 'Admin')}
+                title="Sign in as Administrator"
+              >
+                👑 Admin
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '7px 4px', background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}
+                onClick={() => instantLogin('doctor.test@medora.hospital', 'Doctor')}
+                title="Sign in as Doctor"
+              >
+                🩺 Doctor
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '7px 4px', background: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}
+                onClick={() => instantLogin('accountant.test@medora.hospital', 'Accountant')}
+                title="Sign in as Accountant"
+              >
+                📊 Accountant
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '7px 4px', background: '#f0f9ff', borderColor: '#bae6fd', color: '#0369a1' }}
+                onClick={() => instantLogin('pharmacist.test@medora.hospital', 'Pharmacist')}
+                title="Sign in as Pharmacist"
+              >
+                💊 Pharmacist
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '7px 4px', background: '#faf5ff', borderColor: '#e9d5ff', color: '#6b21a8' }}
+                onClick={() => instantLogin('laboratorist.test@medora.hospital', 'Laboratorist')}
+                title="Sign in as Laboratorist"
+              >
+                🔬 Laboratorist
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 12, padding: '7px 4px', background: '#fff1f2', borderColor: '#fecdd3', color: '#9f1239' }}
+                onClick={() => instantLogin('receptionist.test@medora.hospital', 'Receptionist')}
+                title="Sign in as Receptionist"
+              >
+                📋 Receptionist
+              </button>
+            </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: 12, padding: '7px 4px', background: '#f8fafc', borderColor: '#e2e8f0', color: '#1e293b' }}
-              onClick={() => instantLogin('admin.test@medora.hospital', 'Admin')}
-              title="Sign in as Administrator"
-            >
-              👑 Admin
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: 12, padding: '7px 4px', background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}
-              onClick={() => instantLogin('doctor.test@medora.hospital', 'Doctor')}
-              title="Sign in as Doctor"
-            >
-              🩺 Doctor
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: 12, padding: '7px 4px', background: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}
-              onClick={() => instantLogin('accountant.test@medora.hospital', 'Accountant')}
-              title="Sign in as Accountant"
-            >
-              📊 Accountant
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: 12, padding: '7px 4px', background: '#f0f9ff', borderColor: '#bae6fd', color: '#0369a1' }}
-              onClick={() => instantLogin('pharmacist.test@medora.hospital', 'Pharmacist')}
-              title="Sign in as Pharmacist"
-            >
-              💊 Pharmacist
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: 12, padding: '7px 4px', background: '#faf5ff', borderColor: '#e9d5ff', color: '#6b21a8' }}
-              onClick={() => instantLogin('laboratorist.test@medora.hospital', 'Laboratorist')}
-              title="Sign in as Laboratorist"
-            >
-              🔬 Laboratorist
-            </button>
-            <button
-              type="button"
-              className="btn btn-secondary"
-              style={{ fontSize: 12, padding: '7px 4px', background: '#fff1f2', borderColor: '#fecdd3', color: '#9f1239' }}
-              onClick={() => instantLogin('receptionist.test@medora.hospital', 'Receptionist')}
-              title="Sign in as Receptionist"
-            >
-              📋 Receptionist
-            </button>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Forgot Password Modal */}

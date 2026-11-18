@@ -16,7 +16,6 @@ import {
   Building2,
   Stethoscope,
   User,
-  AlertCircle,
 } from 'lucide-react';
 import type {
   Ward,

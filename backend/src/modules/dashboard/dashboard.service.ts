@@ -352,6 +352,59 @@ export class DashboardService {
   // 2. CLINICAL WORKLOAD (DOCTOR PERSONA)
   // ===========================================================================
 
+  async getDoctorWorkloadForUser(user: any, filterDto: DashboardFilterDto) {
+    const isGlobalAdmin =
+      user.group === 'Admin' ||
+      user.role === 'Admin' ||
+      user.permissions?.includes(HospitalPermission.BRANCH_VIEW_ALL);
+    const userBranchId = user.branchId ? BigInt(user.branchId) : null;
+
+    let targetDoctorId: bigint | null = null;
+
+    // 1. If an Admin or privileged staff explicitly queries a doctorId via query filter
+    if (filterDto.doctorId && (isGlobalAdmin || user.permissions?.includes(HospitalPermission.DOCTOR_VIEW))) {
+      try {
+        targetDoctorId = BigInt(filterDto.doctorId);
+      } catch {
+        throw new BadRequestException('Invalid doctorId format');
+      }
+    } else {
+      // 2. Resolve doctor profile linked to this authenticated user account (ionUserId == user.id)
+      const linkedDoctor = await this.prisma.doctor.findFirst({
+        where: { ionUserId: String(user.id) },
+        select: { id: true },
+      });
+
+      if (linkedDoctor) {
+        targetDoctorId = linkedDoctor.id;
+      } else if (isGlobalAdmin) {
+        // Admin with no linked doctor profile: find first active doctor in branch or system
+        const firstDoctor = await this.prisma.doctor.findFirst({
+          where: userBranchId ? { OR: [{ branchId: userBranchId }, { branchId: null }] } : {},
+          orderBy: { id: 'asc' },
+          select: { id: true },
+        });
+        if (firstDoctor) {
+          targetDoctorId = firstDoctor.id;
+        }
+      }
+    }
+
+    if (!targetDoctorId) {
+      return {
+        doctorId: null,
+        doctor: null,
+        message: 'No doctor profile is linked to this account.',
+        period: filterDto.period || 'today',
+        appointments: { total: 0, completed: 0, items: [] },
+        consultations: { pendingDrafts: 0, completed: 0 },
+        generatedAt: new Date().toISOString(),
+      };
+    }
+
+    return this.getDoctorWorkload(targetDoctorId, filterDto, userBranchId);
+  }
+
   async getDoctorWorkload(
     doctorId: bigint,
     filterDto: DashboardFilterDto,
@@ -403,6 +456,7 @@ export class DashboardService {
 
     return {
       doctorId: doctorId.toString(),
+      message: undefined,
       period: filterDto.period || 'today',
       dateRange: { start: start.toISOString(), end: end.toISOString() },
       appointments: {

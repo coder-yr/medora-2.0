@@ -54,9 +54,7 @@ export class DashboardController {
     @CurrentUser() user: AuthUser,
     @Query() filterDto: DashboardFilterDto,
   ) {
-    const doctorId = BigInt(user.id);
-    const userBranchId = user.branchId ? BigInt(user.branchId) : null;
-    return this.service.getDoctorWorkload(doctorId, filterDto, userBranchId);
+    return this.service.getDoctorWorkloadForUser(user, filterDto);
   }
 
   @Get('branch-comparison')

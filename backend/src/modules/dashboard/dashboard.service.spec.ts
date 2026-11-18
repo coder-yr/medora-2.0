@@ -51,6 +51,10 @@ describe('DashboardService', () => {
     hospitalBranch: {
       findMany: jest.fn(),
     },
+    doctor: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -221,6 +225,36 @@ describe('DashboardService', () => {
       expect(workload.appointments.items[0].id).toBe('10');
       expect(workload.consultations.pendingDrafts).toBe(2);
       expect(workload.consultations.completed).toBe(8);
+    });
+
+    it('should correctly resolve doctor via ionUserId for authenticated doctor', async () => {
+      mockPrisma.doctor.findFirst.mockResolvedValueOnce({
+        id: BigInt(137),
+        name: 'Dr. Test',
+      });
+      mockPrisma.appointment.findMany.mockResolvedValueOnce([]);
+      mockPrisma.appointment.count.mockResolvedValueOnce(0);
+      mockPrisma.consultation.count.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+      const doctorUser = { id: 3, group: 'Doctor', role: 'Doctor' };
+      const workload = await service.getDoctorWorkloadForUser(doctorUser, { period: 'today' });
+
+      expect(mockPrisma.doctor.findFirst).toHaveBeenCalledWith({
+        where: { ionUserId: '3' },
+        select: { id: true },
+      });
+      expect(workload.doctorId).toBe('137');
+    });
+
+    it('should return empty workload when user has no linked doctor profile', async () => {
+      mockPrisma.doctor.findFirst.mockResolvedValueOnce(null);
+
+      const nonDoctorUser = { id: 99, group: 'Nurse', role: 'Nurse' };
+      const workload = await service.getDoctorWorkloadForUser(nonDoctorUser, { period: 'today' });
+
+      expect(workload.doctorId).toBeNull();
+      expect(workload.message).toContain('No doctor profile is linked');
+      expect(workload.appointments.total).toBe(0);
     });
   });
 
