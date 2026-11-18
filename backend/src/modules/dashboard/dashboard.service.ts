@@ -112,7 +112,7 @@ export class DashboardService {
   ): bigint | null {
     if (requestedBranchId && requestedBranchId !== 'all') {
       const reqId = BigInt(requestedBranchId);
-      if (!isGlobalAdmin && userBranchId && reqId !== userBranchId) {
+      if (!isGlobalAdmin && (!userBranchId || reqId !== userBranchId)) {
         throw new ForbiddenException('Access to external branch analytics denied');
       }
       return reqId;
@@ -122,7 +122,13 @@ export class DashboardService {
       return null; // Global view across all branches
     }
 
-    return userBranchId || null;
+    if (!userBranchId) {
+      throw new ForbiddenException(
+        'No operational branch context specified or assigned to user',
+      );
+    }
+
+    return userBranchId;
   }
 
   // ===========================================================================

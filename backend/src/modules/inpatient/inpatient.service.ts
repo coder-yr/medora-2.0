@@ -1,12 +1,16 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { CreateWardDto, UpdateWardDto } from './dto/ward.dto';
 import { CreateBedDto, UpdateBedDto, UpdateBedStatusDto } from './dto/bed.dto';
 import {
@@ -40,13 +44,27 @@ export function serializeBigInt<T>(data: T): any {
 export class InpatientService {
   private readonly logger = new Logger(InpatientService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   // ===========================================================================
   // 1. DASHBOARD & SUMMARY METRICS
   // ===========================================================================
 
-  async getDashboardMetrics() {
+  async getDashboardMetrics(activeBranchId?: bigint | null, isGlobalAdmin = false) {
+    if (!isGlobalAdmin && !activeBranchId) {
+      throw new ForbiddenException('No operational branch context specified or assigned to user');
+    }
+
+    const whereBed: Prisma.BedWhereInput = { isActive: true };
+    const whereAdm: Prisma.AdmissionWhereInput = {};
+    if (activeBranchId) {
+      whereBed.OR = [{ branchId: activeBranchId }, { branchId: null }];
+      whereAdm.OR = [{ branchId: activeBranchId }, { branchId: null }];
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const tomorrow = new Date(today);
@@ -65,19 +83,20 @@ export class InpatientService {
       expectedDischargesToday,
       totalWards,
     ] = await Promise.all([
-      this.prisma.bed.count({ where: { isActive: true } }),
-      this.prisma.bed.count({ where: { isActive: true, status: 'OCCUPIED' } }),
-      this.prisma.bed.count({ where: { isActive: true, status: 'AVAILABLE' } }),
-      this.prisma.bed.count({ where: { isActive: true, status: 'CLEANING' } }),
-      this.prisma.bed.count({ where: { isActive: true, status: 'MAINTENANCE' } }),
-      this.prisma.bed.count({ where: { isActive: true, status: 'RESERVED' } }),
+      this.prisma.bed.count({ where: whereBed }),
+      this.prisma.bed.count({ where: { ...whereBed, status: 'OCCUPIED' } }),
+      this.prisma.bed.count({ where: { ...whereBed, status: 'AVAILABLE' } }),
+      this.prisma.bed.count({ where: { ...whereBed, status: 'CLEANING' } }),
+      this.prisma.bed.count({ where: { ...whereBed, status: 'MAINTENANCE' } }),
+      this.prisma.bed.count({ where: { ...whereBed, status: 'RESERVED' } }),
       this.prisma.admission.count({
-        where: { status: { in: ['ADMITTED', 'TRANSFERRED'] } },
+        where: { ...whereAdm, status: { in: ['ADMITTED', 'TRANSFERRED'] } },
       }),
-      this.prisma.admission.count({ where: { status: 'PENDING' } }),
-      this.prisma.admission.count({ where: { status: 'DISCHARGE_PENDING' } }),
+      this.prisma.admission.count({ where: { ...whereAdm, status: 'PENDING' } }),
+      this.prisma.admission.count({ where: { ...whereAdm, status: 'DISCHARGE_PENDING' } }),
       this.prisma.admission.count({
         where: {
+          ...whereAdm,
           status: { in: ['ADMITTED', 'TRANSFERRED', 'DISCHARGE_PENDING'] },
           expectedDischargeDate: { gte: today, lt: tomorrow },
         },
@@ -235,12 +254,25 @@ export class InpatientService {
   // 3. BED MANAGEMENT
   // ===========================================================================
 
-  async getBeds(query: QueryBedDto) {
+  async getBeds(query: QueryBedDto, user?: AuthUser) {
     const where: Prisma.BedWhereInput = {};
 
     if (query.categoryId) where.categoryId = BigInt(query.categoryId);
     if (query.status) where.status = query.status;
-    if (query.branchId) where.branchId = BigInt(query.branchId);
+
+    if (query.branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+      where.branchId = authorizedBranchId;
+    } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (accessible && accessible.length > 0) {
+        where.OR = [{ branchId: { in: accessible } }, { branchId: null }];
+      } else {
+        where.branchId = -1n;
+      }
+    } else if (query.branchId) {
+      where.branchId = BigInt(query.branchId);
+    }
 
     const beds = await this.prisma.bed.findMany({
       where,
@@ -624,12 +656,26 @@ export class InpatientService {
     });
   }
 
-  async findAllAdmissions(query: QueryAdmissionDto) {
+  async findAllAdmissions(query: QueryAdmissionDto, user?: AuthUser) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 20));
     const skip = (page - 1) * limit;
 
     const where: Prisma.AdmissionWhereInput = {};
+
+    if (query.branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+      where.branchId = authorizedBranchId;
+    } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (accessible && accessible.length > 0) {
+        where.OR = [{ branchId: { in: accessible } }, { branchId: null }];
+      } else {
+        where.branchId = -1n;
+      }
+    } else if (query.branchId) {
+      where.branchId = BigInt(query.branchId);
+    }
 
     if (query.status) where.status = query.status;
     if (query.patientId) where.patientId = BigInt(query.patientId);

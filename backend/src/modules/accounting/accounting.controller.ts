@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   HttpStatus,
@@ -383,8 +384,10 @@ export class AccountingController {
     if (this.branchAuth && req.user && !this.branchAuth.isGlobalAdmin(req.user)) {
       if (query.branchId) {
         await this.branchAuth.assertResourceAccess(req.user, query.branchId, 'accounting report');
+      } else if (req.user.branchId) {
+        query.branchId = Number(req.user.branchId);
       } else {
-        query.branchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+        throw new ForbiddenException('No operational branch context specified or assigned to user');
       }
     }
     return this.accountingService.getTrialBalance(query);
@@ -397,8 +400,10 @@ export class AccountingController {
     if (this.branchAuth && req.user && !this.branchAuth.isGlobalAdmin(req.user)) {
       if (query.branchId) {
         await this.branchAuth.assertResourceAccess(req.user, query.branchId, 'accounting report');
+      } else if (req.user.branchId) {
+        query.branchId = Number(req.user.branchId);
       } else {
-        query.branchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+        throw new ForbiddenException('No operational branch context specified or assigned to user');
       }
     }
     return this.accountingService.getProfitAndLoss(query);
@@ -411,8 +416,10 @@ export class AccountingController {
     if (this.branchAuth && req.user && !this.branchAuth.isGlobalAdmin(req.user)) {
       if (query.branchId) {
         await this.branchAuth.assertResourceAccess(req.user, query.branchId, 'accounting report');
+      } else if (req.user.branchId) {
+        query.branchId = Number(req.user.branchId);
       } else {
-        query.branchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+        throw new ForbiddenException('No operational branch context specified or assigned to user');
       }
     }
     return this.accountingService.getBalanceSheet(query);
@@ -433,8 +440,10 @@ export class AccountingController {
     if (this.branchAuth && req?.user && !this.branchAuth.isGlobalAdmin(req.user)) {
       if (resolvedBranchId) {
         await this.branchAuth.assertResourceAccess(req.user, resolvedBranchId, 'general ledger');
+      } else if (req.user?.branchId) {
+        resolvedBranchId = Number(req.user.branchId);
       } else {
-        resolvedBranchId = req.user.branchId ? Number(req.user.branchId) : undefined;
+        throw new ForbiddenException('No operational branch context specified or assigned to user');
       }
     }
     return this.accountingService.getGeneralLedger(

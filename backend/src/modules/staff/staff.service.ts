@@ -1,11 +1,16 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
+import { Prisma } from '@prisma/client';
 import {
   ChangeDesignationDto,
   CreateDesignationDto,
@@ -24,7 +29,10 @@ import {
 export class StaffService {
   private readonly logger = new Logger(StaffService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   /**
    * Helper to format BigInt values for clean JSON output.
@@ -359,12 +367,26 @@ export class StaffService {
   /**
    * Search and filter staff profiles with pagination.
    */
-  async findAll(query: StaffQueryDto): Promise<{ data: any[]; meta: any }> {
+  async findAll(query: StaffQueryDto, user?: AuthUser): Promise<{ data: any[]; meta: any }> {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 20));
     const skip = (page - 1) * limit;
 
     const where: any = {};
+
+    if (query.branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+      where.branchId = authorizedBranchId;
+    } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (accessible && accessible.length > 0) {
+        where.OR = [{ branchId: { in: accessible } }, { branchId: null }];
+      } else {
+        where.branchId = -1n;
+      }
+    } else if (query.branchId) {
+      where.branchId = BigInt(query.branchId);
+    }
 
     if (query.search?.trim()) {
       const term = query.search.trim();
@@ -388,10 +410,6 @@ export class StaffService {
 
     if (query.category) {
       where.designation = { category: query.category };
-    }
-
-    if (query.branchId) {
-      where.branchId = BigInt(query.branchId);
     }
 
     if (query.employmentStatus) {
@@ -1000,7 +1018,15 @@ export class StaffService {
   /**
    * Get aggregated HR and staff metrics for administrative overview.
    */
-  async getDashboardMetrics(): Promise<any> {
+  async getDashboardMetrics(activeBranchId?: bigint | null, isGlobalAdmin = false): Promise<any> {
+    if (!isGlobalAdmin && !activeBranchId) {
+      throw new ForbiddenException('No operational branch context specified or assigned to user');
+    }
+
+    const whereBranch: Prisma.StaffProfileWhereInput = activeBranchId
+      ? { OR: [{ branchId: activeBranchId }, { branchId: null }] }
+      : {};
+
     const [
       totalStaff,
       activeStaff,
@@ -1013,18 +1039,20 @@ export class StaffService {
       departments,
       recentHistory,
     ] = await Promise.all([
-      this.prisma.staffProfile.count(),
-      this.prisma.staffProfile.count({ where: { employmentStatus: StaffStatus.ACTIVE } }),
-      this.prisma.staffProfile.count({ where: { employmentStatus: StaffStatus.ON_LEAVE } }),
-      this.prisma.staffProfile.count({ where: { employmentStatus: StaffStatus.SUSPENDED } }),
-      this.prisma.staffProfile.count({ where: { employmentStatus: StaffStatus.INACTIVE } }),
-      this.prisma.staffProfile.count({ where: { employmentStatus: StaffStatus.TERMINATED } }),
-      this.prisma.staffProfile.count({ where: { userId: null } }),
+      this.prisma.staffProfile.count({ where: whereBranch }),
+      this.prisma.staffProfile.count({ where: { ...whereBranch, employmentStatus: StaffStatus.ACTIVE } }),
+      this.prisma.staffProfile.count({ where: { ...whereBranch, employmentStatus: StaffStatus.ON_LEAVE } }),
+      this.prisma.staffProfile.count({ where: { ...whereBranch, employmentStatus: StaffStatus.SUSPENDED } }),
+      this.prisma.staffProfile.count({ where: { ...whereBranch, employmentStatus: StaffStatus.INACTIVE } }),
+      this.prisma.staffProfile.count({ where: { ...whereBranch, employmentStatus: StaffStatus.TERMINATED } }),
+      this.prisma.staffProfile.count({ where: { ...whereBranch, userId: null } }),
       this.prisma.staffProfile.groupBy({
+        where: whereBranch,
         by: ['designationId'],
         _count: { id: true },
       }),
       this.prisma.staffProfile.groupBy({
+        where: whereBranch,
         by: ['departmentId'],
         _count: { id: true },
       }),

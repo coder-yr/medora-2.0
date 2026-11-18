@@ -20,6 +20,8 @@ import {
 } from '@nestjs/swagger';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -56,8 +58,13 @@ export class StaffController {
   @RequirePermissions(HospitalPermission.STAFF_VIEW)
   @ApiOperation({ summary: 'Get staff overview metrics, department breakdown and recent activity' })
   @ApiResponse({ status: 200, description: 'Aggregated HR and directory metrics' })
-  async getDashboardMetrics() {
-    return this.staffService.getDashboardMetrics();
+  async getDashboardMetrics(@CurrentUser() user?: AuthUser) {
+    const isGlobalAdmin =
+      user?.group === 'Admin' ||
+      (Array.isArray(user?.permissions) &&
+        user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL));
+    const branchId = user?.branchId ? BigInt(user.branchId) : null;
+    return this.staffService.getDashboardMetrics(branchId, isGlobalAdmin);
   }
 
   @Get('designations')
@@ -88,8 +95,8 @@ export class StaffController {
   @RequirePermissions(HospitalPermission.STAFF_VIEW)
   @ApiOperation({ summary: 'List and search non-medical staff directory with filters and pagination' })
   @ApiResponse({ status: 200, description: 'Paginated list of staff profiles' })
-  async findAll(@Query() query: StaffQueryDto) {
-    return this.staffService.findAll(query);
+  async findAll(@Query() query: StaffQueryDto, @CurrentUser() user?: AuthUser) {
+    return this.staffService.findAll(query, user);
   }
 
   @Post()

@@ -3,9 +3,13 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  ForbiddenException,
+  Optional,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { Prisma } from '@prisma/client';
 import {
   CreateRadiologyCategoryDto,
@@ -50,19 +54,27 @@ function serializeBigInt(obj: any): any {
 export class RadiologyService {
   private readonly logger = new Logger(RadiologyService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   // =========================================================================
   // 1. DASHBOARD & KPIS
   // =========================================================================
 
-  async getDashboardMetrics(branchId?: number) {
+  async getDashboardMetrics(branchId?: number, isGlobalAdmin = false) {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayEnd = new Date();
     todayEnd.setHours(23, 59, 59, 999);
 
-    const whereBranch = branchId ? { branchId: BigInt(branchId) } : {};
+    let whereBranch: Prisma.RadiologyOrderWhereInput = {};
+    if (branchId) {
+      whereBranch = { branchId: BigInt(branchId) };
+    } else if (!isGlobalAdmin) {
+      throw new ForbiddenException('No operational branch context specified or assigned to user');
+    }
 
     const [
       pendingOrders,
@@ -546,8 +558,22 @@ export class RadiologyService {
     });
   }
 
-  async getOrders(query: QueryRadiologyOrderDto) {
+  async getOrders(query: QueryRadiologyOrderDto, user?: AuthUser) {
     const where: Prisma.RadiologyOrderWhereInput = {};
+
+    if (query.branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+      where.branchId = authorizedBranchId;
+    } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (accessible && accessible.length > 0) {
+        where.branchId = { in: accessible };
+      } else {
+        where.branchId = -1n;
+      }
+    } else if (user?.branchId && user.group !== 'Admin') {
+      where.branchId = BigInt(user.branchId);
+    }
 
     if (query.patientId) {
       where.patientId = BigInt(query.patientId);

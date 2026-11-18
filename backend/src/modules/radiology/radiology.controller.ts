@@ -65,8 +65,12 @@ export class RadiologyController {
   @ApiOperation({ summary: 'Get departmental radiology KPI metrics and recent studies' })
   @ApiResponse({ status: 200, description: 'Department metrics successfully retrieved' })
   async getDashboard(@CurrentUser() user?: AuthUser) {
+    const isGlobalAdmin =
+      user?.group === 'Admin' ||
+      (Array.isArray(user?.permissions) &&
+        user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL));
     const branchId = user?.branchId ? Number(user.branchId) : undefined;
-    return this.radiologyService.getDashboardMetrics(branchId);
+    return this.radiologyService.getDashboardMetrics(branchId, isGlobalAdmin);
   }
 
   // =========================================================================
@@ -153,8 +157,11 @@ export class RadiologyController {
   @Get('orders')
   @RequirePermissions(HospitalPermission.RADIOLOGY_VIEW)
   @ApiOperation({ summary: 'Query radiology orders worklist' })
-  async getOrders(@Query() query: QueryRadiologyOrderDto) {
-    return this.radiologyService.getOrders(query);
+  async getOrders(
+    @Query() query: QueryRadiologyOrderDto,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.radiologyService.getOrders(query, user);
   }
 
   @Get('orders/:id')

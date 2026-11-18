@@ -53,8 +53,13 @@ export class InpatientController {
   @RequirePermissions(HospitalPermission.INPATIENT_VIEW)
   @ApiOperation({ summary: 'Get operational inpatient KPIs and bed occupancy statistics' })
   @ApiResponse({ status: 200, description: 'Occupancy rate, counts by bed status, active stays' })
-  async getDashboard() {
-    return this.inpatientService.getDashboardMetrics();
+  async getDashboard(@CurrentUser() user?: AuthUser) {
+    const isGlobalAdmin =
+      user?.group === 'Admin' ||
+      (Array.isArray(user?.permissions) &&
+        user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL));
+    const branchId = user?.branchId ? BigInt(user.branchId) : null;
+    return this.inpatientService.getDashboardMetrics(branchId, isGlobalAdmin);
   }
 
   // =========================================================================
@@ -104,8 +109,8 @@ export class InpatientController {
   @Get('beds')
   @RequirePermissions(HospitalPermission.INPATIENT_VIEW)
   @ApiOperation({ summary: 'List beds with ward and active admission details' })
-  async getBeds(@Query() query: QueryBedDto) {
-    return this.inpatientService.getBeds(query);
+  async getBeds(@Query() query: QueryBedDto, @CurrentUser() user?: AuthUser) {
+    return this.inpatientService.getBeds(query, user);
   }
 
   @Get('beds/available')
@@ -158,8 +163,11 @@ export class InpatientController {
   @Get('admissions')
   @RequirePermissions(HospitalPermission.INPATIENT_VIEW)
   @ApiOperation({ summary: 'List admissions with filters and search' })
-  async getAdmissions(@Query() query: QueryAdmissionDto) {
-    return this.inpatientService.findAllAdmissions(query);
+  async getAdmissions(
+    @Query() query: QueryAdmissionDto,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.inpatientService.findAllAdmissions(query, user);
   }
 
   @Get('admissions/:id')

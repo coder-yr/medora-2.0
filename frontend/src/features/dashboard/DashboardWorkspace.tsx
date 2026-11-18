@@ -358,7 +358,7 @@ export const DashboardWorkspace: React.FC<DashboardWorkspaceProps> = ({
                 {overview.inpatient.activeAdmissions} Patients
               </div>
               <div style={{ fontSize: 12, color: '#7c3aed', marginTop: 4, fontWeight: 500 }}>
-                {overview.inpatient.occupancyRatePercent}% Bed Occupancy ({overview.inpatient.occupiedBeds}/{overview.inpatient.totalBeds})
+                {overview.inpatient?.occupancyRatePercent ?? 0}% Bed Occupancy ({overview.inpatient?.occupiedBeds ?? 0}/{overview.inpatient?.totalBeds ?? 0})
               </div>
             </div>
 
