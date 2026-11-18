@@ -1,6 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { BedDouble, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AdminDashboard } from './admin/AdminDashboard';
 import { DoctorDashboard } from './doctor/DoctorDashboard';
@@ -8,10 +6,10 @@ import { ReceptionistDashboard } from './receptionist/ReceptionistDashboard';
 import { AccountantDashboard } from './accountant/AccountantDashboard';
 import { PharmacistDashboard } from './pharmacist/PharmacistDashboard';
 import { LaboratoristDashboard } from './laboratorist/LaboratoristDashboard';
+import { NurseDashboard } from './nurse/NurseDashboard';
 
 export const DashboardResolver: React.FC = () => {
   const { userRole, currentUser } = useAuth();
-  const navigate = useNavigate();
 
   // 1. Admin Persona: Dedicated Executive Governance Dashboard
   if (userRole === 'Admin') {
@@ -43,29 +41,9 @@ export const DashboardResolver: React.FC = () => {
     return <LaboratoristDashboard />;
   }
 
-  // 7. Nurse Persona: Nursing & Inpatient Dashboard
+  // 7. Nurse Persona: Dedicated Nursing & Inpatient Care Cockpit
   if (userRole === 'Nurse') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <BedDouble size={22} style={{ color: '#0284c7' }} />
-            Inpatient Nursing & Bed Management Dashboard
-          </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Welcome, <strong>{currentUser?.name || 'Nurse'}</strong>. Monitor ward occupancy, manage bed sanitization, and record patient admission notes.
-          </p>
-        </div>
-
-        <div className="card" style={{ maxWidth: 480, padding: 20 }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Inpatient & Bed Allocation</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Track ward capacity, update bed statuses (Occupied, Cleaning, Available), and handle patient transfers.</p>
-          <button onClick={() => navigate('/inpatient')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            Open Inpatient Workspace <ArrowRight size={16} />
-          </button>
-        </div>
-      </div>
-    );
+    return <NurseDashboard />;
   }
 
   // Fallback for unknown or unconfigured persona

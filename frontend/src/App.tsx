@@ -24,6 +24,8 @@ import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
 import { InpatientWorkspace } from './components/InpatientWorkspace';
 import { CashierWorkspace } from './components/CashierWorkspace';
 import { CashierDashboard } from './features/dashboards/cashier/CashierDashboard';
+import { RadiologistDashboard } from './features/dashboards/radiologist/RadiologistDashboard';
+import { HRDashboard } from './features/dashboards/hr/HRDashboard';
 import { StaffWorkspace } from './components/StaffWorkspace';
 import { AccountingWorkspace } from './components/AccountingWorkspace';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
@@ -159,7 +161,27 @@ const LaboratoryRoute: React.FC = () => {
 
 const RadiologyRoute: React.FC = () => {
   const { token, userRole } = useAuth();
-  return <RadiologyWorkspace token={token} userRole={userRole} />;
+  const [viewMode, setViewMode] = React.useState<'dashboard' | 'workspace'>('dashboard');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button
+          onClick={() => setViewMode(viewMode === 'dashboard' ? 'workspace' : 'dashboard')}
+          className="btn btn-secondary"
+          style={{ fontSize: 12, padding: '6px 12px' }}
+        >
+          {viewMode === 'dashboard' ? 'Switch to Full Examination Workspace' : 'Switch to Radiologist Cockpit'}
+        </button>
+      </div>
+
+      {viewMode === 'dashboard' ? (
+        <RadiologistDashboard />
+      ) : (
+        <RadiologyWorkspace token={token} userRole={userRole} />
+      )}
+    </div>
+  );
 };
 
 const InpatientRoute: React.FC = () => {
@@ -250,7 +272,27 @@ const DepartmentRoute: React.FC = () => {
 
 const StaffRoute: React.FC = () => {
   const { token, userRole } = useAuth();
-  return <StaffWorkspace token={token} userRole={userRole} />;
+  const [viewMode, setViewMode] = React.useState<'dashboard' | 'workspace'>('dashboard');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button
+          onClick={() => setViewMode(viewMode === 'dashboard' ? 'workspace' : 'dashboard')}
+          className="btn btn-secondary"
+          style={{ fontSize: 12, padding: '6px 12px' }}
+        >
+          {viewMode === 'dashboard' ? 'Switch to Detailed Staff Roster' : 'Switch to HR Analytics Cockpit'}
+        </button>
+      </div>
+
+      {viewMode === 'dashboard' ? (
+        <HRDashboard />
+      ) : (
+        <StaffWorkspace token={token} userRole={userRole} />
+      )}
+    </div>
+  );
 };
 
 const AccountingRoute: React.FC = () => {
