@@ -97,3 +97,4 @@ export const DashboardSkeletonTable: React.FC<{ rows?: number }> = ({ rows = 4 }
     </div>
   );
 };
+

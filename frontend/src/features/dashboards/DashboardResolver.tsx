@@ -1,16 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Pill,
-  CreditCard,
-  Microscope,
-  BedDouble,
-  ArrowRight,
-} from 'lucide-react';
+import { BedDouble, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { AdminDashboard } from './admin/AdminDashboard';
 import { DoctorDashboard } from './doctor/DoctorDashboard';
 import { ReceptionistDashboard } from './receptionist/ReceptionistDashboard';
+import { AccountantDashboard } from './accountant/AccountantDashboard';
+import { PharmacistDashboard } from './pharmacist/PharmacistDashboard';
+import { LaboratoristDashboard } from './laboratorist/LaboratoristDashboard';
 
 export const DashboardResolver: React.FC = () => {
   const { userRole, currentUser } = useAuth();
@@ -31,107 +28,19 @@ export const DashboardResolver: React.FC = () => {
     return <ReceptionistDashboard />;
   }
 
-  // 4. Accountant Persona: Financial Dashboard
+  // 4. Accountant Persona: Dedicated Financial Management & General Ledger Cockpit
   if (userRole === 'Accountant') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <CreditCard size={22} style={{ color: '#0284c7' }} />
-            Hospital Financial & Billing Management
-          </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Welcome, <strong>{currentUser?.name || 'Accountant'}</strong>. Review hospital billing, invoices, payments, and cashier reconciliations.
-          </p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Invoices & Billing</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Manage patient billing folios, issue itemized invoices, record settlement payments.</p>
-            <button onClick={() => navigate('/billing')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Open Billing & Invoices <ArrowRight size={16} />
-            </button>
-          </div>
-
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Cashier & POS Shifts</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Inspect cash drawer shifts, approve supervisor reconciliations, and record treasury payouts.</p>
-            <button onClick={() => navigate('/cashier')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Open Cashier Shifts <ArrowRight size={16} />
-            </button>
-          </div>
-
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>General Ledger & COA</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Manage double-entry journal vouchers, chart of accounts, and financial statement reports.</p>
-            <button onClick={() => navigate('/accounting')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Open General Accounting <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <AccountantDashboard />;
   }
 
-  // 5. Pharmacist Persona: Pharmacy Dashboard
+  // 5. Pharmacist Persona: Dedicated Pharmacy & Formulary Inventory Dashboard
   if (userRole === 'Pharmacist') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Pill size={22} style={{ color: '#0284c7' }} />
-            Pharmacy & Formulary Inventory Dashboard
-          </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Welcome, <strong>{currentUser?.name || 'Pharmacist'}</strong>. Manage pharmaceutical dispensing, medicine batches, and stock reorders.
-          </p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Pharmacy & Dispensing</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Process prescription dispensing orders, manage batch stocks, and track purchase invoices.</p>
-            <button onClick={() => navigate('/pharmacy')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Open Pharmacy Workspace <ArrowRight size={16} />
-            </button>
-          </div>
-
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Medicine Catalogue</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Maintain master medicine formulary, generic names, dosage forms, and price lists.</p>
-            <button onClick={() => navigate('/medicines')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Open Medicine Catalogue <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <PharmacistDashboard />;
   }
 
-  // 6. Laboratorist Persona: Diagnostics Dashboard
+  // 6. Laboratorist Persona: Dedicated Laboratory Information System (LIS) Dashboard
   if (userRole === 'Laboratorist') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Microscope size={22} style={{ color: '#0284c7' }} />
-            Laboratory Information System (LIS) Dashboard
-          </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Welcome, <strong>{currentUser?.name || 'Laboratorist'}</strong>. Process specimen intake, enter test results, and release validated reports.
-          </p>
-        </div>
-
-        <div className="card" style={{ maxWidth: 480, padding: 20 }}>
-          <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Laboratory Diagnostics</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Receive specimen samples, record parameters, and publish verified test results for clinicians.</p>
-          <button onClick={() => navigate('/laboratory')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            Open Laboratory Workspace <ArrowRight size={16} />
-          </button>
-        </div>
-      </div>
-    );
+    return <LaboratoristDashboard />;
   }
 
   // 7. Nurse Persona: Nursing & Inpatient Dashboard

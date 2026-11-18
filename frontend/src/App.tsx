@@ -23,6 +23,7 @@ import { LaboratoryWorkspace } from './components/LaboratoryWorkspace';
 import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
 import { InpatientWorkspace } from './components/InpatientWorkspace';
 import { CashierWorkspace } from './components/CashierWorkspace';
+import { CashierDashboard } from './features/dashboards/cashier/CashierDashboard';
 import { StaffWorkspace } from './components/StaffWorkspace';
 import { AccountingWorkspace } from './components/AccountingWorkspace';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
@@ -175,7 +176,27 @@ const InpatientRoute: React.FC = () => {
 
 const CashierRoute: React.FC = () => {
   const { token, userRole } = useAuth();
-  return <CashierWorkspace token={token} userRole={userRole} />;
+  const [viewMode, setViewMode] = React.useState<'dashboard' | 'register'>('dashboard');
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button
+          onClick={() => setViewMode(viewMode === 'dashboard' ? 'register' : 'dashboard')}
+          className="btn btn-secondary"
+          style={{ fontSize: 12, padding: '6px 12px' }}
+        >
+          {viewMode === 'dashboard' ? 'Switch to Detailed Register Mode' : 'Switch to Cashier Cockpit'}
+        </button>
+      </div>
+
+      {viewMode === 'dashboard' ? (
+        <CashierDashboard />
+      ) : (
+        <CashierWorkspace token={token} userRole={userRole} />
+      )}
+    </div>
+  );
 };
 
 const BillingRoute: React.FC = () => {

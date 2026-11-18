@@ -68,3 +68,4 @@ export const DashboardErrorState: React.FC<DashboardErrorStateProps> = ({
     </div>
   );
 };
+
