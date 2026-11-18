@@ -212,3 +212,4 @@ export const NAVIGATION_CATEGORIES: NavigationCategory[] = [
   'Inpatient & Billing',
   'Hospital Administration',
 ];
+

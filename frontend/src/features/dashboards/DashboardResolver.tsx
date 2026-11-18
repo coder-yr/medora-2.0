@@ -1,156 +1,34 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Stethoscope,
-  Users,
-  Calendar,
   Pill,
   CreditCard,
   Microscope,
   BedDouble,
   ArrowRight,
-  Clock,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { DashboardWorkspace } from '../dashboard/DashboardWorkspace';
+import { AdminDashboard } from './admin/AdminDashboard';
+import { DoctorDashboard } from './doctor/DoctorDashboard';
+import { ReceptionistDashboard } from './receptionist/ReceptionistDashboard';
 
 export const DashboardResolver: React.FC = () => {
-  const { userRole, currentUser, token, activeBranchId, apiBaseUrl } = useAuth();
+  const { userRole, currentUser } = useAuth();
   const navigate = useNavigate();
 
-  // 1. Admin Persona: Full Unified Operational Executive Dashboard
+  // 1. Admin Persona: Dedicated Executive Governance Dashboard
   if (userRole === 'Admin') {
-    return (
-      <DashboardWorkspace
-        token={token}
-        userRole={userRole}
-        activeBranchId={activeBranchId}
-        apiBaseUrl={apiBaseUrl}
-        onNavigateToModule={(mod) => navigate(`/${mod}`)}
-      />
-    );
+    return <AdminDashboard />;
   }
 
-  // 2. Doctor Persona: Clinical Dashboard
+  // 2. Doctor Persona: Dedicated Clinical Workbench & OPD Queue
   if (userRole === 'Doctor') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <Stethoscope size={22} style={{ color: '#0284c7' }} />
-              Doctor Clinical Workbench
-            </h2>
-            <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-              Welcome back, <strong>{currentUser?.name || 'Dr. Consultant'}</strong>. Review your outpatient queue, consultations, and prescriptions.
-            </p>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button
-              onClick={() => navigate('/consultations')}
-              className="btn btn-primary"
-              style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}
-            >
-              <span>Open Consultations</span>
-              <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16 }}>
-          <div className="card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Active Queue</span>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#e0f2fe', color: '#0284c7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Clock size={18} />
-              </div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-main)' }}>Consultation Workbench</div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 12px 0' }}>Conduct patient examinations, vitals recording, and diagnoses</p>
-            <button onClick={() => navigate('/consultations')} className="btn btn-secondary" style={{ width: '100%', fontSize: 12 }}>
-              Go to Consultations
-            </button>
-          </div>
-
-          <div className="card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Prescriptions</span>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Pill size={18} />
-              </div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-main)' }}>Rx Prescriptions</div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 12px 0' }}>Issue digital e-prescriptions with dosage and duration</p>
-            <button onClick={() => navigate('/prescriptions')} className="btn btn-secondary" style={{ width: '100%', fontSize: 12 }}>
-              Manage Prescriptions
-            </button>
-          </div>
-
-          <div className="card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Appointments</span>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#faf5ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Calendar size={18} />
-              </div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-main)' }}>Schedule & Visits</div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 12px 0' }}>Review registered patients booked for OPD consultations</p>
-            <button onClick={() => navigate('/appointments')} className="btn btn-secondary" style={{ width: '100%', fontSize: 12 }}>
-              View Schedule
-            </button>
-          </div>
-
-          <div className="card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Inpatients</span>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff1f2', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <BedDouble size={18} />
-              </div>
-            </div>
-            <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-main)' }}>IPD Rounds</div>
-            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: '4px 0 12px 0' }}>Monitor admitted patients, bed status, and daily clinical progress</p>
-            <button onClick={() => navigate('/inpatient')} className="btn btn-secondary" style={{ width: '100%', fontSize: 12 }}>
-              Inspect Ward Beds
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <DoctorDashboard />;
   }
 
-  // 3. Receptionist Persona: Front Desk Dashboard
+  // 3. Receptionist Persona: Dedicated Front Desk & Outpatient Reception
   if (userRole === 'Receptionist') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-        <div>
-          <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Users size={22} style={{ color: '#0284c7' }} />
-            Front Desk & Patient Intake Dashboard
-          </h2>
-          <p style={{ margin: '4px 0 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-            Welcome, <strong>{currentUser?.name || 'Receptionist'}</strong>. Manage patient registrations, appointment bookings, and waiting queue.
-          </p>
-        </div>
-
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Patient Central Registry</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Register new walk-in patients, update demographics, and view medical history.</p>
-            <button onClick={() => navigate('/patients')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Open Patient Registry <ArrowRight size={16} />
-            </button>
-          </div>
-
-          <div className="card" style={{ padding: 20 }}>
-            <h3 style={{ margin: '0 0 8px 0', fontSize: 16, fontWeight: 700 }}>Appointments & Visits</h3>
-            <p style={{ fontSize: 13, color: 'var(--text-muted)', margin: '0 0 16px 0' }}>Book clinic appointments, check consultant doctor slot availability, and handle check-ins.</p>
-            <button onClick={() => navigate('/appointments')} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              Open Appointment Schedule <ArrowRight size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    return <ReceptionistDashboard />;
   }
 
   // 4. Accountant Persona: Financial Dashboard

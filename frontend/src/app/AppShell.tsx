@@ -62,8 +62,10 @@ export const AppShell: React.FC = () => {
   }, [apiBaseUrl]);
 
   useEffect(() => {
-    checkBackendHealth();
-    const interval = setInterval(checkBackendHealth, 30000);
+    void checkBackendHealth();
+    const interval = setInterval(() => {
+      void checkBackendHealth();
+    }, 30000);
     return () => clearInterval(interval);
   }, [checkBackendHealth]);
 
@@ -589,3 +591,4 @@ export const AppShell: React.FC = () => {
     </div>
   );
 };
+

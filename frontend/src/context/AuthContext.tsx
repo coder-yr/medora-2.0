@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useState, useEffect, useCallback } from 'react';
 import type { AuthUser, AuthResponse, UserBranch } from '../types/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
@@ -34,7 +34,7 @@ interface AuthContextType {
   refreshIdentity: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+export const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
@@ -153,12 +153,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [handleLogout]);
 
   useEffect(() => {
-    const existingToken = sessionStorage.getItem('medora_access_token');
-    if (existingToken) {
-      validateSessionWithBackend(existingToken);
-    } else {
-      setAuthLoading(false);
-    }
+    let cancelled = false;
+    const restore = async () => {
+      const existingToken = sessionStorage.getItem('medora_access_token');
+      if (existingToken) {
+        await validateSessionWithBackend(existingToken);
+      } else if (!cancelled) {
+        setAuthLoading(false);
+      }
+    };
+    void restore();
+    return () => {
+      cancelled = true;
+    };
   }, [validateSessionWithBackend]);
 
   const handleLoginSuccess = useCallback((auth: AuthResponse) => {
@@ -209,10 +216,5 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+export { useAuth } from './useAuth';
+

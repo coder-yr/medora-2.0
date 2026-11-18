@@ -124,3 +124,4 @@ export const RequirePermission: React.FC<RequirePermissionProps> = ({ permission
 
   return <>{children}</>;
 };
+
