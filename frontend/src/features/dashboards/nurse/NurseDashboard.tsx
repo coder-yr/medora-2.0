@@ -230,7 +230,15 @@ export const NurseDashboard: React.FC = () => {
         >
           <DashboardMetricCard
             title="Bed Occupancy"
-            value={`${metrics?.occupancyRate ?? metrics?.occupancyPercentage ?? 0}%`}
+            value={`${(() => {
+              if (!metrics) return 0;
+              const val = Number(
+                metrics.occupancyRate ??
+                metrics.occupancyPercentage ??
+                (metrics.totalBeds > 0 ? ((metrics.occupiedBeds || 0) / metrics.totalBeds) * 100 : 0)
+              );
+              return isNaN(val) ? 0 : Math.round(val * 10) / 10;
+            })()}%`}
             subtext={`${metrics?.occupiedBeds ?? 0} of ${metrics?.totalBeds ?? 0} active beds`}
             icon={Activity}
             variant="primary"

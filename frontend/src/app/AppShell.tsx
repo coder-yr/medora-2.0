@@ -487,7 +487,37 @@ export const AppShell: React.FC = () => {
 
         {/* Workspace Body Route Outlet */}
         <main className="medora-content-area">
-          <Outlet />
+          <React.Suspense
+            fallback={
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  minHeight: '400px',
+                  color: '#64748b',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  gap: 12,
+                }}
+              >
+                <span
+                  style={{
+                    width: 20,
+                    height: 20,
+                    border: '2px solid #cbd5e1',
+                    borderTopColor: '#0284c7',
+                    borderRadius: '50%',
+                    animation: 'spin 0.8s linear infinite',
+                    display: 'inline-block',
+                  }}
+                />
+                Loading Medora Workspace...
+              </div>
+            }
+          >
+            <Outlet />
+          </React.Suspense>
         </main>
       </div>
 

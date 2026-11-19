@@ -258,7 +258,13 @@ export const AdminDashboard: React.FC = () => {
           {/* 5. Bed Occupancy Rate */}
           <DashboardMetricCard
             title="Ward Bed Occupancy"
-            value={`${overview?.inpatient.occupancyRatePercent ?? 0}%`}
+            value={`${(() => {
+              const rate = overview?.inpatient.occupancyRatePercent;
+              if (typeof rate === 'number' && Number.isFinite(rate)) return rate;
+              const total = overview?.inpatient.totalBeds || 0;
+              const occupied = overview?.inpatient.occupiedBeds || 0;
+              return total > 0 ? Math.round((occupied / total) * 100 * 10) / 10 : 0;
+            })()}%`}
             subtext="Allocated hospital bed capacity"
             icon={BedDouble}
             variant={

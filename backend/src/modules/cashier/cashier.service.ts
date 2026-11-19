@@ -7,6 +7,7 @@ import {
   Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -128,6 +129,46 @@ export class CashierService {
       throw new ConflictException(
         `Cashier #${cashierId} already has an active shift (${existing.shiftNumber}) in ${existing.status} status. Please complete or close it first.`,
       );
+    }
+
+    if (dto.cashDrawerId) {
+      const drawer = await this.prisma.cashDrawer.findUnique({
+        where: { id: BigInt(dto.cashDrawerId) },
+      });
+      if (!drawer) {
+        throw new NotFoundException(`Cash drawer #${dto.cashDrawerId} not found.`);
+      }
+      if (!drawer.isActive) {
+        throw new BadRequestException(`Cash drawer "${drawer.name}" is inactive.`);
+      }
+      if (resolvedBranchId && drawer.branchId && drawer.branchId !== resolvedBranchId) {
+        throw new BadRequestException(
+          `Cash drawer "${drawer.name}" belongs to branch #${drawer.branchId}, not current operational branch #${resolvedBranchId}.`,
+        );
+      }
+      if (drawer.assignedCashierId && drawer.assignedCashierId !== cId) {
+        const isSupervisor =
+          user?.group === 'Admin' ||
+          (Array.isArray(user?.permissions) &&
+            user.permissions.includes(HospitalPermission.CASHIER_SHIFT_APPROVE));
+        if (!isSupervisor) {
+          throw new ForbiddenException(
+            `Cash drawer "${drawer.name}" is dedicated to another cashier (User #${drawer.assignedCashierId}).`,
+          );
+        }
+      }
+
+      const activeDrawerShift = await this.prisma.cashierShift.findFirst({
+        where: {
+          cashDrawerId: BigInt(dto.cashDrawerId),
+          status: { in: ['OPEN', 'CLOSING', 'PENDING_APPROVAL'] },
+        },
+      });
+      if (activeDrawerShift) {
+        throw new ConflictException(
+          `Cash drawer "${drawer.name}" is currently in use by active shift ${activeDrawerShift.shiftNumber}.`,
+        );
+      }
     }
 
     const openingCash = dto.openingCash ? CashierService.round2(dto.openingCash) : 0;

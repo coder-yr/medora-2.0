@@ -218,8 +218,8 @@ export const DashboardWorkspace: React.FC<DashboardWorkspaceProps> = ({
                   alert.level === 'CRITICAL'
                     ? '1px solid #fecaca'
                     : alert.level === 'WARNING'
-                    ? '1px solid #fef3c7'
-                    : '1px solid #dbeafe',
+                      ? '1px solid #fef3c7'
+                      : '1px solid #dbeafe',
                 color:
                   alert.level === 'CRITICAL' ? '#991b1b' : alert.level === 'WARNING' ? '#92400e' : '#1e40af',
               }}
@@ -358,7 +358,14 @@ export const DashboardWorkspace: React.FC<DashboardWorkspaceProps> = ({
                 {overview.inpatient.activeAdmissions} Patients
               </div>
               <div style={{ fontSize: 12, color: '#7c3aed', marginTop: 4, fontWeight: 500 }}>
-                {overview.inpatient?.occupancyRatePercent ?? 0}% Bed Occupancy ({overview.inpatient?.occupiedBeds ?? 0}/{overview.inpatient?.totalBeds ?? 0})
+                {(() => {
+                  const rate = overview.inpatient?.occupancyRatePercent;
+                  if (typeof rate === 'number' && Number.isFinite(rate)) return `${rate}%`;
+                  const total = overview.inpatient?.totalBeds || 0;
+                  const occupied = overview.inpatient?.occupiedBeds || 0;
+                  const calculated = total > 0 ? Math.round((occupied / total) * 100 * 10) / 10 : 0;
+                  return `${calculated}%`;
+                })()} Bed Occupancy ({overview.inpatient?.occupiedBeds ?? 0}/{overview.inpatient?.totalBeds ?? 0})
               </div>
             </div>
 
@@ -555,14 +562,14 @@ export const DashboardWorkspace: React.FC<DashboardWorkspaceProps> = ({
                               app.status === 'Completed' || app.status === 'Visited'
                                 ? '#dcfce7'
                                 : app.status === 'Cancelled'
-                                ? '#fee2e2'
-                                : '#e0e7ff',
+                                  ? '#fee2e2'
+                                  : '#e0e7ff',
                             color:
                               app.status === 'Completed' || app.status === 'Visited'
                                 ? '#166534'
                                 : app.status === 'Cancelled'
-                                ? '#991b1b'
-                                : '#3730a3',
+                                  ? '#991b1b'
+                                  : '#3730a3',
                           }}
                         >
                           {app.status}
