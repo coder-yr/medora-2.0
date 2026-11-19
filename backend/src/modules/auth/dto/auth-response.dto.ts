@@ -29,6 +29,9 @@ export class UserProfileDto {
 
   @ApiProperty({ example: '1', nullable: true })
   branchId?: string | null;
+
+  @ApiProperty({ example: '1', nullable: true, required: false })
+  organizationId?: string | null;
 }
 
 export class AuthResponseDto {

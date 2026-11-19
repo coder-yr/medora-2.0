@@ -19,6 +19,7 @@ export interface AuthUser {
   permissions: string[];
   branchId?: bigint | null;
   staffId?: bigint | null;
+  organizationId?: bigint | null;
 }
 
 export interface JwtPayload {
@@ -29,6 +30,7 @@ export interface JwtPayload {
   permissions: string[];
   branchId?: string | null;
   staffId?: string | null;
+  organizationId?: string | null;
   iat?: number;
   exp?: number;
 }

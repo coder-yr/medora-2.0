@@ -28,6 +28,7 @@ import { CashierModule } from './modules/cashier/cashier.module';
 import { StaffModule } from './modules/staff/staff.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { HospitalSettingsModule } from './modules/hospital-settings/hospital-settings.module';
+import { OrganizationModule } from './modules/organization/organization.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
@@ -66,6 +67,7 @@ import { AppController } from './app.controller';
     StaffModule,
     AccountingModule,
     HospitalSettingsModule,
+    OrganizationModule,
     NotificationModule,
     DashboardModule,
   ],

@@ -33,6 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       permissions: mergedPermissions,
       branchId: payload.branchId ? BigInt(payload.branchId) : null,
       staffId: payload.staffId ? BigInt(payload.staffId) : null,
+      organizationId: payload.organizationId ? BigInt(payload.organizationId) : null,
     };
   }
 }

@@ -175,6 +175,7 @@ export class AuthService {
       group: role,
       permissions,
       branchId: dbUser.branchId ? BigInt(dbUser.branchId) : null,
+      organizationId: dbUser.organizationId ? BigInt(dbUser.organizationId) : null,
     };
 
     // Generate cryptographically secure refresh token & session record
@@ -418,6 +419,7 @@ export class AuthService {
       group: role,
       permissions,
       branchId: dbUser.branchId ? BigInt(dbUser.branchId) : null,
+      organizationId: dbUser.organizationId ? BigInt(dbUser.organizationId) : null,
     };
 
     return this.generateAuthResponse(authUser, newRawRefreshToken);
@@ -508,6 +510,7 @@ export class AuthService {
       permissions: user.permissions,
       branchId: user.branchId ? String(user.branchId) : null,
       staffId: user.staffId ? String(user.staffId) : null,
+      organizationId: user.organizationId ? String(user.organizationId) : null,
     };
 
     const accessToken = this.jwtService.sign(payload);
@@ -525,6 +528,7 @@ export class AuthService {
         role: user.group,
         permissions: user.permissions,
         branchId: user.branchId ? String(user.branchId) : null,
+        organizationId: user.organizationId ? String(user.organizationId) : null,
       },
     };
   }
