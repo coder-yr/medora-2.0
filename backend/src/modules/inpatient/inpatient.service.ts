@@ -414,11 +414,15 @@ export class InpatientService {
       );
     }
 
+    const newDesc = dto.notes
+      ? (bed.description ? `${bed.description} | ${dto.notes}` : dto.notes).trim().slice(-250)
+      : undefined;
+
     const updated = await this.prisma.bed.update({
       where: { id: BigInt(id) },
       data: {
         status: dto.status,
-        description: dto.notes ? `${bed.description || ''} | ${dto.notes}`.trim() : undefined,
+        description: newDesc,
       },
       include: { category: true },
     });
