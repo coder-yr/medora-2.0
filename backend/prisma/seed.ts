@@ -66,12 +66,20 @@ async function main() {
 
   const staffUsers = [
     {
+      login: 'superadmin_test',
+      email: 'superadmin.test@medora.hospital',
+      firstName: 'Super',
+      lastName: 'Administrator',
+      group: 'SuperAdmin',
+      description: 'System-Level Global Super Administrator',
+    },
+    {
       login: 'admin_test',
       email: 'admin.test@medora.hospital',
-      firstName: 'Admin',
-      lastName: 'Test',
+      firstName: 'Hospital',
+      lastName: 'Admin',
       group: 'Admin',
-      description: 'Test Administrator',
+      description: 'Test Hospital Administrator',
     },
     {
       login: 'doctor_test',
@@ -120,6 +128,30 @@ async function main() {
       lastName: 'Test',
       group: 'Laboratorist',
       description: 'Test Laboratorist',
+    },
+    {
+      login: 'radiologist_test',
+      email: 'radiologist.test@medora.hospital',
+      firstName: 'Radiologist',
+      lastName: 'Test',
+      group: 'Radiologist',
+      description: 'Test Radiologist',
+    },
+    {
+      login: 'cashier_test',
+      email: 'cashier.test@medora.hospital',
+      firstName: 'Cashier',
+      lastName: 'Test',
+      group: 'Cashier',
+      description: 'Test Front Desk Cashier',
+    },
+    {
+      login: 'hr_test',
+      email: 'hr.test@medora.hospital',
+      firstName: 'HR',
+      lastName: 'Test',
+      group: 'HR',
+      description: 'Test HR Administrator',
     },
   ];
 
@@ -374,10 +406,29 @@ async function main() {
 
   // Assign memberships for test users
   const allUsers = await prisma.user.findMany({
-    where: { login: { in: ['admin_test', 'accountant_test', 'receptionist_test', 'doctor_test'] } },
+    where: { login: { in: ['superadmin_test', 'admin_test', 'accountant_test', 'receptionist_test', 'doctor_test'] } },
   });
 
   for (const user of allUsers) {
+    if (user.login === 'superadmin_test') {
+      // SuperAdmin has global access across all branches
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { branchId: null },
+      });
+      await prisma.userBranchMembership.upsert({
+        where: { userId_branchId: { userId: user.id, branchId: mainBranch.id } },
+        update: { isDefault: true, isActive: true },
+        create: { userId: user.id, branchId: mainBranch.id, isDefault: true, isActive: true },
+      });
+      await prisma.userBranchMembership.upsert({
+        where: { userId_branchId: { userId: user.id, branchId: cityBranch.id } },
+        update: { isDefault: false, isActive: true },
+        create: { userId: user.id, branchId: cityBranch.id, isDefault: false, isActive: true },
+      });
+      continue;
+    }
+
     // Set default branch on User record
     await prisma.user.update({
       where: { id: user.id },

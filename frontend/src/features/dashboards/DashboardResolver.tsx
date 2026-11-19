@@ -1,58 +1,76 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { AdminDashboard } from './admin/AdminDashboard';
+import { SuperAdminDashboard } from './superadmin/SuperAdminDashboard';
+import { HospitalAdminDashboard } from './admin/HospitalAdminDashboard';
 import { DoctorDashboard } from './doctor/DoctorDashboard';
 import { ReceptionistDashboard } from './receptionist/ReceptionistDashboard';
-import { AccountantDashboard } from './accountant/AccountantDashboard';
+import { NurseDashboard } from './nurse/NurseDashboard';
 import { PharmacistDashboard } from './pharmacist/PharmacistDashboard';
 import { LaboratoristDashboard } from './laboratorist/LaboratoristDashboard';
-import { NurseDashboard } from './nurse/NurseDashboard';
+import { RadiologistDashboard } from './radiologist/RadiologistDashboard';
+import { CashierDashboard } from './cashier/CashierDashboard';
+import { AccountantDashboard } from './accountant/AccountantDashboard';
+import { HRDashboard } from './hr/HRDashboard';
+import { UnconfiguredRoleView } from './components/UnconfiguredRoleView';
 
 export const DashboardResolver: React.FC = () => {
-  const { userRole, currentUser } = useAuth();
+  const { userRole } = useAuth();
 
-  // 1. Admin Persona: Dedicated Executive Governance Dashboard
-  if (userRole === 'Admin') {
-    return <AdminDashboard />;
+  // 1. Super Admin: Global Multi-Branch Governance Cockpit
+  if (userRole === 'Super Admin') {
+    return <SuperAdminDashboard />;
   }
 
-  // 2. Doctor Persona: Dedicated Clinical Workbench & OPD Queue
+  // 2. Hospital Admin: Branch Operations Administration
+  if (userRole === 'Hospital Admin') {
+    return <HospitalAdminDashboard />;
+  }
+
+  // 3. Doctor Persona: Clinical Workbench & OPD Queue
   if (userRole === 'Doctor') {
     return <DoctorDashboard />;
   }
 
-  // 3. Receptionist Persona: Dedicated Front Desk & Outpatient Reception
+  // 4. Receptionist Persona: Front Desk & Outpatient Reception
   if (userRole === 'Receptionist') {
     return <ReceptionistDashboard />;
   }
 
-  // 4. Accountant Persona: Dedicated Financial Management & General Ledger Cockpit
-  if (userRole === 'Accountant') {
-    return <AccountantDashboard />;
-  }
-
-  // 5. Pharmacist Persona: Dedicated Pharmacy & Formulary Inventory Dashboard
-  if (userRole === 'Pharmacist') {
-    return <PharmacistDashboard />;
-  }
-
-  // 6. Laboratorist Persona: Dedicated Laboratory Information System (LIS) Dashboard
-  if (userRole === 'Laboratorist') {
-    return <LaboratoristDashboard />;
-  }
-
-  // 7. Nurse Persona: Dedicated Nursing & Inpatient Care Cockpit
+  // 5. Nurse Persona: Nursing Station & Inpatient Bedside Care
   if (userRole === 'Nurse') {
     return <NurseDashboard />;
   }
 
-  // Fallback for unknown or unconfigured persona
-  return (
-    <div style={{ maxWidth: 520, margin: '40px auto', padding: 24, textAlign: 'center' }} className="card">
-      <h3 style={{ margin: '0 0 8px 0' }}>Welcome to Medora 2.0</h3>
-      <p style={{ color: 'var(--text-muted)', fontSize: 13.5 }}>
-        Signed in as <strong>{currentUser?.name}</strong> ({userRole}).
-      </p>
-    </div>
-  );
+  // 6. Pharmacist Persona: Pharmacy Dispensary & Formulary Inventory
+  if (userRole === 'Pharmacist') {
+    return <PharmacistDashboard />;
+  }
+
+  // 7. Laboratorist Persona: Laboratory Information System (LIS) & Specimen Processing
+  if (userRole === 'Laboratorist') {
+    return <LaboratoristDashboard />;
+  }
+
+  // 8. Radiologist Persona: Medical Imaging, PACS Worklist & Modality Diagnostic Reports
+  if (userRole === 'Radiologist') {
+    return <RadiologistDashboard />;
+  }
+
+  // 9. Cashier Persona: POS Counter, Shift Cashier Till & Patient Settlements
+  if (userRole === 'Cashier') {
+    return <CashierDashboard />;
+  }
+
+  // 10. Accountant Persona: Financial Management, GL & Hospital Invoicing
+  if (userRole === 'Accountant') {
+    return <AccountantDashboard />;
+  }
+
+  // 11. HR Persona: Human Resources, Staff Onboarding & Department Rosters
+  if (userRole === 'HR') {
+    return <HRDashboard />;
+  }
+
+  // Fallback for unconfigured role, unassigned persona, or missing permissions
+  return <UnconfiguredRoleView />;
 };

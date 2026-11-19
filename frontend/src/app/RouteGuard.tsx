@@ -59,7 +59,7 @@ export const RequirePermission: React.FC<RequirePermissionProps> = ({ permission
   const navigate = useNavigate();
 
   const hasAccess =
-    userRole === 'Admin' ||
+    userRole === 'Super Admin' ||
     userPermissions.map((p) => p.toLowerCase()).includes(permission.toLowerCase());
 
   if (!hasAccess) {

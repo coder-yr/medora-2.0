@@ -321,19 +321,23 @@ async function runPhase8UAT() {
 
   // Step 2.3: Patient Search by Name
   const searchRes = await api(`/patients?q=${encodeURIComponent(patientFullName)}`, { token: personas.receptionist.token });
+  const searchItems = searchRes.data?.data?.items || searchRes.data?.data || [];
   assert(
-    searchRes.status === 200 && (searchRes.data?.data || []).length > 0,
+    searchRes.status === 200 && searchItems.length > 0,
     `Receptionist searches patient by name tag "${patientFullName}"`,
-    `Found: ${(searchRes.data?.data || []).length}`,
+    `Found: ${searchItems.length}`,
     'Reception'
   );
 
-  // Step 2.4: Book Doctor Appointment
+  // Step 2.4: Book Doctor Appointment on unique future weekday
   const d = new Date();
-  d.setDate(d.getDate() + 8);
+  d.setDate(d.getDate() + 30 + Math.floor(Math.random() * 30));
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+  if (d.getDay() === 6) d.setDate(d.getDate() + 2);
+
   const appointmentDate = d.toISOString().split('T')[0];
   const randomMin = ['00', '15', '30', '45'][Math.floor(Math.random() * 4)];
-  const randomHour = String(11 + Math.floor(Math.random() * 6)).padStart(2, '0');
+  const randomHour = String(10 + Math.floor(Math.random() * 3)).padStart(2, '0');
   const appointmentTime = `${randomHour}:${randomMin}`;
 
   const appRes = await api('/appointments', {
@@ -356,19 +360,22 @@ async function runPhase8UAT() {
   );
   const appointmentId = appRes.data?.data?.id || appRes.data?.id;
 
-  // Step 2.5: Reschedule Appointment
+  // Step 2.5: Reschedule Appointment to non-colliding afternoon slot
+  const reschedMin = ['00', '15', '30'][Math.floor(Math.random() * 3)];
+  const reschedHour = String(15 + Math.floor(Math.random() * 2)).padStart(2, '0');
+  const reschedTime = `${reschedHour}:${reschedMin}`;
   const reschedRes = await api(`/appointments/${appointmentId}`, {
     method: 'PATCH',
     token: personas.receptionist.token,
     body: {
       date: appointmentDate,
-      start: '17:30',
+      start: reschedTime,
       remarks: 'Rescheduled for UAT slot test',
     },
   });
   assert(
     reschedRes.status === 200 || reschedRes.ok,
-    'Appointment successfully rescheduled to 17:30 slot',
+    `Appointment successfully rescheduled to ${reschedTime} slot`,
     `Status: ${reschedRes.status}`,
     'Reception'
   );
@@ -902,10 +909,11 @@ async function runPhase8UAT() {
 
   // Step 8.3: Nurse Accesses Admitted Worklist
   const nurseWorklist = await api('/inpatient/admissions?status=ADMITTED', { token: personas.nurse.token });
+  const admItems = Array.isArray(nurseWorklist.data?.data) ? nurseWorklist.data.data : (nurseWorklist.data?.data?.items || nurseWorklist.data?.data?.admissions || []);
   assert(
-    nurseWorklist.status === 200 && (nurseWorklist.data?.data || []).length > 0,
+    nurseWorklist.status === 200 && admItems.length > 0,
     'Nurse accesses active inpatient care worklist with patient vitals tracking',
-    `Count: ${(nurseWorklist.data?.data || []).length}`,
+    `Count: ${admItems.length}`,
     'Nurse'
   );
 
@@ -976,8 +984,9 @@ async function runPhase8UAT() {
 
   // Step 9.3: Draft vs Posted Journal Integrity
   const journalsRes = await api('/accounting/journals?status=POSTED', { token: personas.accountant.token });
+  const journalItems = journalsRes.data?.data?.items || journalsRes.data?.data || [];
   assert(
-    journalsRes.status === 200 && Array.isArray(journalsRes.data?.data || journalsRes.data?.data?.items),
+    journalsRes.status === 200 && Array.isArray(journalItems),
     'Accountant verifies general ledger journals: Only POSTED entries affect ledger accounts',
     `Status: ${journalsRes.status}`,
     'Accountant'
@@ -1000,8 +1009,9 @@ async function runPhase8UAT() {
 
   // Step 10.2: Department Structure & Hierarchy
   const deptRes = await api('/departments', { token: personas.hr.token });
+  const deptItems = deptRes.data?.data?.departments || deptRes.data?.data || [];
   assert(
-    deptRes.status === 200 && Array.isArray(deptRes.data?.data || deptRes.data),
+    deptRes.status === 200 && Array.isArray(deptItems),
     'HR reviews clinical and operational department organization structure',
     `Status: ${deptRes.status}`,
     'HR'

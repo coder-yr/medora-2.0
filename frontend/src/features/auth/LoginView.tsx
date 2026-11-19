@@ -510,20 +510,29 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
               <Sparkles size={12} style={{ color: '#0284c7' }} />
               Authorized Test Account Quick Fill
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6 }}>
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: 12, padding: '7px 4px', background: '#f8fafc', borderColor: '#e2e8f0', color: '#1e293b' }}
-                onClick={() => instantLogin('admin.test@medora.hospital', 'Admin')}
-                title="Sign in as Administrator"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#eef2ff', borderColor: '#c7d2fe', color: '#3730a3', fontWeight: 600 }}
+                onClick={() => instantLogin('superadmin.test@medora.hospital', 'Super Admin')}
+                title="Sign in as Super Administrator"
+              >
+                🛡️ Super Admin
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#f8fafc', borderColor: '#e2e8f0', color: '#1e293b', fontWeight: 600 }}
+                onClick={() => instantLogin('admin.test@medora.hospital', 'Hospital Admin')}
+                title="Sign in as Hospital Administrator"
               >
                 👑 Admin
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: 12, padding: '7px 4px', background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46', fontWeight: 600 }}
                 onClick={() => instantLogin('doctor.test@medora.hospital', 'Doctor')}
                 title="Sign in as Doctor"
               >
@@ -532,16 +541,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: 12, padding: '7px 4px', background: '#fef3c7', borderColor: '#fde68a', color: '#92400e' }}
-                onClick={() => instantLogin('accountant.test@medora.hospital', 'Accountant')}
-                title="Sign in as Accountant"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#fff1f2', borderColor: '#fecdd3', color: '#9f1239', fontWeight: 600 }}
+                onClick={() => instantLogin('receptionist.test@medora.hospital', 'Receptionist')}
+                title="Sign in as Receptionist"
               >
-                📊 Accountant
+                📋 Receptionist
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: 12, padding: '7px 4px', background: '#f0f9ff', borderColor: '#bae6fd', color: '#0369a1' }}
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534', fontWeight: 600 }}
+                onClick={() => instantLogin('nurse.test@medora.hospital', 'Nurse')}
+                title="Sign in as Nurse"
+              >
+                💉 Nurse
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#f0f9ff', borderColor: '#bae6fd', color: '#0369a1', fontWeight: 600 }}
                 onClick={() => instantLogin('pharmacist.test@medora.hospital', 'Pharmacist')}
                 title="Sign in as Pharmacist"
               >
@@ -550,7 +568,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: 12, padding: '7px 4px', background: '#faf5ff', borderColor: '#e9d5ff', color: '#6b21a8' }}
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#faf5ff', borderColor: '#e9d5ff', color: '#6b21a8', fontWeight: 600 }}
                 onClick={() => instantLogin('laboratorist.test@medora.hospital', 'Laboratorist')}
                 title="Sign in as Laboratorist"
               >
@@ -559,11 +577,38 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
               <button
                 type="button"
                 className="btn btn-secondary"
-                style={{ fontSize: 12, padding: '7px 4px', background: '#fff1f2', borderColor: '#fecdd3', color: '#9f1239' }}
-                onClick={() => instantLogin('receptionist.test@medora.hospital', 'Receptionist')}
-                title="Sign in as Receptionist"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#f5f3ff', borderColor: '#ddd6fe', color: '#5b21b6', fontWeight: 600 }}
+                onClick={() => instantLogin('radiologist.test@medora.hospital', 'Radiologist')}
+                title="Sign in as Radiologist"
               >
-                📋 Receptionist
+                ☢️ Radiologist
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#fffbeb', borderColor: '#fde68a', color: '#92400e', fontWeight: 600 }}
+                onClick={() => instantLogin('cashier.test@medora.hospital', 'Cashier')}
+                title="Sign in as Cashier"
+              >
+                💵 Cashier
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#fef3c7', borderColor: '#fde68a', color: '#92400e', fontWeight: 600 }}
+                onClick={() => instantLogin('accountant.test@medora.hospital', 'Accountant')}
+                title="Sign in as Accountant"
+              >
+                📊 Accountant
+              </button>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                style={{ fontSize: 11.5, padding: '6px 4px', background: '#fdf2f8', borderColor: '#fbcfe8', color: '#9d174d', fontWeight: 600 }}
+                onClick={() => instantLogin('hr.test@medora.hospital', 'HR')}
+                title="Sign in as HR Administrator"
+              >
+                👥 HR
               </button>
             </div>
           </div>

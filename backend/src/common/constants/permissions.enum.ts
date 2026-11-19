@@ -248,7 +248,15 @@ export enum HospitalPermission {
  * Default permission grants per role from Phase 1 audit and legacy seeders
  */
 export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
-  Admin: Object.values(HospitalPermission),
+  SuperAdmin: Object.values(HospitalPermission),
+  Admin: Object.values(HospitalPermission).filter(
+    (p) =>
+      p !== HospitalPermission.BRANCH_VIEW_ALL &&
+      p !== HospitalPermission.BACKUP_MANAGE &&
+      p !== HospitalPermission.SYSTEM_SETTINGS &&
+      p !== HospitalPermission.BRANCH_CREATE &&
+      p !== HospitalPermission.BRANCH_DEACTIVATE,
+  ),
   Doctor: [
     HospitalPermission.PATIENT_VIEW,
     HospitalPermission.PATIENT_MEDICAL_HISTORY,
@@ -506,5 +514,61 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
     HospitalPermission.INVOICE_VIEW,
     HospitalPermission.INVOICE_ADD,
     HospitalPermission.PAYMENT_VIEW,
+  ],
+  Radiologist: [
+    HospitalPermission.RADIOLOGY_VIEW,
+    HospitalPermission.RADIOLOGY_ORDER,
+    HospitalPermission.RADIOLOGY_SCHEDULE,
+    HospitalPermission.RADIOLOGY_PROCESS,
+    HospitalPermission.RADIOLOGY_RESULT_ENTER,
+    HospitalPermission.RADIOLOGY_VERIFY,
+    HospitalPermission.RADIOLOGY_APPROVE,
+    HospitalPermission.RADIOLOGY_AMEND,
+    HospitalPermission.RADIOLOGY_CATALOGUE_MANAGE,
+    HospitalPermission.RADIOLOGY_REPORTS,
+    HospitalPermission.PATIENT_VIEW,
+    HospitalPermission.DOCTOR_VIEW,
+    HospitalPermission.DEPARTMENT_VIEW,
+    HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+  ],
+  Cashier: [
+    HospitalPermission.CASHIER_VIEW,
+    HospitalPermission.CASHIER_SHIFT_OPEN,
+    HospitalPermission.CASHIER_SHIFT_CLOSE,
+    HospitalPermission.CASHIER_SHIFT_APPROVE,
+    HospitalPermission.CASHIER_TRANSACTION_VIEW,
+    HospitalPermission.CASHIER_DAYBOOK_VIEW,
+    HospitalPermission.INVOICE_VIEW,
+    HospitalPermission.INVOICE_ADD,
+    HospitalPermission.PAYMENT_VIEW,
+    HospitalPermission.PAYMENT_ADD,
+    HospitalPermission.PAYMENT_UPDATE,
+    HospitalPermission.PATIENT_VIEW,
+    HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
+  ],
+  HR: [
+    HospitalPermission.STAFF_VIEW,
+    HospitalPermission.STAFF_CREATE,
+    HospitalPermission.STAFF_UPDATE,
+    HospitalPermission.STAFF_ASSIGN_DEPARTMENT,
+    HospitalPermission.STAFF_CHANGE_DESIGNATION,
+    HospitalPermission.STAFF_LINK_USER,
+    HospitalPermission.STAFF_DEACTIVATE,
+    HospitalPermission.DEPARTMENT_VIEW,
+    HospitalPermission.DEPARTMENT_ADD,
+    HospitalPermission.DEPARTMENT_UPDATE,
+    HospitalPermission.BRANCH_VIEW,
+    HospitalPermission.DASHBOARD_VIEW,
+    HospitalPermission.NOTIFICATION_VIEW,
+    HospitalPermission.NOTIFICATION_MARK_READ,
+    HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE,
   ],
 };

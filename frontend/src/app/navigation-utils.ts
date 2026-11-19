@@ -2,15 +2,18 @@ import type { NavigationItem, NavigationCategory } from './NavigationConfig';
 
 /**
  * Checks if a user has sufficient permissions for a navigation item.
- * An Admin has full access to all navigation items.
- * Non-admins require all permissions in `requiredPermissions` OR any permission in `requiredAnyPermissions`.
+ * Super Admin has full global access to all navigation items.
+ * All other roles require all permissions in `requiredPermissions` OR any permission in `requiredAnyPermissions`.
  */
 export function canAccessItem(
   item: NavigationItem,
   userPermissions: string[] = [],
-  userRole = 'Admin',
+  userRole = '',
 ): boolean {
-  if (userRole === 'Admin') return true;
+  if (userRole === 'Super Admin') return true;
+
+  // Unconfigured or empty roles have no access to protected navigation items
+  if (!userRole || userRole === 'Unconfigured') return false;
 
   const permissionsSet = new Set(userPermissions.map((p) => p.toLowerCase()));
 
@@ -39,7 +42,7 @@ export function canAccessItem(
 export function filterNavItems(
   items: NavigationItem[],
   userPermissions: string[] = [],
-  userRole = 'Admin',
+  userRole = '',
 ): NavigationItem[] {
   return items.filter((item) => canAccessItem(item, userPermissions, userRole));
 }
@@ -67,24 +70,13 @@ export function groupNavItemsByCategory(
 }
 
 /**
- * Resolves the primary workspace route for each hospital persona.
+ * Resolves the primary landing route for each hospital persona.
+ * In Medora 2.0, all authenticated personas land on `/dashboard`,
+ * which renders their dedicated, role-specific operational dashboard.
  */
-export function getDefaultRouteForRole(role: string): string {
-  switch (role) {
-    case 'Doctor':
-      return '/consultations';
-    case 'Pharmacist':
-      return '/pharmacy';
-    case 'Laboratorist':
-      return '/laboratory';
-    case 'Accountant':
-      return '/billing';
-    case 'Receptionist':
-      return '/appointments';
-    case 'Nurse':
-      return '/inpatient';
-    case 'Admin':
-    default:
-      return '/dashboard';
+export function getDefaultRouteForRole(role?: string): string {
+  if (!role || role === 'Unconfigured') {
+    return '/dashboard';
   }
+  return '/dashboard';
 }

@@ -27,7 +27,7 @@ export const NurseDashboard: React.FC = () => {
   const navigate = useNavigate();
 
   const hasPermission = useCallback(
-    (perm: string) => userRole === 'Admin' || userPermissions.includes(perm),
+    (perm: string) => userRole === 'Super Admin' || userPermissions.includes(perm),
     [userRole, userPermissions],
   );
 

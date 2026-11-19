@@ -1,28 +1,13 @@
 import React, { createContext, useState, useEffect, useCallback } from 'react';
 import type { AuthUser, AuthResponse, UserBranch } from '../types/auth';
+import { resolveUserRole, type AppRole } from '../app/role-resolution';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
-
-function resolveRole(user: { role?: string; group?: string } | null | undefined): string {
-  if (!user) return 'Admin';
-  const rawRole = user.role || user.group || 'Admin';
-  const roleLower = String(rawRole).toLowerCase();
-
-  if (roleLower.includes('doc')) return 'Doctor';
-  if (roleLower.includes('acc') || roleLower.includes('fin')) return 'Accountant';
-  if (roleLower.includes('pharm')) return 'Pharmacist';
-  if (roleLower.includes('lab') || roleLower.includes('path')) return 'Laboratorist';
-  if (roleLower.includes('recept') || roleLower.includes('front')) return 'Receptionist';
-  if (roleLower.includes('nurse')) return 'Nurse';
-  if (roleLower.includes('admin')) return 'Admin';
-
-  return rawRole.charAt(0).toUpperCase() + rawRole.slice(1);
-}
 
 interface AuthContextType {
   token: string;
   currentUser: AuthUser | null;
-  userRole: string;
+  userRole: AppRole;
   userPermissions: string[];
   userBranches: UserBranch[];
   activeBranchId: string;
@@ -39,10 +24,12 @@ export const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [token, setToken] = useState<string>(() => sessionStorage.getItem('medora_access_token') || '');
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [userRole, setUserRole] = useState<string>('Admin');
+  const [userRole, setUserRole] = useState<AppRole>('');
   const [userPermissions, setUserPermissions] = useState<string[]>([]);
   const [userBranches, setUserBranches] = useState<UserBranch[]>([]);
-  const [activeBranchId, setActiveBranchIdState] = useState<string>(() => localStorage.getItem('medora_active_branch') || '1');
+  const [activeBranchId, setActiveBranchIdState] = useState<string>(
+    () => localStorage.getItem('medora_active_branch') || '1',
+  );
   const [authLoading, setAuthLoading] = useState<boolean>(true);
 
   const setActiveBranchId = useCallback((id: string) => {
@@ -53,18 +40,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const handleLogout = useCallback(() => {
     sessionStorage.removeItem('medora_access_token');
     sessionStorage.removeItem('medora_user');
+    localStorage.removeItem('medora_active_branch');
     setToken('');
     setCurrentUser(null);
-    setUserRole('Admin');
+    setUserRole('');
     setUserPermissions([]);
     setUserBranches([]);
   }, []);
 
   /**
    * Authoritative identity restoration: validates token against backend GET /api/v1/auth/me
+   * Invariant: Never restores privileged access from unvalidated cached session storage.
    */
   const validateSessionWithBackend = useCallback(async (authToken: string) => {
     if (!authToken) {
+      setCurrentUser(null);
+      setUserRole('');
+      setUserPermissions([]);
       setAuthLoading(false);
       return;
     }
@@ -84,7 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const json = await res.json();
       if (json.success && json.data) {
         const user = json.data;
-        const resolved = resolveRole(user);
+        const resolved = resolveUserRole(user);
         const permissions: string[] = Array.isArray(user.permissions) ? user.permissions : [];
 
         const normalizedUser: AuthUser = {
@@ -101,7 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUserRole(resolved);
         setUserPermissions(permissions);
 
-        // Fetch authorized branches
+        // Fetch authorized branches for the validated user
         try {
           const branchRes = await fetch(`${API_BASE_URL}/api/v1/branches/my-branches`, {
             headers: { Authorization: `Bearer ${authToken}` },
@@ -115,7 +107,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           setUserBranches(branches);
 
-          // Reconcile active branch
+          // Reconcile active branch securely
           const storedBranch = localStorage.getItem('medora_active_branch');
           if (branches.length > 0) {
             if (storedBranch && branches.some((b) => String(b.id) === String(storedBranch))) {
@@ -125,28 +117,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setActiveBranchIdState(defaultBranch);
               localStorage.setItem('medora_active_branch', defaultBranch);
             }
+          } else if (normalizedUser.branchId) {
+            setActiveBranchIdState(normalizedUser.branchId);
+            localStorage.setItem('medora_active_branch', normalizedUser.branchId);
           }
         } catch {
-          // Branch fetching error fallback
+          // Fallback if branch lookup fails
+          if (normalizedUser.branchId) {
+            setActiveBranchIdState(normalizedUser.branchId);
+          }
         }
       } else {
         handleLogout();
       }
     } catch {
-      // Network connectivity error during startup
-      // Attempt read from cached session with warning
-      const raw = sessionStorage.getItem('medora_user');
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw);
-          const resolved = resolveRole(parsed);
-          setCurrentUser(parsed);
-          setUserRole(resolved);
-          setUserPermissions(parsed.permissions || []);
-        } catch {
-          handleLogout();
-        }
-      }
+      // Network failure during startup: do NOT grant default admin
+      handleLogout();
     } finally {
       setAuthLoading(false);
     }
@@ -168,12 +154,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [validateSessionWithBackend]);
 
-  const handleLoginSuccess = useCallback((auth: AuthResponse) => {
-    setToken(auth.accessToken);
-    sessionStorage.setItem('medora_access_token', auth.accessToken);
+  const handleLoginSuccess = useCallback(
+    (auth: AuthResponse) => {
+      if (!auth.accessToken || !auth.user) {
+        handleLogout();
+        return;
+      }
 
-    if (auth.user) {
-      const resolvedRole = resolveRole(auth.user);
+      setToken(auth.accessToken);
+      sessionStorage.setItem('medora_access_token', auth.accessToken);
+
+      const resolvedRole = resolveUserRole(auth.user);
       const permissions: string[] = Array.isArray(auth.user.permissions) ? auth.user.permissions : [];
       const normalizedUser: AuthUser = {
         ...auth.user,
@@ -190,9 +181,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (auth.user.branches && auth.user.branches.length > 0) {
         setUserBranches(auth.user.branches);
         setActiveBranchId(String(auth.user.branches[0].id));
+      } else if (auth.user.branchId) {
+        setActiveBranchId(String(auth.user.branchId));
+      } else {
+        localStorage.removeItem('medora_active_branch');
       }
-    }
-  }, [setActiveBranchId]);
+    },
+    [setActiveBranchId, handleLogout],
+  );
 
   return (
     <AuthContext.Provider
@@ -217,4 +213,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 };
 
 export { useAuth } from './useAuth';
-

@@ -47,10 +47,11 @@ export class BranchController {
     @Query('includeInactive') includeInactive?: string,
     @CurrentUser() user?: AuthUser,
   ) {
-    const isAdmin =
-      user?.group === 'Admin' ||
+    const isGlobal =
+      user?.group === 'SuperAdmin' ||
+      (user?.group === 'Admin' && !user?.branchId) ||
       user?.permissions?.includes(HospitalPermission.BRANCH_VIEW_ALL);
-    const allowInactive = isAdmin && includeInactive === 'true';
+    const allowInactive = Boolean(isGlobal && includeInactive === 'true');
     return this.service.listBranches(allowInactive);
   }
 
@@ -60,7 +61,8 @@ export class BranchController {
   @ApiResponse({ status: 200, description: 'Accessible branches retrieved' })
   async getMyBranches(@CurrentUser() user: AuthUser) {
     const isGlobalAdmin =
-      user.group === 'Admin' ||
+      user.group === 'SuperAdmin' ||
+      (user.group === 'Admin' && !user.branchId) ||
       user.permissions?.includes(HospitalPermission.BRANCH_VIEW_ALL);
     return this.service.getUserAccessibleBranches(BigInt(user.id), isGlobalAdmin);
   }

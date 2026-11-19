@@ -252,9 +252,9 @@ async function runPhase6Tests() {
   assert(patientRes.status === 201 || patientRes.ok, 'Step A1: Receptionist registers patient record', JSON.stringify(patientRes.data));
   const patientId = patientRes.data?.data?.id || patientRes.data?.id;
 
-  // A2. Receptionist: Book appointment on next week date to prevent time-slot collision
+  // A2. Receptionist: Book appointment on future date to prevent time-slot collision
   const d = new Date();
-  d.setDate(d.getDate() + 7);
+  d.setDate(d.getDate() + 20 + Math.floor(Math.random() * 60));
   const appointmentDate = d.toISOString().split('T')[0];
   const randomMin = ['00', '15', '30', '45'][Math.floor(Math.random() * 4)];
   const randomHour = String(11 + Math.floor(Math.random() * 6)).padStart(2, '0');

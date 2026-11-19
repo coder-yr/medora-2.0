@@ -1,5 +1,15 @@
 export type HospitalRole =
-  'Admin' | 'Doctor' | 'Nurse' | 'Accountant' | 'Receptionist' | 'Pharmacist' | 'Laboratorist';
+  | 'SuperAdmin'
+  | 'Admin'
+  | 'Doctor'
+  | 'Nurse'
+  | 'Accountant'
+  | 'Receptionist'
+  | 'Pharmacist'
+  | 'Laboratorist'
+  | 'Radiologist'
+  | 'Cashier'
+  | 'HR';
 
 export interface AuthUser {
   id: string;

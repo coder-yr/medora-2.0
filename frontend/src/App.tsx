@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProtectedRoute, RequirePermission } from './app/RouteGuard';
 import { AppShell } from './app/AppShell';
 import { getDefaultRouteForRole } from './app/navigation-utils';
+import { resolveUserRole } from './app/role-resolution';
 
 // Features & Workspaces
 import { LoginView } from './features/auth/LoginView';
@@ -59,7 +60,7 @@ const LoginRoute: React.FC = () => {
       apiBaseUrl={apiBaseUrl}
       onLoginSuccess={(auth) => {
         handleLoginSuccess(auth);
-        const resolvedRole = auth.user?.role || auth.user?.group || 'Admin';
+        const resolvedRole = resolveUserRole(auth.user);
         navigate(getDefaultRouteForRole(resolvedRole), { replace: true });
       }}
     />

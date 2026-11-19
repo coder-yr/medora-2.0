@@ -148,9 +148,24 @@ export class AuthService {
       }
     }
 
-    // Derive role and permissions strictly from database-controlled assignments
-    const role = (dbUser.group || 'Admin') as HospitalRole;
-    const permissions = DEFAULT_ROLE_PERMISSIONS[role] || [];
+    // Derive role and permissions strictly from database-controlled assignments (no fallback to Admin)
+    const validRoles: HospitalRole[] = [
+      'SuperAdmin',
+      'Admin',
+      'Doctor',
+      'Nurse',
+      'Accountant',
+      'Receptionist',
+      'Pharmacist',
+      'Laboratorist',
+      'Radiologist',
+      'Cashier',
+      'HR',
+    ];
+    const rawGroup = dbUser.group ? (dbUser.group.trim() as HospitalRole) : null;
+    const isKnown = Boolean(rawGroup && validRoles.includes(rawGroup!));
+    const role: HospitalRole = isKnown ? rawGroup! : ('Unconfigured' as any);
+    const permissions = isKnown ? DEFAULT_ROLE_PERMISSIONS[role] || [] : [];
 
     const fullName = `${dbUser.firstName} ${dbUser.lastName}`.trim() || dbUser.email;
     const authUser: AuthUser = {
@@ -378,8 +393,23 @@ export class AuthService {
       });
     });
 
-    const role = (dbUser.group || 'Admin') as HospitalRole;
-    const permissions = DEFAULT_ROLE_PERMISSIONS[role] || [];
+    const validRoles: HospitalRole[] = [
+      'SuperAdmin',
+      'Admin',
+      'Doctor',
+      'Nurse',
+      'Accountant',
+      'Receptionist',
+      'Pharmacist',
+      'Laboratorist',
+      'Radiologist',
+      'Cashier',
+      'HR',
+    ];
+    const rawGroup = dbUser.group ? (dbUser.group.trim() as HospitalRole) : null;
+    const isKnown = Boolean(rawGroup && validRoles.includes(rawGroup!));
+    const role: HospitalRole = isKnown ? rawGroup! : ('Unconfigured' as any);
+    const permissions = isKnown ? DEFAULT_ROLE_PERMISSIONS[role] || [] : [];
     const fullName = `${dbUser.firstName} ${dbUser.lastName}`.trim() || dbUser.email;
     const authUser: AuthUser = {
       id: String(dbUser.id),

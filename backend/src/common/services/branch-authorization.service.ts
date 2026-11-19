@@ -13,11 +13,19 @@ export class BranchAuthorizationService {
   constructor(private readonly prisma: PrismaService) {}
 
   isGlobalAdmin(user: AuthUser): boolean {
-    return (
-      user.group === 'Admin' ||
-      (Array.isArray(user.permissions) &&
-        user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL))
-    );
+    if (!user) return false;
+    if (user.group === 'SuperAdmin') return true;
+    if (
+      Array.isArray(user.permissions) &&
+      (user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL) ||
+        user.permissions.includes('*'))
+    ) {
+      return true;
+    }
+    if (user.group === 'Admin' && (!user.branchId || user.branchId === null)) {
+      return true;
+    }
+    return false;
   }
 
   async resolveAccessibleBranchIds(user: AuthUser): Promise<bigint[] | null> {
