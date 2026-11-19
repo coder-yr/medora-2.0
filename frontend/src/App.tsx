@@ -17,48 +17,19 @@ import { PrescriptionWorkspace } from './features/prescriptions/PrescriptionWork
 import { BillingWorkspace } from './features/billing/BillingWorkspace';
 import { DoctorWorkspace } from './features/doctors/DoctorWorkspace';
 import { DepartmentWorkspace } from './features/departments/DepartmentWorkspace';
-// Lazy-Loaded Operational Workspaces (Route-Level Code Splitting)
-const PharmacyWorkspace = React.lazy(() =>
-  import('./components/PharmacyWorkspace').then((m) => ({ default: m.PharmacyWorkspace })),
-);
-const MedicineCatalogue = React.lazy(() =>
-  import('./components/MedicineCatalogue').then((m) => ({ default: m.MedicineCatalogue })),
-);
-const LaboratoryWorkspace = React.lazy(() =>
-  import('./components/LaboratoryWorkspace').then((m) => ({ default: m.LaboratoryWorkspace })),
-);
-const RadiologyWorkspace = React.lazy(() =>
-  import('./features/radiology/RadiologyWorkspace').then((m) => ({ default: m.RadiologyWorkspace })),
-);
-const InpatientWorkspace = React.lazy(() =>
-  import('./components/InpatientWorkspace').then((m) => ({ default: m.InpatientWorkspace })),
-);
-const CashierWorkspace = React.lazy(() =>
-  import('./components/CashierWorkspace').then((m) => ({ default: m.CashierWorkspace })),
-);
-const CashierDashboard = React.lazy(() =>
-  import('./features/dashboards/cashier/CashierDashboard').then((m) => ({ default: m.CashierDashboard })),
-);
-const RadiologistDashboard = React.lazy(() =>
-  import('./features/dashboards/radiologist/RadiologistDashboard').then((m) => ({ default: m.RadiologistDashboard })),
-);
-const HRDashboard = React.lazy(() =>
-  import('./features/dashboards/hr/HRDashboard').then((m) => ({ default: m.HRDashboard })),
-);
-const StaffWorkspace = React.lazy(() =>
-  import('./components/StaffWorkspace').then((m) => ({ default: m.StaffWorkspace })),
-);
-const AccountingWorkspace = React.lazy(() =>
-  import('./components/AccountingWorkspace').then((m) => ({ default: m.AccountingWorkspace })),
-);
-const SettingsWorkspace = React.lazy(() =>
-  import('./components/SettingsWorkspace').then((m) => ({ default: m.SettingsWorkspace })),
-);
-const NotificationAdminWorkspace = React.lazy(() =>
-  import('./features/notifications/NotificationAdminWorkspace').then((m) => ({
-    default: m.NotificationAdminWorkspace,
-  })),
-);
+import { PharmacyWorkspace } from './components/PharmacyWorkspace';
+import { MedicineCatalogue } from './components/MedicineCatalogue';
+import { LaboratoryWorkspace } from './components/LaboratoryWorkspace';
+import { RadiologyWorkspace } from './features/radiology/RadiologyWorkspace';
+import { InpatientWorkspace } from './components/InpatientWorkspace';
+import { CashierWorkspace } from './components/CashierWorkspace';
+import { CashierDashboard } from './features/dashboards/cashier/CashierDashboard';
+import { RadiologistDashboard } from './features/dashboards/radiologist/RadiologistDashboard';
+import { HRDashboard } from './features/dashboards/hr/HRDashboard';
+import { StaffWorkspace } from './components/StaffWorkspace';
+import { AccountingWorkspace } from './components/AccountingWorkspace';
+import { SettingsWorkspace } from './components/SettingsWorkspace';
+import { NotificationAdminWorkspace } from './features/notifications/NotificationAdminWorkspace';
 
 // Types
 import type { Patient } from './types/patient';
