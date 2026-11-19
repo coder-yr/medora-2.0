@@ -43,6 +43,31 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
 
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roleParam = params.get('persona') || params.get('role');
+    if (!roleParam) return;
+
+    const roleMap: Record<string, [string, string]> = {
+      superadmin: ['superadmin.test@medora.hospital', 'Super Admin'],
+      admin: ['admin.test@medora.hospital', 'Hospital Admin'],
+      doctor: ['doctor.test@medora.hospital', 'Doctor'],
+      receptionist: ['receptionist.test@medora.hospital', 'Receptionist'],
+      nurse: ['nurse.test@medora.hospital', 'Nurse'],
+      pharmacist: ['pharmacist.test@medora.hospital', 'Pharmacist'],
+      laboratorist: ['laboratorist.test@medora.hospital', 'Laboratorist'],
+      radiologist: ['radiologist.test@medora.hospital', 'Radiologist'],
+      cashier: ['cashier.test@medora.hospital', 'Cashier'],
+      accountant: ['accountant.test@medora.hospital', 'Accountant'],
+      hr: ['hr.test@medora.hospital', 'HR'],
+    };
+
+    const target = roleMap[roleParam.toLowerCase().replace(/[^a-z]/g, '')];
+    if (target) {
+      instantLogin(target[0], target[1]);
+    }
+  }, []);
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim() || !password) {

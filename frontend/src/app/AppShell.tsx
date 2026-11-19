@@ -8,16 +8,15 @@ import {
   Building2,
   Plus,
   Activity,
-  ExternalLink,
   X,
-  Users,
-  Calendar,
-  CreditCard,
-  UserCheck,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { NAVIGATION_ITEMS, NAVIGATION_CATEGORIES } from './NavigationConfig';
-import { filterNavItems, groupNavItemsByCategory } from './navigation-utils';
+import { NAVIGATION_ITEMS } from './NavigationConfig';
+import {
+  getRoleNavigation,
+  getRoleQuickActions,
+  getRoleDepartmentMeta,
+} from './navigation-utils';
 import { NotificationCenter } from '../features/notifications/NotificationCenter';
 import { ChangePasswordModal } from '../features/auth/ChangePasswordModal';
 
@@ -69,21 +68,44 @@ export const AppShell: React.FC = () => {
     return () => clearInterval(interval);
   }, [checkBackendHealth]);
 
-  // Compute filtered navigation items based on backend-issued permissions
-  const authorizedNavItems = useMemo(() => {
-    return filterNavItems(NAVIGATION_ITEMS, userPermissions, userRole);
-  }, [userPermissions, userRole]);
+  // Phase 8.2: Role-tailored department branding and navigation hierarchy
+  const roleMeta = useMemo(() => {
+    return getRoleDepartmentMeta(userRole);
+  }, [userRole]);
 
-  const groupedNav = useMemo(() => {
-    return groupNavItemsByCategory(authorizedNavItems);
-  }, [authorizedNavItems]);
+  const roleSections = useMemo(() => {
+    return getRoleNavigation(userRole, userPermissions);
+  }, [userRole, userPermissions]);
 
-  // Determine active title
-  const currentNavItem = useMemo(() => {
-    return NAVIGATION_ITEMS.find((item) => item.path === location.pathname);
-  }, [location.pathname]);
+  const roleQuickActions = useMemo(() => {
+    return getRoleQuickActions(userRole, userPermissions);
+  }, [userRole, userPermissions]);
 
-  const activeTitle = currentNavItem ? currentNavItem.label : 'Workspace';
+  // Determine active title based on role navigation items first, fallback to master NAVIGATION_ITEMS
+  const activeTitle = useMemo(() => {
+    for (const section of roleSections) {
+      const match = section.items.find((item) => item.path === location.pathname);
+      if (match) return match.label;
+    }
+    const currentNavItem = NAVIGATION_ITEMS.find((item) => item.path === location.pathname);
+    return currentNavItem ? currentNavItem.label : 'Workspace';
+  }, [roleSections, location.pathname]);
+
+  // Active Branch Context
+  const activeBranch = useMemo(() => {
+    return userBranches.find((b) => String(b.id) === String(activeBranchId)) || {
+      id: '1',
+      name: 'Main Campus',
+      code: 'MAIN',
+    };
+  }, [userBranches, activeBranchId]);
+
+  // Branch selector capability check (Super Admin, users with branch_view_all, or users assigned to multiple branches)
+  const isSuperAdmin = userRole === 'Super Admin';
+  const hasBranchViewAll = (userPermissions || []).some(
+    (p) => p.toLowerCase() === 'branch_view_all' || p === '*',
+  );
+  const canSelectBranch = isSuperAdmin || hasBranchViewAll || (userBranches && userBranches.length > 1);
 
   return (
     <div className="medora-layout">
@@ -95,59 +117,67 @@ export const AppShell: React.FC = () => {
             <Stethoscope size={22} />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
               <h1 style={{ fontSize: 16, margin: 0, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.02em' }}>
                 MEDORA 2.0
               </h1>
               <span style={{
                 background: 'var(--primary-light)',
                 color: 'var(--primary)',
-                fontSize: 10,
+                fontSize: 9.5,
                 fontWeight: 700,
-                padding: '1px 6px',
+                padding: '1px 5px',
                 borderRadius: 4,
                 textTransform: 'uppercase',
                 letterSpacing: '0.04em'
               }}>
-                Pro
+                {roleMeta.badge}
               </span>
             </div>
-            <p style={{ margin: 0, fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              Hospital Clinical Core
+            <p style={{ margin: '2px 0 0 0', fontSize: 11, color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {roleMeta.subtext}
             </p>
           </div>
         </div>
 
-        {/* Dynamic RBAC-Filtered Navigation Categories */}
+        {/* Dynamic Role-Tailored & RBAC-Filtered Navigation Sections */}
         <div className="sidebar-content">
-          {NAVIGATION_CATEGORIES.map((category) => {
-            const items = groupedNav[category];
-            if (!items || items.length === 0) return null;
+          {roleSections.map((section) => (
+            <div key={section.title}>
+              <div className="sidebar-group-title">{section.title}</div>
+              <div className="sidebar-group-items">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
 
-            return (
-              <div key={category}>
-                <div className="sidebar-group-title">{category}</div>
-                <div className="sidebar-group-items">
-                  {items.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = location.pathname === item.path;
-
-                    return (
-                      <Link
-                        key={item.id}
-                        to={item.path}
-                        className={`sidebar-link ${isActive ? 'active' : ''}`}
-                        style={{ textDecoration: 'none' }}
-                      >
-                        <Icon size={17} />
-                        <span>{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+                  return (
+                    <Link
+                      key={item.id}
+                      to={item.path}
+                      className={`sidebar-link ${isActive ? 'active' : ''}`}
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <Icon size={17} />
+                      <span>{item.label}</span>
+                      {item.badge && (
+                        <span style={{
+                          marginLeft: 'auto',
+                          fontSize: 10,
+                          fontWeight: 700,
+                          padding: '1px 5px',
+                          borderRadius: 4,
+                          background: 'var(--surface-subtle)',
+                          color: 'var(--text-muted)'
+                        }}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
 
         {/* Sidebar Footer User Profile */}
@@ -171,7 +201,7 @@ export const AppShell: React.FC = () => {
             </div>
             <div style={{ minWidth: 0, flex: 1 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-main)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {currentUser?.name || 'Administrator'}
+                {currentUser?.name || 'Authorized Staff'}
               </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{
@@ -265,213 +295,152 @@ export const AppShell: React.FC = () => {
               </span>
             </div>
 
-            {/* Active Branch Switcher */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              background: '#ffffff',
-              border: '1px solid #e2e8f0',
-              padding: '5px 12px',
-              borderRadius: 9999,
-              boxShadow: 'var(--shadow-xs)'
-            }}>
-              <Building2 size={15} style={{ color: 'var(--primary)' }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Branch:</span>
-              <select
+            {/* Active Branch Control: Dropdown selector for multi-branch users, static badge for single-facility staff */}
+            {canSelectBranch ? (
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: '#ffffff',
+                border: '1px solid #e2e8f0',
+                padding: '5px 12px',
+                borderRadius: 9999,
+                boxShadow: 'var(--shadow-xs)'
+              }}>
+                <Building2 size={15} style={{ color: 'var(--primary)' }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Branch:</span>
+                <select
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    color: '#0f172a',
+                    outline: 'none',
+                    cursor: 'pointer'
+                  }}
+                  value={activeBranchId || '1'}
+                  onChange={(e) => setActiveBranchId(e.target.value)}
+                  title="Switch Active Operating Branch"
+                >
+                  {userBranches.length > 0 ? (
+                    userBranches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} [{b.code}]
+                      </option>
+                    ))
+                  ) : (
+                    <option value="1">Main Campus [MAIN]</option>
+                  )}
+                </select>
+              </div>
+            ) : (
+              <div
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  fontWeight: 700,
-                  fontSize: 12.5,
-                  color: '#0f172a',
-                  outline: 'none',
-                  cursor: 'pointer'
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  background: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  padding: '5px 12px',
+                  borderRadius: 9999,
+                  boxShadow: 'var(--shadow-xs)'
                 }}
-                value={activeBranchId}
-                onChange={(e) => setActiveBranchId(e.target.value)}
+                title="Assigned Hospital Facility Scope"
               >
-                {userBranches.length > 0 ? (
-                  userBranches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.name} [{b.code}]
-                    </option>
-                  ))
-                ) : (
-                  <option value="1">Main Campus [MAIN]</option>
-                )}
-              </select>
-            </div>
+                <Building2 size={15} style={{ color: 'var(--primary)' }} />
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Facility:</span>
+                <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0f172a' }}>
+                  {activeBranch.name} [{activeBranch.code}]
+                </span>
+              </div>
+            )}
 
             {/* Notification Center Bell */}
             <NotificationCenter token={token} apiBaseUrl={apiBaseUrl} />
 
-            {/* Quick Action "+ Add New" Dropdown */}
-            <div style={{ position: 'relative' }}>
-              <button
-                className="btn btn-primary"
-                style={{
-                  padding: '6px 14px',
-                  fontSize: 12.5,
-                  borderRadius: 9999,
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 6,
-                  boxShadow: 'var(--shadow-xs)',
-                }}
-                onClick={() => setQuickActionMenuOpen(!quickActionMenuOpen)}
-              >
-                <Plus size={15} /> Add New
-              </button>
-
-              {quickActionMenuOpen && (
-                <div
+            {/* Persona-Specific "+ Add New" Quick Action Dropdown */}
+            {roleQuickActions.length > 0 && (
+              <div style={{ position: 'relative' }}>
+                <button
+                  className="btn btn-primary"
                   style={{
-                    position: 'absolute',
-                    top: '115%',
-                    right: 0,
-                    width: 220,
-                    background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: 12,
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-                    padding: '6px 0',
-                    zIndex: 60,
+                    padding: '6px 14px',
+                    fontSize: 12.5,
+                    borderRadius: 9999,
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    boxShadow: 'var(--shadow-xs)',
                   }}
-                  onMouseLeave={() => setQuickActionMenuOpen(false)}
+                  onClick={() => setQuickActionMenuOpen(!quickActionMenuOpen)}
                 >
-                  <div style={{ padding: '6px 14px', fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase' }}>
-                    Quick Actions
+                  <Plus size={15} /> Add New
+                </button>
+
+                {quickActionMenuOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '115%',
+                      right: 0,
+                      width: 240,
+                      background: '#ffffff',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: 12,
+                      boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
+                      padding: '6px 0',
+                      zIndex: 60,
+                    }}
+                    onMouseLeave={() => setQuickActionMenuOpen(false)}
+                  >
+                    <div style={{
+                      padding: '6px 14px',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      color: '#94a3b8',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em'
+                    }}>
+                      {userRole} Quick Actions
+                    </div>
+
+                    {roleQuickActions.map((action) => {
+                      const Icon = action.icon;
+                      return (
+                        <button
+                          key={action.id}
+                          style={{
+                            width: '100%',
+                            padding: '9px 14px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            background: 'transparent',
+                            border: 'none',
+                            fontSize: 13,
+                            color: '#0f172a',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            transition: 'background-color 0.15s ease'
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
+                          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          onClick={() => {
+                            setQuickActionMenuOpen(false);
+                            navigate(action.path);
+                          }}
+                        >
+                          <Icon size={16} style={{ color: action.color || 'var(--primary)' }} />
+                          <span style={{ fontWeight: 500 }}>{action.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
-
-                  <button
-                    style={{
-                      width: '100%',
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: 'transparent',
-                      border: 'none',
-                      fontSize: 13,
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    onClick={() => {
-                      setQuickActionMenuOpen(false);
-                      navigate('/patients');
-                    }}
-                  >
-                    <Users size={16} style={{ color: '#d97706' }} />
-                    <span>Register Patient</span>
-                  </button>
-
-                  <button
-                    style={{
-                      width: '100%',
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: 'transparent',
-                      border: 'none',
-                      fontSize: 13,
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    onClick={() => {
-                      setQuickActionMenuOpen(false);
-                      navigate('/appointments');
-                    }}
-                  >
-                    <Calendar size={16} style={{ color: '#7c3aed' }} />
-                    <span>Book Appointment</span>
-                  </button>
-
-                  <button
-                    style={{
-                      width: '100%',
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: 'transparent',
-                      border: 'none',
-                      fontSize: 13,
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    onClick={() => {
-                      setQuickActionMenuOpen(false);
-                      navigate('/doctors');
-                    }}
-                  >
-                    <Stethoscope size={16} style={{ color: '#0284c7' }} />
-                    <span>Register Doctor</span>
-                  </button>
-
-                  <button
-                    style={{
-                      width: '100%',
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: 'transparent',
-                      border: 'none',
-                      fontSize: 13,
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    onClick={() => {
-                      setQuickActionMenuOpen(false);
-                      navigate('/billing');
-                    }}
-                  >
-                    <CreditCard size={16} style={{ color: '#dc2626' }} />
-                    <span>Raise Invoice</span>
-                  </button>
-
-                  <button
-                    style={{
-                      width: '100%',
-                      padding: '8px 14px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      background: 'transparent',
-                      border: 'none',
-                      fontSize: 13,
-                      color: '#0f172a',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f1f5f9')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    onClick={() => {
-                      setQuickActionMenuOpen(false);
-                      navigate('/staff');
-                    }}
-                  >
-                    <UserCheck size={16} style={{ color: '#059669' }} />
-                    <span>Onboard Staff</span>
-                  </button>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* Change Password Button */}
             <button
@@ -548,77 +517,80 @@ export const AppShell: React.FC = () => {
           <div className="card" style={{ maxWidth: 480, width: '100%', padding: 24, position: 'relative' }}>
             <button
               onClick={() => setShowStatusModal(false)}
-              style={{ position: 'absolute', right: 16, top: 16, color: '#94a3b8', background: 'transparent', border: 'none', cursor: 'pointer' }}
+              style={{
+                position: 'absolute',
+                top: 14,
+                right: 14,
+                background: 'transparent',
+                border: 'none',
+                color: '#64748b',
+                cursor: 'pointer',
+              }}
             >
-              <X size={20} />
+              <X size={18} />
             </button>
 
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div
                 style={{
-                  width: 36,
-                  height: 36,
+                  width: 38,
+                  height: 38,
                   borderRadius: 10,
                   background: backendStatus === 'online' ? '#dcfce7' : '#fee2e2',
-                  color: backendStatus === 'online' ? '#16a34a' : '#dc2626',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  color: backendStatus === 'online' ? '#16a34a' : '#dc2626',
                 }}
               >
                 <Activity size={20} />
               </div>
               <div>
-                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 700 }}>Medora Backend Service</h3>
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Real-time Connection Diagnostics</span>
+                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: 'var(--text-main)' }}>
+                  Backend System Health
+                </h3>
+                <p style={{ margin: 0, fontSize: 12, color: 'var(--text-muted)' }}>
+                  Medora 2.0 Core Diagnostic Status
+                </p>
               </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, fontSize: 13, background: 'var(--bg-subtle)', padding: 16, borderRadius: 8, marginBottom: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 13 }}>
+                <span style={{ color: '#64748b' }}>Connection Status</span>
                 <span style={{ fontWeight: 700, color: backendStatus === 'online' ? '#16a34a' : '#dc2626' }}>
-                  {backendStatus === 'online' ? '● Operational (200 OK)' : '○ Unreachable'}
+                  {backendStatus === 'online' ? 'Connected (Operational)' : backendStatus === 'checking' ? 'Testing Connection...' : 'Disconnected'}
                 </span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Endpoint:</span>
-                <code style={{ fontSize: 12 }}>{apiBaseUrl || window.location.origin}</code>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 13 }}>
+                <span style={{ color: '#64748b' }}>Latency Round-Trip</span>
+                <span style={{ fontWeight: 600 }}>{backendLatency ? `${backendLatency} ms` : 'N/A'}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Latency (Ping):</span>
-                <span style={{ fontWeight: 600 }}>{backendLatency !== null ? `${backendLatency} ms` : '-'}</span>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 13 }}>
+                <span style={{ color: '#64748b' }}>Gateway Endpoint</span>
+                <span style={{ fontWeight: 600, fontFamily: 'monospace', fontSize: 12 }}>{apiBaseUrl}</span>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: 'var(--text-muted)' }}>API Version:</span>
-                <span style={{ fontWeight: 600 }}>v2.0.0 (NestJS 11 + Prisma)</span>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 13 }}>
+                <span style={{ color: '#64748b' }}>Active Staff Persona</span>
+                <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{userRole}</span>
               </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <button
-                className="btn btn-secondary"
-                onClick={checkBackendHealth}
-                style={{ fontSize: 12.5 }}
-              >
-                Re-check
-              </button>
-
-              <a
-                href={`${apiBaseUrl}/status`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-primary"
-                style={{ fontSize: 12.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}
-              >
-                <span>Open Backend Status Page</span>
-                <ExternalLink size={14} />
-              </a>
-            </div>
+            <button
+              onClick={() => {
+                void checkBackendHealth();
+              }}
+              className="btn btn-secondary"
+              style={{ width: '100%', padding: '10px', fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            >
+              <Activity size={15} /> Re-verify Gateway Connectivity
+            </button>
           </div>
         </div>
       )}
     </div>
   );
 };
-

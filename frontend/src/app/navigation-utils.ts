@@ -1,4 +1,14 @@
-import type { NavigationItem, NavigationCategory } from './NavigationConfig';
+import {
+  type NavigationItem,
+  type NavigationCategory,
+  type RoleNavigationItem,
+  type RoleNavigationSection,
+  type RoleQuickAction,
+  type RoleDepartmentMeta,
+  ROLE_NAVIGATION_CONFIG,
+  ROLE_QUICK_ACTIONS,
+  ROLE_DEPARTMENT_META,
+} from './NavigationConfig';
 
 /**
  * Checks if a user has sufficient permissions for a navigation item.
@@ -6,7 +16,7 @@ import type { NavigationItem, NavigationCategory } from './NavigationConfig';
  * All other roles require all permissions in `requiredPermissions` OR any permission in `requiredAnyPermissions`.
  */
 export function canAccessItem(
-  item: NavigationItem,
+  item: NavigationItem | RoleNavigationItem,
   userPermissions: string[] = [],
   userRole = '',
 ): boolean {
@@ -67,6 +77,53 @@ export function groupNavItemsByCategory(
   }
 
   return grouped;
+}
+
+/**
+ * Resolves the role-specific navigation sections and items tailored to the user's role.
+ * Filters out items for which the user lacks backend-issued permissions.
+ */
+export function getRoleNavigation(
+  userRole: string,
+  userPermissions: string[] = [],
+): RoleNavigationSection[] {
+  const sections = ROLE_NAVIGATION_CONFIG[userRole] || ROLE_NAVIGATION_CONFIG['Hospital Admin'] || [];
+
+  return sections
+    .map((section) => ({
+      title: section.title,
+      items: section.items.filter((item) => canAccessItem(item, userPermissions, userRole)),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+/**
+ * Resolves role-specific Quick Actions ("+ Add New" dropdown menu).
+ */
+export function getRoleQuickActions(
+  userRole: string,
+  userPermissions: string[] = [],
+): RoleQuickAction[] {
+  const actions = ROLE_QUICK_ACTIONS[userRole] || ROLE_QUICK_ACTIONS['Hospital Admin'] || [];
+  if (userRole === 'Super Admin') return actions;
+
+  const permsSet = new Set(userPermissions.map((p) => p.toLowerCase()));
+  return actions.filter((action) => {
+    if (!action.requiredPermission) return true;
+    return permsSet.has(action.requiredPermission.toLowerCase());
+  });
+}
+
+/**
+ * Retrieves department title badge and subtitle description for the active persona.
+ */
+export function getRoleDepartmentMeta(userRole: string): RoleDepartmentMeta {
+  return (
+    ROLE_DEPARTMENT_META[userRole] || {
+      badge: 'HEALTHCARE CORE',
+      subtext: 'Hospital Clinical System',
+    }
+  );
 }
 
 /**
