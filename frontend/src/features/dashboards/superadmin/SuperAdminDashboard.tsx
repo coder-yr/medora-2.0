@@ -23,10 +23,13 @@ interface BranchComparisonItem {
   branchId: string;
   branchName: string;
   branchCode: string;
-  appointmentCount: number;
-  admissionCount: number;
-  grossRevenue: number;
-  netRevenue: number;
+  address?: string;
+  appointmentCount?: number;
+  appointmentsCount?: number;
+  admissionCount?: number;
+  admissionsCount?: number;
+  grossRevenue?: number;
+  netRevenue?: number | null;
 }
 
 interface OperationalAlertItem {
@@ -123,9 +126,18 @@ export const SuperAdminDashboard: React.FC = () => {
     fetchGlobalData();
   };
 
-  const totalNetworkRevenue = branchComparison.reduce((acc, b) => acc + (b.grossRevenue || 0), 0);
-  const totalNetworkAppointments = branchComparison.reduce((acc, b) => acc + (b.appointmentCount || 0), 0);
-  const totalNetworkAdmissions = branchComparison.reduce((acc, b) => acc + (b.admissionCount || 0), 0);
+  const totalNetworkRevenue = branchComparison.reduce(
+    (acc, b) => acc + Number(b.netRevenue ?? b.grossRevenue ?? 0),
+    0
+  );
+  const totalNetworkAppointments = branchComparison.reduce(
+    (acc, b) => acc + Number(b.appointmentsCount ?? b.appointmentCount ?? 0),
+    0
+  );
+  const totalNetworkAdmissions = branchComparison.reduce(
+    (acc, b) => acc + Number(b.admissionsCount ?? b.admissionCount ?? 0),
+    0
+  );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
@@ -269,22 +281,28 @@ export const SuperAdminDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {branchComparison.map((b) => (
-                  <tr key={b.branchId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '10px 14px', fontWeight: 600 }}>{b.branchName}</td>
-                    <td style={{ padding: '10px 14px' }}>
-                      <span className="badge badge-neutral" style={{ fontSize: 11 }}>{b.branchCode}</span>
-                    </td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right' }}>{b.appointmentCount.toLocaleString()}</td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right' }}>{b.admissionCount.toLocaleString()}</td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>
-                      PKR {b.grossRevenue.toLocaleString()}
-                    </td>
-                    <td style={{ padding: '10px 14px', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>
-                      PKR {b.netRevenue.toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
+                {branchComparison.map((b) => {
+                  const appointments = Number(b.appointmentsCount ?? b.appointmentCount ?? 0);
+                  const admissions = Number(b.admissionsCount ?? b.admissionCount ?? 0);
+                  const grossRev = Number(b.grossRevenue ?? b.netRevenue ?? 0);
+                  const netRev = Number(b.netRevenue ?? 0);
+                  return (
+                    <tr key={b.branchId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '10px 14px', fontWeight: 600 }}>{b.branchName}</td>
+                      <td style={{ padding: '10px 14px' }}>
+                        <span className="badge badge-neutral" style={{ fontSize: 11 }}>{b.branchCode}</span>
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>{appointments.toLocaleString()}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right' }}>{admissions.toLocaleString()}</td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>
+                        PKR {grossRev.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '10px 14px', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>
+                        PKR {netRev.toLocaleString()}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

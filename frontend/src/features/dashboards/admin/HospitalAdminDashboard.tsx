@@ -211,8 +211,8 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 1. Registered Patients */}
           <DashboardMetricCard
             title="Total Registered Patients"
-            value={overview?.patients.totalRegistered.toLocaleString()}
-            subtext={`+${overview?.patients.newInPeriod || 0} registered in ${period}`}
+            value={overview?.patients?.totalRegistered != null ? overview.patients.totalRegistered.toLocaleString() : '0'}
+            subtext={`+${overview?.patients?.newInPeriod || 0} registered in ${period}`}
             icon={Users}
             variant="primary"
             onClick={() => navigate('/patients')}
