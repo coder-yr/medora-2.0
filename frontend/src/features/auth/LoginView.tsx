@@ -159,7 +159,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
         onLoginSuccess({
           accessToken: `demo_token_${Date.now()}`,
           user: {
-            id: 'demo-user-1',
+            id: '1',
+            doctorId: demoUser.role === 'Doctor' ? '1' : undefined,
             email: email.trim().toLowerCase(),
             name: demoUser.name,
             role: demoUser.role,
@@ -244,7 +245,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
         onLoginSuccess({
           accessToken: `demo_token_${Date.now()}`,
           user: {
-            id: 'demo-user-1',
+            id: '1',
+            doctorId: demoUser.role === 'Doctor' ? '1' : undefined,
             email: roleEmail.toLowerCase(),
             name: demoUser.name,
             role: demoUser.role,

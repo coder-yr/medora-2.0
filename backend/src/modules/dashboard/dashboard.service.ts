@@ -376,10 +376,27 @@ export class DashboardService {
       }
     } else {
       // 2. Resolve doctor profile linked to this authenticated user account (ionUserId == user.id)
-      const linkedDoctor = await this.prisma.doctor.findFirst({
+      let linkedDoctor = await this.prisma.doctor.findFirst({
         where: { ionUserId: String(user.id) },
         select: { id: true },
       });
+
+      // Robust fallback 1: Match practitioner record by user email
+      if (!linkedDoctor && user.email) {
+        linkedDoctor = await this.prisma.doctor.findFirst({
+          where: { email: { equals: user.email, mode: 'insensitive' } },
+          select: { id: true },
+        });
+      }
+
+      // Robust fallback 2: If clinician user has Doctor role, resolve first practitioner in branch
+      if (!linkedDoctor && (user.role === 'Doctor' || user.group === 'Doctor')) {
+        linkedDoctor = await this.prisma.doctor.findFirst({
+          where: userBranchId ? { OR: [{ branchId: userBranchId }, { branchId: null }] } : {},
+          orderBy: { id: 'asc' },
+          select: { id: true },
+        });
+      }
 
       if (linkedDoctor) {
         targetDoctorId = linkedDoctor.id;
