@@ -202,3 +202,4 @@ The `OrganizationModule` exposes a comprehensive RESTful API under `/api/v1/orga
   An `OrganizationSubscription` or `FeatureEntitlement` matrix will be introduced to control feature availability (e.g. `IPD_ADMISSION`, `PHARMACY_FEFO`, `RADIOLOGY_PACS`, `ACCOUNTING_LEDGER`) based on whether the tenant is licensed for **Medora Clinic**, **Medora Professional**, or **Medora Hospital**.
 - **Phase 10.3 (Clinic Edition UI & Simplified Workspaces)**:
   Dedicated clinic navigation and lightweight workflows tailored for single-doctor and small polyclinic environments, eliminating unused hospital-grade menus (such as ward bed management or morgue/OT scheduling) while retaining the unified backend domain logic.
+

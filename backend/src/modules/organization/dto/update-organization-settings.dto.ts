@@ -83,3 +83,4 @@ export class UpdateOrganizationSettingsDto {
   @IsOptional()
   invoiceFooter?: string;
 }
+

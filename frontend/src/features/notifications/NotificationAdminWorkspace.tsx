@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import type { AdminNotification, QueueHealth, NotificationTemplate } from '../../types/notification';
 
+import { getApiBaseUrl } from '../../config/api';
+
 interface NotificationAdminWorkspaceProps {
   token: string | null;
   activeBranchId?: string | null;
@@ -20,7 +22,7 @@ interface NotificationAdminWorkspaceProps {
 export const NotificationAdminWorkspace: React.FC<NotificationAdminWorkspaceProps> = ({
   token,
   activeBranchId,
-  apiBaseUrl = 'http://localhost:3000',
+  apiBaseUrl = getApiBaseUrl(),
 }) => {
   const [activeTab, setActiveTab] = useState<'outbox' | 'templates' | 'health'>('outbox');
   const [health, setHealth] = useState<QueueHealth | null>(null);

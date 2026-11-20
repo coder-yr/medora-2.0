@@ -165,3 +165,4 @@ To ensure high performance across thousands of tenants:
    - `OrganizationSettings`: `@@unique([organizationId])` for O(1) branding retrieval.
 3. **Soft-Deletion Safe Indexing**:
    - Queries always include `deletedAt: null` to maintain audit preservation without degrading query execution plans.
+

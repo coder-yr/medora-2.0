@@ -56,8 +56,11 @@ async function bootstrap() {
 
       const isAllowed =
         allowedOriginsList.includes(origin) ||
+        allowedOriginsList.includes('*') ||
         origin.endsWith('.vercel.app') ||
-        origin.startsWith('http://localhost:');
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        /^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin);
 
       if (isAllowed) {
         return callback(null, true);
@@ -102,9 +105,10 @@ async function bootstrap() {
   // Enable graceful process termination
   app.enableShutdownHooks();
 
-  await app.listen(port);
-  logger.log(`Medora 2.0 backend running on port ${port}`);
-  logger.log(`API base endpoint: http://localhost:${port}/${globalPrefix}`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`Medora 2.0 backend running on 0.0.0.0:${port}`);
+  logger.log(`API base endpoint (local): http://localhost:${port}/${globalPrefix}`);
+  logger.log(`API base endpoint (network): http://192.168.1.104:${port}/${globalPrefix}`);
   logger.log(`Swagger OpenAPI documentation: http://localhost:${port}/api/docs`);
 }
 

@@ -28,6 +28,8 @@ import type {
 import type { Doctor } from '../../types/doctor';
 import type { Patient } from '../../types/patient';
 
+import { getApiBaseUrl } from '../../config/api';
+
 interface InpatientWorkspaceProps {
   apiBaseUrl?: string;
   token?: string;
@@ -37,7 +39,7 @@ interface InpatientWorkspaceProps {
 }
 
 export function InpatientWorkspace({
-  apiBaseUrl = 'http://localhost:3000',
+  apiBaseUrl = getApiBaseUrl(),
   token,
   userRole: _userRole = 'Doctor',
   onNotification,

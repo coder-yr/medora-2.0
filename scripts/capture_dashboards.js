@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require(path.join(__dirname, '../backend/node_modules/jsonwebtoken'));
 
-const FRONTEND_URL = 'http://localhost:5173';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://127.0.0.1:5173';
 const ARTIFACT_DIR = path.resolve('C:/Users/Acer/.gemini/antigravity/brain/fee9c3f7-74ea-42d0-a86c-d6648836c1eb/screenshots');
 const USER_DATA_DIR = path.resolve(process.env.TEMP, 'chrome_cdp_screens');
 

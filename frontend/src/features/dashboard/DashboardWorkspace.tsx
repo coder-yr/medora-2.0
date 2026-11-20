@@ -21,6 +21,7 @@ import type {
   OperationalAlertsData,
   DashboardPeriod,
 } from '../../types/dashboard';
+import { getApiBaseUrl } from '../../config/api';
 
 interface DashboardWorkspaceProps {
   token: string | null;
@@ -34,7 +35,7 @@ export const DashboardWorkspace: React.FC<DashboardWorkspaceProps> = ({
   token,
   userRole = 'Admin',
   activeBranchId,
-  apiBaseUrl = 'http://localhost:3000',
+  apiBaseUrl = getApiBaseUrl(),
   onNavigateToModule,
 }) => {
   const [period, setPeriod] = useState<DashboardPeriod>('today');

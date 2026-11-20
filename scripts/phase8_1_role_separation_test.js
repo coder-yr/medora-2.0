@@ -9,7 +9,7 @@ const JWT_SECRET = secretLine
   ? secretLine.split('=')[1].trim().replace(/^["']|["']$/g, '')
   : (process.env.JWT_SECRET || 'local-dev-secret');
 
-const API_BASE = 'http://localhost:3000/api/v1';
+const API_BASE = process.env.API_BASE_URL || 'http://127.0.0.1:3000/api/v1';
 
 // Import pure role-resolution function simulation (identical to frontend/src/app/role-resolution.ts)
 function resolveUserRole(user) {

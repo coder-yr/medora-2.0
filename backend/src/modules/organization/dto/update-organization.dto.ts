@@ -25,3 +25,4 @@ export class UpdateOrganizationDto {
   @IsOptional()
   status?: OrganizationStatusDto;
 }
+

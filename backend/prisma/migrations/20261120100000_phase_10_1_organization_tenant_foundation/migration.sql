@@ -166,3 +166,4 @@ SELECT u.id, o.id, true, true, u.group, CURRENT_TIMESTAMP
 FROM "users" u
 CROSS JOIN (SELECT id FROM "organizations" WHERE "code" = 'MEDORA-HOSP-01' LIMIT 1) o
 ON CONFLICT ("user_id", "organization_id") DO NOTHING;
+

@@ -29,7 +29,9 @@ interface SettingsWorkspaceProps {
   onBranchChange?: (branchId: string) => void;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
+import { getApiBaseUrl } from '../../config/api';
+
+const API_BASE_URL = getApiBaseUrl();
 
 export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
   token,

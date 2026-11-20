@@ -9,7 +9,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 process.env.PORT = process.env.PORT || '3000';
 process.env.API_PREFIX = process.env.API_PREFIX || 'api';
 process.env.API_VERSION = process.env.API_VERSION || 'v1';
-process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173,https://*.vercel.app';
+process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.104:5173,https://*.vercel.app';
 
 require('reflect-metadata');
 const { NestFactory } = require('@nestjs/core');
@@ -64,7 +64,9 @@ async function bootstrap() {
       const isAllowed =
         allowedOriginsList.includes(origin) ||
         origin.endsWith('.vercel.app') ||
-        origin.startsWith('http://localhost:');
+        origin.startsWith('http://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        /^https?:\/\/(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/.test(origin);
       if (isAllowed) return callback(null, true);
       return callback(null, true); // Permissive in serverless to ensure frontend connectivity
     },

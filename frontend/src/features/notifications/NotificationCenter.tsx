@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Bell, Check, CheckCheck, Sliders, RefreshCw, X, Mail, MessageSquare, CheckCircle } from 'lucide-react';
 import type { NotificationItem, NotificationPreference } from '../../types/notification';
 
+import { getApiBaseUrl } from '../../config/api';
+
 interface NotificationCenterProps {
   token: string | null;
   apiBaseUrl?: string;
@@ -9,7 +11,7 @@ interface NotificationCenterProps {
 
 export const NotificationCenter: React.FC<NotificationCenterProps> = ({
   token,
-  apiBaseUrl = 'http://localhost:3000',
+  apiBaseUrl = getApiBaseUrl(),
 }) => {
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [isOpen, setIsOpen] = useState<boolean>(false);
