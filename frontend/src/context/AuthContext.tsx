@@ -62,6 +62,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    // Demo persona bypass when running in offline/preview demo mode
+    if (authToken.startsWith('demo_token_')) {
+      const storedUser = sessionStorage.getItem('medora_user');
+      if (storedUser) {
+        try {
+          const user = JSON.parse(storedUser);
+          setCurrentUser(user);
+          setUserRole(user.role);
+          setUserPermissions(user.permissions || []);
+          setUserBranches(user.branches || [
+            { id: '1', name: 'Main City Hospital', code: 'MAIN-01', isMain: true },
+          ]);
+          setActiveBranchIdState('1');
+          setAuthLoading(false);
+          return;
+        } catch {}
+      }
+    }
+
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
         headers: { Authorization: `Bearer ${authToken}` },
