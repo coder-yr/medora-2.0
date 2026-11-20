@@ -67,6 +67,8 @@ const DEMO_PERSONAS_MAP: Record<string, { role: string; name: string; permission
   },
 };
 
+const TODAY_DATE = new Date().toISOString().split('T')[0];
+
 function buildMockResponse(url: string, method: string, body?: any): Response {
   let data: any = { success: true, data: [] };
 
@@ -156,6 +158,64 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
         },
       ],
     };
+  } else if (url.includes('/api/v1/dashboard/doctor-workload')) {
+    data = {
+      success: true,
+      data: {
+        doctorId: '1',
+        appointments: {
+          total: 4,
+          completed: 1,
+          items: [],
+        },
+        consultations: {
+          pendingDrafts: 1,
+          completed: 3,
+        },
+      },
+    };
+  } else if (url.includes('/api/v1/dashboard/operational-alerts')) {
+    data = {
+      success: true,
+      data: [
+        {
+          id: '1',
+          type: 'WARNING',
+          title: 'Pharmacy Reorder Trigger',
+          message: 'Amoxicillin 250mg stock is below safety threshold (12 packs remaining)',
+          timestamp: new Date().toISOString(),
+        },
+        {
+          id: '2',
+          type: 'INFO',
+          title: 'Bed Capacity Alert',
+          message: 'Intensive Care Unit (ICU) reached 83% occupancy (10/12 beds occupied)',
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+  } else if (url.includes('/api/v1/dashboard/branch-comparison')) {
+    data = {
+      success: true,
+      data: [
+        {
+          branchId: '1',
+          branchName: 'Main City Hospital',
+          code: 'MAIN-01',
+          totalPatients: 1100,
+          occupancyRate: 74,
+          revenue: 14200.0,
+        },
+        {
+          branchId: '2',
+          branchName: 'North Wing Specialty Clinic',
+          code: 'NORTH-02',
+          totalPatients: 320,
+          occupancyRate: 58,
+          revenue: 4300.0,
+        },
+      ],
+    };
   } else if (url.includes('/api/v1/dashboard')) {
     data = {
       success: true,
@@ -179,6 +239,100 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
         ],
       },
     };
+  } else if (url.includes('/api/v1/appointments')) {
+    data = {
+      success: true,
+      data: [
+        {
+          id: '1',
+          appointmentNumber: 'APT-001',
+          date: TODAY_DATE,
+          timeSlot: '09:30 AM',
+          patientId: '1',
+          patient: {
+            id: '1',
+            patientId: '000001',
+            name: 'Amina Yousaf',
+            phone: '+92 300 1234567',
+            gender: 'Female',
+            age: 34,
+          },
+          doctorId: '1',
+          doctorName: 'Dr. Michael Chen',
+          remarks: 'Follow-up on Hypertension and Routine ECG',
+          bp: '120/80',
+          pulse: '74',
+          temperature: '98.4°F',
+          status: 'waiting',
+        },
+        {
+          id: '2',
+          appointmentNumber: 'APT-002',
+          date: TODAY_DATE,
+          timeSlot: '10:00 AM',
+          patientId: '2',
+          patient: {
+            id: '2',
+            patientId: '000002',
+            name: 'Bilal Ahmed',
+            phone: '+92 321 7654321',
+            gender: 'Male',
+            age: 42,
+          },
+          doctorId: '1',
+          doctorName: 'Dr. Michael Chen',
+          remarks: 'Chest tightness, stat consultation',
+          bp: '135/88',
+          pulse: '82',
+          temperature: '98.6°F',
+          status: 'in_consultation',
+        },
+        {
+          id: '3',
+          appointmentNumber: 'APT-003',
+          date: TODAY_DATE,
+          timeSlot: '10:30 AM',
+          patientId: '3',
+          patient: {
+            id: '3',
+            patientId: '000003',
+            name: 'Sara Khan',
+            phone: '+92 333 9876543',
+            gender: 'Female',
+            age: 28,
+          },
+          doctorId: '1',
+          doctorName: 'Dr. Michael Chen',
+          remarks: 'Seasonal allergies and sinus headache',
+          bp: '115/75',
+          pulse: '70',
+          temperature: '99.1°F',
+          status: 'waiting',
+        },
+        {
+          id: '4',
+          appointmentNumber: 'APT-004',
+          date: TODAY_DATE,
+          timeSlot: '08:45 AM',
+          patientId: '4',
+          patient: {
+            id: '4',
+            patientId: '000004',
+            name: 'Tariq Mehmood',
+            phone: '+92 312 3456789',
+            gender: 'Male',
+            age: 55,
+          },
+          doctorId: '1',
+          doctorName: 'Dr. Michael Chen',
+          remarks: 'Diabetic follow-up and HbA1c review',
+          bp: '128/82',
+          pulse: '76',
+          temperature: '98.2°F',
+          status: 'completed',
+        },
+      ],
+    };
   } else if (url.includes('/api/v1/patients')) {
     data = {
       success: true,
@@ -188,14 +342,6 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
         { id: '3', mrn: '000003', name: 'Sara Khan', gender: 'Female', age: 28, phone: '+92 333 9876543', bloodGroup: 'A+', status: 'Active', branchId: '1' },
       ],
       total: 3,
-    };
-  } else if (url.includes('/api/v1/appointments')) {
-    data = {
-      success: true,
-      data: [
-        { id: '1', appointmentNumber: 'APT-001', patientId: '1', patientName: 'Amina Yousaf', doctorId: '1', doctorName: 'Dr. Michael Chen', department: 'General Medicine', scheduledAt: new Date().toISOString(), status: 'CONFIRMED' },
-        { id: '2', appointmentNumber: 'APT-002', patientId: '2', patientName: 'Bilal Ahmed', doctorId: '1', doctorName: 'Dr. Michael Chen', department: 'Cardiology', scheduledAt: new Date().toISOString(), status: 'WAITING' },
-      ],
     };
   } else if (url.includes('/api/v1/doctors')) {
     data = {
@@ -215,6 +361,17 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
         { id: '4', name: 'Orthopedics', code: 'ORTHO' },
       ],
     };
+  } else if (url.includes('/api/v1/staff/dashboard/metrics')) {
+    data = {
+      success: true,
+      data: {
+        totalStaff: 48,
+        doctors: 18,
+        nurses: 16,
+        administrative: 14,
+        onDutyToday: 32,
+      },
+    };
   } else if (url.includes('/api/v1/staff')) {
     data = {
       success: true,
@@ -223,51 +380,88 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
         { id: '2', name: 'Sarah Jenkins', email: 'admin.test@medora.hospital', role: 'Hospital Admin', designation: 'Operations Director', department: 'Administration', status: 'ACTIVE' },
       ],
     };
-  } else if (url.includes('/api/v1/inpatient')) {
+  } else if (url.includes('/api/v1/inpatient/dashboard')) {
     data = {
       success: true,
       data: {
         totalAdmissions: 84,
+        admittedToday: 6,
+        dischargedToday: 4,
         availableBeds: 36,
-        occupiedBeds: 84,
-        wards: [
-          { id: '1', name: 'Intensive Care Unit (ICU)', capacity: 12, occupied: 10 },
-          { id: '2', name: 'General Medical Ward', capacity: 30, occupied: 24 },
-        ],
-        admissions: [],
+        occupancyRate: 70.0,
       },
     };
-  } else if (url.includes('/api/v1/lab')) {
+  } else if (url.includes('/api/v1/inpatient/admissions')) {
+    data = {
+      success: true,
+      data: [
+        {
+          id: '1',
+          admissionNumber: 'ADM-001',
+          patient: { id: '1', name: 'Amina Yousaf', mrn: '000001' },
+          ward: { name: 'ICU' },
+          bed: { bedNumber: 'ICU-03' },
+          admittedAt: new Date().toISOString(),
+          status: 'ADMITTED',
+        },
+      ],
+    };
+  } else if (url.includes('/api/v1/inpatient/beds')) {
+    data = {
+      success: true,
+      data: [
+        { id: '1', bedNumber: 'ICU-01', wardName: 'ICU', status: 'OCCUPIED' },
+        { id: '2', bedNumber: 'ICU-02', wardName: 'ICU', status: 'AVAILABLE' },
+        { id: '3', bedNumber: 'GW-01', wardName: 'General Ward', status: 'CLEANING' },
+      ],
+    };
+  } else if (url.includes('/api/v1/lab/dashboard')) {
     data = {
       success: true,
       data: {
         pendingOrders: 7,
-        inProgress: 4,
+        samplesCollected: 14,
+        inAnalysis: 5,
         completedToday: 26,
-        orders: [],
       },
     };
-  } else if (url.includes('/api/v1/radiology')) {
+  } else if (url.includes('/api/v1/radiology/dashboard')) {
     data = {
       success: true,
       data: {
         pendingOrders: 4,
-        completedToday: 18,
-        orders: [],
+        inProgress: 2,
+        reportedToday: 18,
       },
     };
-  } else if (url.includes('/api/v1/pharmacy') || url.includes('/api/v1/medicines')) {
+  } else if (url.includes('/api/v1/pharmacy/dashboard') || url.includes('/api/v1/pharmacy')) {
     data = {
       success: true,
       data: {
-        totalItems: 124,
-        lowStock: 8,
+        totalMedicines: 340,
+        lowStockCount: 8,
+        prescriptionsPending: 12,
         dispensedToday: 42,
-        medicines: [
-          { id: '1', name: 'Paracetamol 500mg', genericName: 'Acetaminophen', stock: 1500, price: 2.5 },
-          { id: '2', name: 'Amoxicillin 250mg', genericName: 'Amoxicillin', stock: 650, price: 8.0 },
-        ],
       },
+    };
+  } else if (url.includes('/api/v1/cashier/shifts/active')) {
+    data = {
+      success: true,
+      data: {
+        id: '1',
+        status: 'OPEN',
+        openedAt: new Date().toISOString(),
+        initialCash: 500.0,
+        totalCollected: 2450.0,
+      },
+    };
+  } else if (url.includes('/api/v1/cashier/drawers')) {
+    data = {
+      success: true,
+      data: [
+        { id: '1', name: 'Main Counter Drawer #1', status: 'ACTIVE', branchId: '1' },
+        { id: '2', name: 'Emergency Counter Drawer', status: 'ACTIVE', branchId: '1' },
+      ],
     };
   } else if (url.includes('/api/v1/cashier') || url.includes('/api/v1/invoices') || url.includes('/api/v1/accounting')) {
     data = {
