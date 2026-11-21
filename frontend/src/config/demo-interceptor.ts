@@ -223,6 +223,9 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
     data = {
       success: true,
       data: {
+        period: 'today',
+        dateRange: { start: new Date().toISOString(), end: new Date().toISOString() },
+        branchScope: '1',
         totalPatients: 1420,
         todayAppointments: 38,
         admittedPatients: 84,
@@ -233,6 +236,42 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
         pendingPrescriptions: 12,
         pendingLabTests: 7,
         pendingRadiology: 4,
+        patients: {
+          totalRegistered: 1420,
+          newInPeriod: 14,
+        },
+        appointments: {
+          total: 38,
+          completed: 24,
+          cancelled: 2,
+          completionRatePercent: 63,
+          consultationsCompleted: 22,
+        },
+        inpatient: {
+          activeAdmissions: 84,
+          totalBeds: 120,
+          occupiedBeds: 84,
+          occupancyRatePercent: 70,
+        },
+        pharmacy: {
+          lowStockMedicines: 4,
+          nearExpiryBatches: 2,
+        },
+        diagnostics: {
+          pendingLabOrders: 7,
+          pendingRadiologyStudies: 4,
+        },
+        financial: {
+          recognizedRevenue: 18500,
+          cashCollections: 14200,
+          nonCashCollections: 4300,
+          accountsReceivable: 2100,
+          openOrPendingShifts: 1,
+        },
+        notifications: {
+          deadLetterJobs: 0,
+          queueStatus: 'HEALTHY',
+        },
         branches: [
           { id: '1', name: 'Main City Hospital', totalPatients: 1100, occupancyRate: 74 },
           { id: '2', name: 'North Wing Clinic', totalPatients: 320, occupancyRate: 58 },

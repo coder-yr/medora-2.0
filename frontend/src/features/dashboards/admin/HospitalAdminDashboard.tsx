@@ -221,8 +221,8 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 2. Today's Appointments */}
           <DashboardMetricCard
             title="Scheduled Appointments"
-            value={overview?.appointments.total}
-            subtext={`${overview?.appointments.completionRatePercent ?? 0}% clinical completion`}
+            value={overview?.appointments?.total ?? 0}
+            subtext={`${overview?.appointments?.completionRatePercent ?? 0}% clinical completion`}
             icon={Calendar}
             variant="teal"
             onClick={() => navigate('/appointments')}
@@ -231,8 +231,8 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 3. Completed Consultations */}
           <DashboardMetricCard
             title="Completed Consultations"
-            value={overview?.appointments.consultationsCompleted}
-            subtext={`${overview?.appointments.completed || 0} visits completed`}
+            value={overview?.appointments?.consultationsCompleted ?? 0}
+            subtext={`${overview?.appointments?.completed || 0} visits completed`}
             icon={Stethoscope}
             variant="emerald"
             onClick={() => navigate('/consultations')}
@@ -241,8 +241,8 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 4. Inpatient Admissions */}
           <DashboardMetricCard
             title="Active IPD Inpatients"
-            value={overview?.inpatient.activeAdmissions}
-            subtext={`${overview?.inpatient.occupiedBeds || 0}/${overview?.inpatient.totalBeds || 0} beds (${overview?.inpatient.occupancyRatePercent ?? 0}%)`}
+            value={overview?.inpatient?.activeAdmissions ?? 0}
+            subtext={`${overview?.inpatient?.occupiedBeds || 0}/${overview?.inpatient?.totalBeds || 0} beds (${overview?.inpatient?.occupancyRatePercent ?? 0}%)`}
             icon={BedDouble}
             variant="amber"
             onClick={() => navigate('/inpatient')}
@@ -271,8 +271,8 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 7. Low Stock Medicines */}
           <DashboardMetricCard
             title="Low Stock Medicines"
-            value={overview?.pharmacy.lowStockMedicines}
-            subtext={`${overview?.pharmacy.nearExpiryBatches || 0} batches near expiry`}
+            value={overview?.pharmacy?.lowStockMedicines ?? 0}
+            subtext={`${overview?.pharmacy?.nearExpiryBatches || 0} batches near expiry`}
             icon={Boxes}
             variant="rose"
             onClick={() => navigate('/pharmacy')}
@@ -281,8 +281,8 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 8. Pending Diagnostics */}
           <DashboardMetricCard
             title="Pending Diagnostic Tests"
-            value={(overview?.diagnostics.pendingLabOrders || 0) + (overview?.diagnostics.pendingRadiologyStudies || 0)}
-            subtext={`${overview?.diagnostics.pendingLabOrders || 0} lab, ${overview?.diagnostics.pendingRadiologyStudies || 0} radiology`}
+            value={(overview?.diagnostics?.pendingLabOrders || 0) + (overview?.diagnostics?.pendingRadiologyStudies || 0)}
+            subtext={`${overview?.diagnostics?.pendingLabOrders || 0} lab, ${overview?.diagnostics?.pendingRadiologyStudies || 0} radiology`}
             icon={Microscope}
             variant="teal"
             onClick={() => navigate('/laboratory')}
@@ -297,20 +297,20 @@ export const HospitalAdminDashboard: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-subtle, #f8fafc)', borderRadius: 8 }}>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Bed Occupancy Rate</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: (overview?.inpatient.occupancyRatePercent || 0) > 85 ? '#dc2626' : '#059669' }}>
-                {overview?.inpatient.occupancyRatePercent ?? 0}%
+              <span style={{ fontSize: 14, fontWeight: 700, color: (overview?.inpatient?.occupancyRatePercent || 0) > 85 ? '#dc2626' : '#059669' }}>
+                {overview?.inpatient?.occupancyRatePercent ?? 0}%
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-subtle, #f8fafc)', borderRadius: 8 }}>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Available Inpatient Beds</span>
               <span style={{ fontSize: 14, fontWeight: 700 }}>
-                {Math.max(0, (overview?.inpatient.totalBeds || 0) - (overview?.inpatient.occupiedBeds || 0))} Beds
+                {Math.max(0, (overview?.inpatient?.totalBeds || 0) - (overview?.inpatient?.occupiedBeds || 0))} Beds
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-subtle, #f8fafc)', borderRadius: 8 }}>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Appointment Completion Rate</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#0284c7' }}>
-                {overview?.appointments.completionRatePercent ?? 0}%
+                {overview?.appointments?.completionRatePercent ?? 0}%
               </span>
             </div>
           </div>
@@ -321,20 +321,20 @@ export const HospitalAdminDashboard: React.FC = () => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-subtle, #f8fafc)', borderRadius: 8 }}>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Critical Stock Items</span>
-              <span style={{ fontSize: 14, fontWeight: 700, color: (overview?.pharmacy.lowStockMedicines || 0) > 0 ? '#dc2626' : '#059669' }}>
-                {overview?.pharmacy.lowStockMedicines ?? 0} SKUs
+              <span style={{ fontSize: 14, fontWeight: 700, color: (overview?.pharmacy?.lowStockMedicines || 0) > 0 ? '#dc2626' : '#059669' }}>
+                {overview?.pharmacy?.lowStockMedicines ?? 0} SKUs
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-subtle, #f8fafc)', borderRadius: 8 }}>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Pending Lab Specimens</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#0284c7' }}>
-                {overview?.diagnostics.pendingLabOrders ?? 0} orders
+                {overview?.diagnostics?.pendingLabOrders ?? 0} orders
               </span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'var(--surface-subtle, #f8fafc)', borderRadius: 8 }}>
               <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Pending Radiology Studies</span>
               <span style={{ fontSize: 14, fontWeight: 700, color: '#7c3aed' }}>
-                {overview?.diagnostics.pendingRadiologyStudies ?? 0} studies
+                {overview?.diagnostics?.pendingRadiologyStudies ?? 0} studies
               </span>
             </div>
           </div>
