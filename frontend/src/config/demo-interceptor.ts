@@ -96,6 +96,7 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
         accessToken: `demo_token_${Date.now()}`,
         user: {
           id: '1',
+          doctorId: persona.role === 'Doctor' ? '1' : undefined,
           email,
           name: persona.name,
           role: persona.role,
@@ -493,6 +494,22 @@ export function initDemoInterceptor() {
 
     // Only process /api/v1 requests
     if (url.includes('/api/v1')) {
+      // Detect if running on static cloud hosting (Vercel, Netlify) without an external API server
+      const isStaticHosting =
+        typeof window !== 'undefined' &&
+        (window.location.hostname.endsWith('.vercel.app') ||
+          window.location.hostname.endsWith('.netlify.app') ||
+          window.location.hostname.includes('vercel')) &&
+        (!import.meta.env.VITE_API_BASE_URL ||
+          !import.meta.env.VITE_API_BASE_URL.startsWith('http') ||
+          import.meta.env.VITE_API_BASE_URL.includes(window.location.hostname));
+
+      // On static hosting with no live backend, serve mock response immediately without making a doomed
+      // network request that triggers HTTP 405 Method Not Allowed on POST
+      if (isStaticHosting || url.includes('/api/v1/preview/')) {
+        return buildMockResponse(url, init?.method || 'GET', init?.body);
+      }
+
       try {
         const response = await originalFetch(input, init);
 

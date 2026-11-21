@@ -28,7 +28,7 @@ export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly branchAuth?: BranchAuthorizationService,
-  ) {}
+  ) { }
 
   /**
    * Standardizes date range boundaries to inclusive UTC start and end
@@ -555,15 +555,15 @@ export class DashboardService {
           }),
           canViewFinancial
             ? this.prisma.payment.aggregate({
-                where: {
-                  branchId: branch.id,
-                  createdAt: { gte: start, lte: end },
-                },
-                _sum: {
-                  grossTotal: true,
-                  discount: true,
-                },
-              })
+              where: {
+                branchId: branch.id,
+                createdAt: { gte: start, lte: end },
+              },
+              _sum: {
+                grossTotal: true,
+                discount: true,
+              },
+            })
             : Promise.resolve({ _sum: { grossTotal: null, discount: null } }),
         ]);
 
