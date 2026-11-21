@@ -90,6 +90,7 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
     } catch {}
 
     const persona = DEMO_PERSONAS_MAP[email.toLowerCase()] || DEMO_PERSONAS_MAP['doctor.test@medora.hospital'];
+    const resolvedGroup = persona.role === 'Hospital Admin' ? 'Admin' : (persona.role === 'Super Admin' ? 'SuperAdmin' : persona.role);
     data = {
       success: true,
       data: {
@@ -100,6 +101,7 @@ function buildMockResponse(url: string, method: string, body?: any): Response {
           email,
           name: persona.name,
           role: persona.role,
+          group: resolvedGroup,
           permissions: persona.permissions,
           branchId: '1',
           branches: [

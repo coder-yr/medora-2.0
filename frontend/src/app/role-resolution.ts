@@ -46,25 +46,26 @@ export function resolveUserRole(user: ResolvableUser | null | undefined): AppRol
   }
 
   const rawGroup = (user.group || user.role || '').trim();
+  const normalizedGroup = rawGroup.toLowerCase().replace(/[\s_-]+/g, '');
   const perms = (Array.isArray(user.permissions) ? user.permissions : []).map((p) => p.toLowerCase());
   const permsSet = new Set(perms);
 
   // 1. Super Admin: Explicit system-level global administration
   if (
-    rawGroup === 'SuperAdmin' ||
-    rawGroup === 'super_admin' ||
-    (rawGroup === 'Admin' && permsSet.has('branch_view_all') && permsSet.has('system_settings'))
+    normalizedGroup === 'superadmin' ||
+    (normalizedGroup === 'admin' && permsSet.has('branch_view_all') && permsSet.has('system_settings')) ||
+    permsSet.has('*')
   ) {
     return 'Super Admin';
   }
 
   // 2. Hospital Admin: Hospital or branch-level administrative operations
-  if (rawGroup === 'Admin' || rawGroup === 'HospitalAdmin') {
+  if (normalizedGroup === 'hospitaladmin' || normalizedGroup === 'admin') {
     return 'Hospital Admin';
   }
 
   // 3. Doctor or Specialized Radiologist
-  if (rawGroup === 'Doctor') {
+  if (normalizedGroup === 'doctor') {
     // If clinician is dedicated to radiology interpretation without general outpatient consultations
     const isDedicatedRadiologist =
       (permsSet.has('radiology_verify') || permsSet.has('radiology_process') || permsSet.has('radiology_result_enter')) &&
@@ -75,12 +76,12 @@ export function resolveUserRole(user: ResolvableUser | null | undefined): AppRol
   }
 
   // 4. Radiologist (direct group or designation)
-  if (rawGroup === 'Radiologist') {
+  if (normalizedGroup === 'radiologist') {
     return 'Radiologist';
   }
 
   // 5. Receptionist or Dedicated Cashier
-  if (rawGroup === 'Receptionist') {
+  if (normalizedGroup === 'receptionist') {
     // If front-desk staff is dedicated to cash drawer desk without patient registration or appointment booking
     const isDedicatedCashier =
       permsSet.has('cashier_shift_open') &&
@@ -92,32 +93,32 @@ export function resolveUserRole(user: ResolvableUser | null | undefined): AppRol
   }
 
   // 6. Cashier (direct group or designation)
-  if (rawGroup === 'Cashier') {
+  if (normalizedGroup === 'cashier') {
     return 'Cashier';
   }
 
   // 7. Nurse: Inpatient care, vitals and ward management
-  if (rawGroup === 'Nurse') {
+  if (normalizedGroup === 'nurse') {
     return 'Nurse';
   }
 
   // 8. Pharmacist: Medication formulary, FEFO dispensing and stock
-  if (rawGroup === 'Pharmacist') {
+  if (normalizedGroup === 'pharmacist') {
     return 'Pharmacist';
   }
 
   // 9. Laboratorist: Pathology, diagnostic tests, accessioning
-  if (rawGroup === 'Laboratorist') {
+  if (normalizedGroup === 'laboratorist' || normalizedGroup === 'lab') {
     return 'Laboratorist';
   }
 
   // 10. Accountant: Financial reporting, general ledger, trial balance
-  if (rawGroup === 'Accountant') {
+  if (normalizedGroup === 'accountant') {
     return 'Accountant';
   }
 
   // 11. HR Specialist (direct group or administrative staff designation)
-  if (rawGroup === 'HR' || rawGroup === 'StaffAdmin') {
+  if (normalizedGroup === 'hr' || normalizedGroup === 'staffadmin') {
     return 'HR';
   }
 
