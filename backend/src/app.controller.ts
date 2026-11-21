@@ -52,7 +52,7 @@ export class AppController {
     const dbStatus = readiness.checks.database.status;
     const isDbConnected = dbStatus === 'connected';
     const uptimeStr = this.formatUptime(liveness.uptimeSeconds);
-    const host = req.get('host') || 'localhost:3000';
+    const host = req.get('host') || process.env.HOST || 'medora.hospital';
     const protocol = req.protocol || 'http';
     const fullUrl = `${protocol}://${host}`;
 

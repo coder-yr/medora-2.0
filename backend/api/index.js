@@ -9,7 +9,7 @@ process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 process.env.PORT = process.env.PORT || '3000';
 process.env.API_PREFIX = process.env.API_PREFIX || 'api';
 process.env.API_VERSION = process.env.API_VERSION || 'v1';
-process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.104:5173,https://*.vercel.app';
+process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 require('reflect-metadata');
 const { NestFactory } = require('@nestjs/core');
@@ -35,7 +35,7 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const apiPrefix = configService.get('api.prefix') || 'api';
   const apiVersion = configService.get('api.version') || 'v1';
-  const corsOrigin = configService.get('api.corsOrigin') || 'http://localhost:5173';
+  const corsOrigin = configService.get('api.corsOrigin') || process.env.CORS_ORIGIN || '*';
   const globalPrefix = `${apiPrefix}/${apiVersion}`;
 
   // Security headers

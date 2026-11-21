@@ -4,7 +4,7 @@ export default () => ({
   api: {
     prefix: process.env.API_PREFIX || 'api',
     version: process.env.API_VERSION || 'v1',
-    corsOrigin: process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.104:5173',
+    corsOrigin: process.env.CORS_ORIGIN || '*',
   },
   database: {
     url: process.env.DATABASE_URL,

@@ -16,7 +16,7 @@ async function bootstrap() {
   const port = configService.get<number>('port') || 3000;
   const apiPrefix = configService.get<string>('api.prefix') || 'api';
   const apiVersion = configService.get<string>('api.version') || 'v1';
-  const corsOrigin = configService.get<string>('api.corsOrigin') || 'http://localhost:5173';
+  const corsOrigin = configService.get<string>('api.corsOrigin') || process.env.CORS_ORIGIN || '*';
   const isProd = configService.get<string>('environment') === 'production';
 
   // Security Headers: Helmet (Permit inline styling for Swagger docs and Status landing page)
@@ -97,7 +97,7 @@ async function bootstrap() {
 
     const document = SwaggerModule.createDocument(app, swaggerConfig);
     SwaggerModule.setup('api/docs', app, document);
-    logger.log(`Swagger OpenAPI documentation: http://localhost:${port}/api/docs`);
+    logger.log(`Swagger OpenAPI documentation: /api/docs (port ${port})`);
   } else {
     logger.log('Swagger documentation is disabled in production mode');
   }
@@ -106,10 +106,9 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   await app.listen(port, '0.0.0.0');
-  logger.log(`Medora 2.0 backend running on 0.0.0.0:${port}`);
-  logger.log(`API base endpoint (local): http://localhost:${port}/${globalPrefix}`);
-  logger.log(`API base endpoint (network): http://192.168.1.104:${port}/${globalPrefix}`);
-  logger.log(`Swagger OpenAPI documentation: http://localhost:${port}/api/docs`);
+  logger.log(`Medora 2.0 backend listening on port ${port}`);
+  logger.log(`API base endpoint: /${globalPrefix}`);
+  logger.log(`Swagger documentation: /api/docs`);
 }
 
 bootstrap().catch((err) => {
