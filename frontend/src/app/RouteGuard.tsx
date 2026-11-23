@@ -125,3 +125,53 @@ export const RequirePermission: React.FC<RequirePermissionProps> = ({ permission
   return <>{children}</>;
 };
 
+export const RequireSuperAdmin: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { userRole } = useAuth();
+  const navigate = useNavigate();
+
+  if (userRole !== 'Super Admin') {
+    return (
+      <div style={{
+        maxWidth: 560,
+        margin: '60px auto',
+        padding: 32,
+        borderRadius: 16,
+        background: '#ffffff',
+        border: '1px solid #fee2e2',
+        boxShadow: '0 10px 25px -5px rgba(239, 68, 68, 0.08)',
+        textAlign: 'center',
+      }}>
+        <div style={{
+          width: 56,
+          height: 56,
+          borderRadius: '50%',
+          background: '#fef2f2',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#dc2626',
+          margin: '0 auto 16px',
+        }}>
+          <ShieldAlert size={30} />
+        </div>
+        <h3 style={{ margin: '0 0 8px 0', fontSize: 20, fontWeight: 700, color: '#0f172a' }}>
+          Platform Owner Authorization Required
+        </h3>
+        <p style={{ margin: '0 0 16px 0', fontSize: 13.5, color: '#64748b', lineHeight: 1.5 }}>
+          This workspace is strictly reserved for the designated Platform Super Administrator. Organization and Hospital Administrators cannot access platform-level governance.
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="btn btn-primary"
+            style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px', fontSize: 13 }}
+          >
+            <ArrowLeft size={16} /> Return to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};

@@ -44,7 +44,7 @@ export class UpdateOrganizationSettingsDto {
   @MaxLength(255)
   address?: string;
 
-  @ApiPropertyOptional({ description: 'Default ISO currency code', example: 'PKR' })
+  @ApiPropertyOptional({ description: 'Default ISO currency code', example: 'INR' })
   @IsString()
   @IsOptional()
   @MaxLength(10)

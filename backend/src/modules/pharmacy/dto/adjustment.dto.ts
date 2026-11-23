@@ -52,6 +52,12 @@ export class CreateStockAdjustmentDto {
   @IsString()
   notes?: string;
 
+  @ApiPropertyOptional({ description: 'Hospital branch ID for this stock adjustment' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  branchId?: number;
+
   @ApiProperty({ description: 'Items being adjusted', type: [StockAdjustmentItemDto] })
   @IsArray()
   @ArrayMinSize(1, { message: 'At least one batch item must be specified for adjustment.' })

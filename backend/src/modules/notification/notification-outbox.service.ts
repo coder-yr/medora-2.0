@@ -68,6 +68,28 @@ export class NotificationOutboxService {
     let retryableCount = 0;
 
     for (const job of candidateJobs) {
+      // Phase 10.4: Check tenant organization status before processing
+      if (job.notification.branch?.organizationId) {
+        const org = await this.prisma.organization.findUnique({
+          where: { id: job.notification.branch.organizationId },
+          select: { status: true, name: true },
+        });
+        if (org && org.status === 'SUSPENDED') {
+          this.logger.warn(
+            `Skipping outbox job #${job.id}: Organization "${org.name}" is SUSPENDED.`,
+          );
+          await this.prisma.notificationOutbox.update({
+            where: { id: job.id },
+            data: {
+              status: 'FAILED',
+              lastError: `Organization "${org.name}" is SUSPENDED. Automated dispatches paused.`,
+            },
+          });
+          failedCount++;
+          continue;
+        }
+      }
+
       // 2. Lock job transition to PROCESSING
       await this.prisma.notificationOutbox.update({
         where: { id: job.id },

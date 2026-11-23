@@ -62,25 +62,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Demo persona bypass when running in offline/preview demo mode
-    if (authToken.startsWith('demo_token_')) {
-      const storedUser = sessionStorage.getItem('medora_user');
-      if (storedUser) {
-        try {
-          const user = JSON.parse(storedUser);
-          setCurrentUser(user);
-          setUserRole(user.role);
-          setUserPermissions(user.permissions || []);
-          setUserBranches(user.branches || [
-            { id: '1', name: 'Main City Hospital', code: 'MAIN-01', isMain: true },
-          ]);
-          setActiveBranchIdState('1');
-          setAuthLoading(false);
-          return;
-        } catch {}
-      }
-    }
-
     try {
       const res = await fetch(`${API_BASE_URL}/api/v1/auth/me`, {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -107,11 +88,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           group: user.group || resolved,
           permissions,
           branchId: user.branchId ? String(user.branchId) : undefined,
+          organizationId: user.organizationId ? String(user.organizationId) : undefined,
+          organizationRole: user.organizationRole || undefined,
+          organizationEdition: user.organizationEdition || undefined,
+          organizationStatus: user.organizationStatus || undefined,
+          isSuperAdmin: Boolean(user.isSuperAdmin),
         };
 
         setCurrentUser(normalizedUser);
         setUserRole(resolved);
         setUserPermissions(permissions);
+        sessionStorage.setItem('medora_user', JSON.stringify(normalizedUser));
 
         // Fetch authorized branches for the validated user
         try {
@@ -191,6 +178,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: resolvedRole,
         group: auth.user.group || resolvedRole,
         permissions,
+        organizationId: auth.user.organizationId ? String(auth.user.organizationId) : undefined,
+        organizationRole: auth.user.organizationRole || undefined,
+        organizationEdition: auth.user.organizationEdition || undefined,
+        organizationStatus: auth.user.organizationStatus || undefined,
+        isSuperAdmin: Boolean(auth.user.isSuperAdmin),
       };
 
       setCurrentUser(normalizedUser);

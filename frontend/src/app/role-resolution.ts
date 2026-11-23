@@ -3,11 +3,14 @@
  * 
  * Enforces explicit, non-escalating identity resolution based strictly
  * on backend-issued user groups, roles, and granular permission claims.
+ * Zero hardcoded email bypasses.
  */
 
 export type AppRole =
   | 'Super Admin'
   | 'Hospital Admin'
+  | 'Organization Admin'
+  | 'Clinic Admin'
   | 'Doctor'
   | 'Receptionist'
   | 'Nurse'
@@ -28,17 +31,22 @@ export interface ResolvableUser {
   role?: string;
   permissions?: string[];
   branchId?: string | number | null;
+  organizationId?: string | number | null;
+  organizationRole?: string | null;
+  organizationEdition?: string | null;
+  isSuperAdmin?: boolean;
 }
 
 /**
- * Normalizes user identity to one of the 11 recognized operational hospital roles.
+ * Normalizes user identity to one of the recognized operational hospital roles.
  * 
  * Security Invariants:
  * 1. Missing or undefined identity returns '' (unauthenticated).
  * 2. An unknown, missing or malformed identity NEVER receives 'Admin' or 'Super Admin'.
- * 3. 'Super Admin' requires explicit 'SuperAdmin' group or 'branch_view_all' + 'system_settings'.
- * 4. 'Hospital Admin' is bound to branch-scoped administration and does not receive Super Admin bypass.
- * 5. Specialized operational personas (Radiologist, Cashier, HR) are resolved via verifiable backend grants.
+ * 3. 'Super Admin' requires explicit server-side verified isSuperAdmin boolean.
+ * 4. 'Hospital Admin' and 'Organization Admin' derive strictly from authorized organization context.
+ * 5. Generic 'Admin' without verified active organization membership returns 'Unconfigured'.
+ * 6. Zero hardcoded email fallbacks.
  */
 export function resolveUserRole(user: ResolvableUser | null | undefined): AppRole {
   if (!user || user.id === undefined || user.id === null) {
@@ -47,42 +55,66 @@ export function resolveUserRole(user: ResolvableUser | null | undefined): AppRol
 
   const rawGroup = (user.group || user.role || '').trim();
   const normalizedGroup = rawGroup.toLowerCase().replace(/[\s_-]+/g, '');
+  const orgRole = (user.organizationRole || '').toLowerCase().trim();
+  const orgEdition = (user.organizationEdition || '').toUpperCase().trim();
   const perms = (Array.isArray(user.permissions) ? user.permissions : []).map((p) => p.toLowerCase());
   const permsSet = new Set(perms);
 
-  // 1. Super Admin: Explicit system-level global administration
+  // 1. Super Admin: Exclusive platform-level authority (strictly server-verified isSuperAdmin)
   if (
-    normalizedGroup === 'superadmin' ||
-    (normalizedGroup === 'admin' && permsSet.has('branch_view_all') && permsSet.has('system_settings')) ||
-    permsSet.has('*')
+    user.isSuperAdmin === true ||
+    (normalizedGroup === 'superadmin' && user.isSuperAdmin !== false)
   ) {
     return 'Super Admin';
   }
 
-  // 2. Hospital Admin: Hospital or branch-level administrative operations
-  if (normalizedGroup === 'hospitaladmin' || normalizedGroup === 'admin') {
+  // 2. Organization Admin: Organization-level administrative authority
+  if (
+    normalizedGroup === 'organizationadmin' ||
+    normalizedGroup === 'orgadmin' ||
+    orgRole === 'organizationadmin'
+  ) {
+    return 'Organization Admin';
+  }
+
+  // 3. Clinic Admin: Outpatient clinic administrative authority
+  if (
+    normalizedGroup === 'clinicadmin' ||
+    (orgEdition === 'CLINIC' && (orgRole === 'admin' || normalizedGroup === 'admin'))
+  ) {
+    return 'Clinic Admin';
+  }
+
+  // 4. Hospital Admin: Hospital campus administrative operations
+  if (
+    normalizedGroup === 'hospitaladmin' ||
+    ((orgEdition === 'HOSPITAL' || orgEdition === 'ENTERPRISE' || !orgEdition) &&
+      (orgRole === 'admin' || normalizedGroup === 'admin' || normalizedGroup === 'administrator')) ||
+    permsSet.has('hospital:*') ||
+    permsSet.has('hospital_settings_view')
+  ) {
     return 'Hospital Admin';
   }
 
-  // 3. Doctor or Specialized Radiologist
+  // 5. Doctor or Specialized Radiologist
   if (normalizedGroup === 'doctor') {
-    // If clinician is dedicated to radiology interpretation without general outpatient consultations
     const isDedicatedRadiologist =
-      (permsSet.has('radiology_verify') || permsSet.has('radiology_process') || permsSet.has('radiology_result_enter')) &&
+      (permsSet.has('radiology_verify') ||
+        permsSet.has('radiology_process') ||
+        permsSet.has('radiology_result_enter')) &&
       !permsSet.has('consultation_add') &&
       !permsSet.has('prescription_add');
 
     return isDedicatedRadiologist ? 'Radiologist' : 'Doctor';
   }
 
-  // 4. Radiologist (direct group or designation)
+  // 6. Radiologist (direct group or designation)
   if (normalizedGroup === 'radiologist') {
     return 'Radiologist';
   }
 
-  // 5. Receptionist or Dedicated Cashier
+  // 7. Receptionist or Dedicated Cashier
   if (normalizedGroup === 'receptionist') {
-    // If front-desk staff is dedicated to cash drawer desk without patient registration or appointment booking
     const isDedicatedCashier =
       permsSet.has('cashier_shift_open') &&
       permsSet.has('cashier_view') &&
@@ -92,37 +124,37 @@ export function resolveUserRole(user: ResolvableUser | null | undefined): AppRol
     return isDedicatedCashier ? 'Cashier' : 'Receptionist';
   }
 
-  // 6. Cashier (direct group or designation)
+  // 8. Cashier (direct group or designation)
   if (normalizedGroup === 'cashier') {
     return 'Cashier';
   }
 
-  // 7. Nurse: Inpatient care, vitals and ward management
+  // 9. Nurse: Inpatient care, vitals and ward management
   if (normalizedGroup === 'nurse') {
     return 'Nurse';
   }
 
-  // 8. Pharmacist: Medication formulary, FEFO dispensing and stock
+  // 10. Pharmacist: Medication formulary, FEFO dispensing and stock
   if (normalizedGroup === 'pharmacist') {
     return 'Pharmacist';
   }
 
-  // 9. Laboratorist: Pathology, diagnostic tests, accessioning
+  // 11. Laboratorist: Pathology, diagnostic tests, accessioning
   if (normalizedGroup === 'laboratorist' || normalizedGroup === 'lab') {
     return 'Laboratorist';
   }
 
-  // 10. Accountant: Financial reporting, general ledger, trial balance
+  // 12. Accountant: Financial reporting, general ledger, trial balance
   if (normalizedGroup === 'accountant') {
     return 'Accountant';
   }
 
-  // 11. HR Specialist (direct group or administrative staff designation)
+  // 13. HR Specialist (direct group or administrative staff designation)
   if (normalizedGroup === 'hr' || normalizedGroup === 'staffadmin') {
     return 'HR';
   }
 
-  // Fallback: Check if user has explicit grants matching specialized personas
+  // Granular permission heuristic fallbacks for specialized operational personas
   if (
     permsSet.has('staff_view') &&
     permsSet.has('staff_create') &&

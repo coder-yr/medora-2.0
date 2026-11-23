@@ -48,7 +48,7 @@ export class DispenseItemDto {
   @Min(1, { message: 'Dispensed quantity must be at least 1.' })
   quantity!: number;
 
-  @ApiPropertyOptional({ description: 'Custom unit selling price in PKR (defaults to catalogue or batch price if omitted)' })
+  @ApiPropertyOptional({ description: 'Custom unit selling price in INR (defaults to catalogue or batch price if omitted)' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -85,14 +85,14 @@ export class DispensePrescriptionDto {
   @IsNotEmpty()
   dispenseDate!: string;
 
-  @ApiPropertyOptional({ description: 'Discount in PKR', example: 0.0, default: 0.0 })
+  @ApiPropertyOptional({ description: 'Discount in INR', example: 0.0, default: 0.0 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   discount?: number;
 
-  @ApiPropertyOptional({ description: 'Sales Tax / VAT in PKR', example: 0.0, default: 0.0 })
+  @ApiPropertyOptional({ description: 'Sales Tax / VAT in INR', example: 0.0, default: 0.0 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -114,6 +114,12 @@ export class DispensePrescriptionDto {
   @Type(() => Number)
   @IsInt()
   admissionId?: number;
+
+  @ApiPropertyOptional({ description: 'Hospital branch ID for this dispensation' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  branchId?: number;
 
   @ApiProperty({ description: 'Medications being dispensed', type: [DispenseItemDto] })
   @IsArray()

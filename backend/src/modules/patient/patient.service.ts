@@ -106,14 +106,24 @@ export class PatientService {
     const term = (query.q || '').trim();
 
     let branchFilter: any = {};
-    if (query.branchId && user && this.branchAuth) {
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+
+      if (query.branchId) {
+        const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+        branchFilter = isOrg1
+          ? { OR: [{ branchId: authorizedBranchId }, { branchId: null }] }
+          : { branchId: authorizedBranchId };
+      } else {
+        const branchIds = accessibleBranches || [];
+        branchFilter = isOrg1
+          ? { OR: [{ branchId: { in: branchIds } }, { branchId: null }] }
+          : { branchId: { in: branchIds } };
+      }
+    } else if (query.branchId && user && this.branchAuth) {
       const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
-      branchFilter = {
-        OR: [
-          { branchId: authorizedBranchId },
-          { branchId: null },
-        ],
-      };
+      branchFilter = { branchId: authorizedBranchId };
     }
 
     const whereClause: any = {
@@ -160,7 +170,7 @@ export class PatientService {
   /**
    * Find patient by numeric ID or 6-digit patient_id.
    */
-  async findById(idOrPatientId: string | number): Promise<PatientResponseDto> {
+  async findById(idOrPatientId: string | number, user?: AuthUser): Promise<PatientResponseDto> {
     const searchKey = String(idOrPatientId).trim();
     const isNumeric = /^\d+$/.test(searchKey);
 
@@ -180,6 +190,10 @@ export class PatientService {
 
     if (!patient) {
       throw new NotFoundException(`Patient with ID "${searchKey}" not found`);
+    }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, patient.branchId, 'patient');
     }
 
     return this.mapToDto(patient);
@@ -257,8 +271,8 @@ export class PatientService {
     dto: UpdatePatientDto,
     user?: AuthUser,
   ): Promise<PatientResponseDto> {
-    const existing = await this.findById(idOrPatientId);
-    if (user && this.branchAuth && existing.branchId) {
+    const existing = await this.findById(idOrPatientId, user);
+    if (user && this.branchAuth) {
       await this.branchAuth.assertResourceAccess(user, existing.branchId, 'patient');
     }
     if (dto.branchId && user && this.branchAuth) {
@@ -310,8 +324,8 @@ export class PatientService {
    * Delete a patient record from PostgreSQL with active appointment constraint guard.
    */
   async remove(idOrPatientId: string | number, user?: AuthUser): Promise<{ message: string }> {
-    const existing = await this.findById(idOrPatientId);
-    if (user && this.branchAuth && existing.branchId) {
+    const existing = await this.findById(idOrPatientId, user);
+    if (user && this.branchAuth) {
       await this.branchAuth.assertResourceAccess(user, existing.branchId, 'patient');
     }
     const label = `${existing.patientId} ${existing.name}`;

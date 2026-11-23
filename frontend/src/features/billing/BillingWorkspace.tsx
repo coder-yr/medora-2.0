@@ -3,7 +3,7 @@ import {
   CreditCard,
   Plus,
   Search,
-  DollarSign,
+  IndianRupee,
   Printer,
   AlertCircle,
   X,
@@ -258,7 +258,7 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
       return;
     }
     if (paymentAmount > Number(paymentInvoice.balance)) {
-      setPaymentError(`Payment cannot exceed outstanding balance of Rs. ${paymentInvoice.balance}`);
+      setPaymentError(`Payment cannot exceed outstanding balance of ₹${paymentInvoice.balance}`);
       return;
     }
 
@@ -326,14 +326,14 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }}>
         <div className="card" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 18 }}>
           <div style={{ background: '#fee2e2', color: '#dc2626', padding: 12, borderRadius: 10 }}>
-            <DollarSign size={24} />
+            <IndianRupee size={24} />
           </div>
           <div>
             <div style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>
               Total Outstanding Receivables
             </div>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#dc2626' }}>
-              Rs. {Number(totalOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ₹{Number(totalOwed).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
           </div>
         </div>
@@ -459,13 +459,13 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
                       {inv.doctor?.name || (inv.doctorId ? `Doctor #${inv.doctorId}` : 'General / Facility')}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 600 }}>
-                      Rs. {Number(inv.grossTotal).toFixed(2)}
+                      ₹{Number(inv.grossTotal).toFixed(2)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', color: '#16a34a' }}>
-                      Rs. {Number(inv.paid).toFixed(2)}
+                      ₹{Number(inv.paid).toFixed(2)}
                     </td>
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700, color: Number(inv.balance) > 0 ? '#dc2626' : '#16a34a' }}>
-                      Rs. {Number(inv.balance).toFixed(2)}
+                      ₹{Number(inv.balance).toFixed(2)}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span
@@ -728,7 +728,7 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
                           />
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'right', fontWeight: 600 }}>
-                          Rs. {(item.quantity * item.unit_price).toFixed(2)}
+                          ₹{(item.quantity * item.unit_price).toFixed(2)}
                         </td>
                         <td style={{ padding: '8px 10px', textAlign: 'center' }}>
                           {lineItems.length > 1 && (
@@ -763,10 +763,10 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
                 <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--text-muted)' }}>Subtotal:</span>
-                    <strong>Rs. {subtotal.toFixed(2)}</strong>
+                    <strong>₹{subtotal.toFixed(2)}</strong>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>Discount (Rs.):</span>
+                    <span style={{ color: 'var(--text-muted)' }}>Discount (₹):</span>
                     <input
                       type="number"
                       min="0"
@@ -777,7 +777,7 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
                     />
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-muted)' }}>VAT/Tax (Rs.):</span>
+                    <span style={{ color: 'var(--text-muted)' }}>VAT/Tax (₹):</span>
                     <input
                       type="number"
                       min="0"
@@ -789,7 +789,7 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid var(--border-color)', paddingTop: 6, fontSize: 15 }}>
                     <strong>Net Gross Total:</strong>
-                    <strong style={{ color: '#0284c7' }}>Rs. {grossTotal.toFixed(2)}</strong>
+                    <strong style={{ color: '#0284c7' }}>₹{grossTotal.toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
@@ -855,13 +855,13 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #e2e8f0', paddingTop: 6, marginTop: 6 }}>
                 <span style={{ color: '#dc2626', fontWeight: 600 }}>Balance Owed:</span>
-                <strong style={{ color: '#dc2626' }}>Rs. {Number(paymentInvoice.balance).toFixed(2)}</strong>
+                <strong style={{ color: '#dc2626' }}>₹{Number(paymentInvoice.balance).toFixed(2)}</strong>
               </div>
             </div>
 
             <form onSubmit={handleRecordPayment}>
               <div className="form-group">
-                <label className="form-label">Payment Amount (Rs.) *</label>
+                <label className="form-label">Payment Amount (₹) *</label>
                 <input
                   type="number"
                   min="0.01"
@@ -969,8 +969,8 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
                     <tr key={it.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
                       <td style={{ padding: '8px 0', fontWeight: 600 }}>{it.name}</td>
                       <td style={{ padding: '8px 0', textAlign: 'center' }}>{it.quantity}</td>
-                      <td style={{ padding: '8px 0', textAlign: 'right' }}>Rs. {Number(it.unitPrice).toFixed(2)}</td>
-                      <td style={{ padding: '8px 0', textAlign: 'right' }}>Rs. {Number(it.lineTotal).toFixed(2)}</td>
+                      <td style={{ padding: '8px 0', textAlign: 'right' }}>₹{Number(it.unitPrice).toFixed(2)}</td>
+                      <td style={{ padding: '8px 0', textAlign: 'right' }}>₹{Number(it.lineTotal).toFixed(2)}</td>
                     </tr>
                   ))
                 ) : (
@@ -985,16 +985,16 @@ export const BillingWorkspace: React.FC<BillingWorkspaceProps> = ({
               <div style={{ width: 220 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
                   <span>Gross Total:</span>
-                  <strong>Rs. {Number(printInvoice.grossTotal).toFixed(2)}</strong>
+                  <strong>₹{Number(printInvoice.grossTotal).toFixed(2)}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: '#16a34a' }}>
                   <span>Amount Paid:</span>
-                  <strong>Rs. {Number(printInvoice.paid).toFixed(2)}</strong>
+                  <strong>₹{Number(printInvoice.paid).toFixed(2)}</strong>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '2px solid #000', paddingTop: 4, fontWeight: 700, fontSize: 14 }}>
                   <span>Balance Owed:</span>
                   <span style={{ color: Number(printInvoice.balance) > 0 ? '#dc2626' : '#000' }}>
-                    Rs. {Number(printInvoice.balance).toFixed(2)}
+                    ₹{Number(printInvoice.balance).toFixed(2)}
                   </span>
                 </div>
               </div>

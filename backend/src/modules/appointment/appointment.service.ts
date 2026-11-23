@@ -196,8 +196,14 @@ export class AppointmentService {
       where.branchId = authorizedBranchId;
     } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
       const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
-      if (accessible && accessible.length > 0) {
-        where.branchId = { in: accessible };
+      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+      if (isOrg1) {
+        where.OR = [
+          { branchId: { in: accessible || [] } },
+          { branchId: null },
+        ];
+      } else {
+        where.branchId = { in: accessible || [] };
       }
     }
 
@@ -227,7 +233,7 @@ export class AppointmentService {
   /**
    * Find single appointment by numeric ID.
    */
-  async findOne(idOrKey: string | number): Promise<AppointmentResponseDto> {
+  async findOne(idOrKey: string | number, user?: AuthUser): Promise<AppointmentResponseDto> {
     const idStr = String(idOrKey);
 
     const record = await this.prisma.appointment.findUnique({
@@ -242,6 +248,10 @@ export class AppointmentService {
       throw new NotFoundException(`Appointment #${idStr} not found.`);
     }
 
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, record.branchId, 'appointment');
+    }
+
     return this.formatAppointment(record);
   }
 
@@ -254,9 +264,9 @@ export class AppointmentService {
     user?: AuthUser,
   ): Promise<AppointmentResponseDto> {
     const idStr = String(idOrKey);
-    const existing = await this.findOne(idStr);
+    const existing = await this.findOne(idStr, user);
 
-    if (user && this.branchAuth && existing.branchId) {
+    if (user && this.branchAuth) {
       await this.branchAuth.assertResourceAccess(user, existing.branchId, 'appointment');
     }
     if (dto.branchId && user && this.branchAuth) {
@@ -339,9 +349,9 @@ export class AppointmentService {
    */
   async remove(idOrKey: string | number, user?: AuthUser): Promise<{ message: string }> {
     const idStr = String(idOrKey);
-    const existing = await this.findOne(idStr);
+    const existing = await this.findOne(idStr, user);
 
-    if (user && this.branchAuth && existing.branchId) {
+    if (user && this.branchAuth) {
       await this.branchAuth.assertResourceAccess(user, existing.branchId, 'appointment');
     }
 

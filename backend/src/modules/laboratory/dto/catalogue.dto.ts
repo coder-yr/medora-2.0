@@ -98,7 +98,7 @@ export class CreateLabTestCatalogueDto {
   @MaxLength(255)
   referenceValue?: string;
 
-  @ApiPropertyOptional({ description: 'Official service price in PKR', example: 1500.0 })
+  @ApiPropertyOptional({ description: 'Official service price in INR', example: 1500.0 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -160,7 +160,7 @@ export class UpdateLabTestCatalogueDto {
   @MaxLength(255)
   referenceValue?: string;
 
-  @ApiPropertyOptional({ description: 'Official service price in PKR' })
+  @ApiPropertyOptional({ description: 'Official service price in INR' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

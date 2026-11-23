@@ -201,7 +201,7 @@ export const PharmacistDashboard: React.FC = () => {
           <DashboardMetricCard
             title="Dispensed Today"
             value={metrics?.todayDispensationsCount ?? 0}
-            subtext={metrics?.todayTakings ? `Revenue: PKR ${metrics.todayTakings.toLocaleString()}` : '0 transactions recorded'}
+            subtext={metrics?.todayTakings ? `Revenue: ₹${metrics.todayTakings.toLocaleString()}` : '0 transactions recorded'}
             icon={CheckCircle2}
             variant="emerald"
             badge="Today"
@@ -243,7 +243,7 @@ export const PharmacistDashboard: React.FC = () => {
           <DashboardMetricCard
             title="Formulary Catalog"
             value={metrics?.totalMedicines ?? medicines.length}
-            subtext={metrics?.totalRetailValuation ? `Retail val: PKR ${metrics.totalRetailValuation.toLocaleString()}` : 'Active medicine items'}
+            subtext={metrics?.totalRetailValuation ? `Retail val: ₹${metrics.totalRetailValuation.toLocaleString()}` : 'Active medicine items'}
             icon={Boxes}
             variant="purple"
             onClick={() => navigate('/medicines')}

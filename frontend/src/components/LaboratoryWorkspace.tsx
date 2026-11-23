@@ -999,7 +999,7 @@ export function LaboratoryWorkspace({ token, userRole }: Props) {
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-bold text-slate-900 text-base">{item.category}</h4>
                     <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700">
-                      PKR {item.price ? Number(item.price).toLocaleString() : '0'}
+                      ₹{item.price ? Number(item.price).toLocaleString() : '0'}
                     </span>
                   </div>
 
@@ -1822,7 +1822,7 @@ export function LaboratoryWorkspace({ token, userRole }: Props) {
                           />
                           <span>{test.category}</span>
                         </div>
-                        <span className="font-mono text-slate-500">PKR {Number(test.price || 0)}</span>
+                        <span className="font-mono text-slate-500">₹{Number(test.price || 0)}</span>
                       </label>
                     );
                   })}
@@ -1906,7 +1906,7 @@ export function LaboratoryWorkspace({ token, userRole }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-slate-700 block mb-1">Service Price (PKR)</label>
+                  <label className="text-xs font-semibold text-slate-700 block mb-1">Service Price (₹)</label>
                   <input
                     type="number"
                     min="0"
@@ -2220,7 +2220,7 @@ export function LaboratoryWorkspace({ token, userRole }: Props) {
                 </div>
                 <div>
                   <span className="text-xs text-slate-400 block">Price</span>
-                  <span className="font-semibold text-emerald-600">PKR {Number(selectedCatalogueItem.price || 0).toLocaleString()}</span>
+                  <span className="font-semibold text-emerald-600">₹{Number(selectedCatalogueItem.price || 0).toLocaleString()}</span>
                 </div>
                 <div>
                   <span className="text-xs text-slate-400 block">Status</span>

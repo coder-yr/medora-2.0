@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Put,
   Query,
@@ -13,6 +14,7 @@ import { OrganizationService } from './organization.service';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
 import { UpdateOrganizationSettingsDto } from './dto/update-organization-settings.dto';
+import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -98,5 +100,23 @@ export class OrganizationController {
   @ApiOperation({ summary: 'List all user memberships belonging to an organization' })
   async getOrganizationMembers(@Param('id') id: string) {
     return this.organizationService.getOrganizationMembers(id);
+  }
+
+  @Get(':id/onboarding')
+  @Roles('SuperAdmin', 'Admin', 'Doctor')
+  @ApiOperation({ summary: 'Get organization onboarding state and checklist' })
+  async getOnboarding(@Param('id') id: string) {
+    return this.organizationService.getOnboarding(id);
+  }
+
+  @Patch(':id/onboarding')
+  @Roles('SuperAdmin', 'Admin')
+  @ApiOperation({ summary: 'Update organization onboarding progress and checklist' })
+  async updateOnboarding(
+    @Param('id') id: string,
+    @Body() dto: UpdateOnboardingDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.organizationService.updateOnboarding(id, dto, user.id);
   }
 }

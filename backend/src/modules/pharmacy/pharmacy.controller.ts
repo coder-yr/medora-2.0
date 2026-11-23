@@ -9,7 +9,6 @@ import {
   Patch,
   Post,
   Query,
-  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -22,9 +21,12 @@ import {
 } from '@nestjs/swagger';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { PharmacyService } from './pharmacy.service';
 import { CreateBatchDto, UpdateBatchStatusDto } from './dto/batch.dto';
 import {
@@ -55,8 +57,8 @@ export class PharmacyController {
   @RequirePermissions(HospitalPermission.PHARMACY_VIEW)
   @ApiOperation({ summary: 'Pharmacy operations dashboard KPIs and summary' })
   @ApiResponse({ status: 200, description: 'Dashboard metrics retrieved successfully' })
-  async getDashboard() {
-    return this.pharmacyService.getDashboard();
+  async getDashboard(@CurrentUser() user: AuthUser) {
+    return this.pharmacyService.getDashboard(user);
   }
 
   // ===========================================================================
@@ -67,8 +69,11 @@ export class PharmacyController {
   @RequirePermissions(HospitalPermission.PHARMACY_VIEW)
   @ApiOperation({ summary: 'List medicine batches with filtering, pagination, and search' })
   @ApiResponse({ status: 200, description: 'Batches retrieved successfully' })
-  async findAllBatches(@Query() query: QueryBatchDto) {
-    return this.pharmacyService.getBatches(query);
+  async findAllBatches(
+    @Query() query: QueryBatchDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getBatches(query, user);
   }
 
   @Post('batches')
@@ -76,10 +81,14 @@ export class PharmacyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Register an opening or direct medicine batch' })
   @ApiResponse({ status: 201, description: 'Batch registered and stock movement logged' })
-  async createBatch(@Body() dto: CreateBatchDto, @Req() req: any) {
+  async createBatch(
+    @Body() dto: CreateBatchDto,
+    @CurrentUser() user: AuthUser,
+  ) {
     return this.pharmacyService.createBatch(
       dto,
-      req.user?.id ? Number(req.user.id) : undefined,
+      user?.id ? Number(user.id) : undefined,
+      user,
     );
   }
 
@@ -89,8 +98,11 @@ export class PharmacyController {
   @ApiParam({ name: 'id', description: 'Batch ID' })
   @ApiResponse({ status: 200, description: 'Batch details retrieved' })
   @ApiResponse({ status: 404, description: 'Batch not found' })
-  async findOneBatch(@Param('id', ParseIntPipe) id: number) {
-    return this.pharmacyService.getBatchById(id);
+  async findOneBatch(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getBatchById(id, user);
   }
 
   @Patch('batches/:id/status')
@@ -101,8 +113,9 @@ export class PharmacyController {
   async updateBatchStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateBatchStatusDto,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.pharmacyService.updateBatchStatus(id, dto);
+    return this.pharmacyService.updateBatchStatus(id, dto, user);
   }
 
   // ===========================================================================
@@ -113,9 +126,14 @@ export class PharmacyController {
   @RequirePermissions(HospitalPermission.PHARMACY_PURCHASE)
   @ApiOperation({ summary: 'List purchase orders' })
   @ApiQuery({ name: 'status', required: false, description: 'Filter by PO status' })
+  @ApiQuery({ name: 'branchId', required: false, description: 'Filter by branch ID' })
   @ApiResponse({ status: 200, description: 'Purchase orders list' })
-  async findAllPurchaseOrders(@Query('status') status?: string) {
-    return this.pharmacyService.getPurchaseOrders({ status });
+  async findAllPurchaseOrders(
+    @Query('status') status?: string,
+    @Query('branchId') branchId?: number,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.pharmacyService.getPurchaseOrders({ status, branchId }, user);
   }
 
   @Post('purchases/orders')
@@ -123,10 +141,14 @@ export class PharmacyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create purchase order for supplier' })
   @ApiResponse({ status: 201, description: 'Purchase order created' })
-  async createPurchaseOrder(@Body() dto: CreatePurchaseOrderDto, @Req() req: any) {
+  async createPurchaseOrder(
+    @Body() dto: CreatePurchaseOrderDto,
+    @CurrentUser() user: AuthUser,
+  ) {
     return this.pharmacyService.createPurchaseOrder(
       dto,
-      req.user?.id ? Number(req.user.id) : undefined,
+      user?.id ? Number(user.id) : undefined,
+      user,
     );
   }
 
@@ -134,15 +156,22 @@ export class PharmacyController {
   @RequirePermissions(HospitalPermission.PHARMACY_PURCHASE)
   @ApiOperation({ summary: 'Get purchase order details' })
   @ApiParam({ name: 'id', description: 'Purchase order ID' })
-  async findOnePurchaseOrder(@Param('id', ParseIntPipe) id: number) {
-    return this.pharmacyService.getPurchaseOrderById(id);
+  async findOnePurchaseOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getPurchaseOrderById(id, user);
   }
 
   @Get('purchases/receipts')
   @RequirePermissions(HospitalPermission.PHARMACY_RECEIVE)
   @ApiOperation({ summary: 'List goods receipts (GRNs)' })
-  async findAllGoodsReceipts() {
-    return this.pharmacyService.getGoodsReceipts({});
+  @ApiQuery({ name: 'branchId', required: false, description: 'Filter by branch ID' })
+  async findAllGoodsReceipts(
+    @Query('branchId') branchId?: number,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.pharmacyService.getGoodsReceipts({ branchId }, user);
   }
 
   @Post('purchases/receipts')
@@ -150,10 +179,14 @@ export class PharmacyController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Receive goods receipt, allocate batches and increment inventory' })
   @ApiResponse({ status: 201, description: 'Goods received and batch inventory created' })
-  async receiveGoods(@Body() dto: CreateGoodsReceiptDto, @Req() req: any) {
+  async receiveGoods(
+    @Body() dto: CreateGoodsReceiptDto,
+    @CurrentUser() user: AuthUser,
+  ) {
     return this.pharmacyService.createGoodsReceipt(
       dto,
-      req.user?.id ? Number(req.user.id) : undefined,
+      user?.id ? Number(user.id) : undefined,
+      user,
     );
   }
 
@@ -161,31 +194,41 @@ export class PharmacyController {
   @RequirePermissions(HospitalPermission.PHARMACY_RECEIVE)
   @ApiOperation({ summary: 'Get goods receipt details' })
   @ApiParam({ name: 'id', description: 'Goods receipt ID' })
-  async findOneGoodsReceipt(@Param('id', ParseIntPipe) id: number) {
-    return this.pharmacyService.getGoodsReceiptById(id);
+  async findOneGoodsReceipt(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getGoodsReceiptById(id, user);
   }
 
   // ===========================================================================
   // 4. DISPENSING & PRESCRIPTION CONTEXT
   // ===========================================================================
 
+  @ProtectClinicalAccess()
   @Get('dispensations/context/:prescriptionId')
   @RequirePermissions(HospitalPermission.PHARMACY_DISPENSE)
   @ApiOperation({ summary: 'Load prescription items with FEFO batches for dispensing' })
   @ApiParam({ name: 'prescriptionId', description: 'Prescription ID' })
   async getPrescriptionDispenseContext(
     @Param('prescriptionId', ParseIntPipe) prescriptionId: number,
+    @CurrentUser() user: AuthUser,
   ) {
-    return this.pharmacyService.getPrescriptionDispenseContext(prescriptionId);
+    return this.pharmacyService.getPrescriptionDispenseContext(prescriptionId, user);
   }
 
+  @ProtectClinicalAccess()
   @Get('dispensations')
   @RequirePermissions(HospitalPermission.PHARMACY_VIEW)
   @ApiOperation({ summary: 'List pharmacy dispensations with search & filters' })
-  async findAllDispensations(@Query() query: QueryDispensationDto) {
-    return this.pharmacyService.getDispensations(query);
+  async findAllDispensations(
+    @Query() query: QueryDispensationDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getDispensations(query, user);
   }
 
+  @ProtectClinicalAccess()
   @Post('dispensations')
   @RequirePermissions(HospitalPermission.PHARMACY_DISPENSE)
   @HttpCode(HttpStatus.CREATED)
@@ -195,20 +238,25 @@ export class PharmacyController {
   @ApiResponse({ status: 201, description: 'Medication dispensed and stock deducted' })
   async dispensePrescription(
     @Body() dto: DispensePrescriptionDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthUser,
   ) {
     return this.pharmacyService.dispense(
       dto,
-      req.user?.id ? Number(req.user.id) : undefined,
+      user?.id ? Number(user.id) : undefined,
+      user,
     );
   }
 
+  @ProtectClinicalAccess()
   @Get('dispensations/:id')
   @RequirePermissions(HospitalPermission.PHARMACY_VIEW)
   @ApiOperation({ summary: 'Get dispensation details for print receipt' })
   @ApiParam({ name: 'id', description: 'Dispensation ID' })
-  async findOneDispensation(@Param('id', ParseIntPipe) id: number) {
-    return this.pharmacyService.getDispensationById(id);
+  async findOneDispensation(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getDispensationById(id, user);
   }
 
   // ===========================================================================
@@ -218,8 +266,12 @@ export class PharmacyController {
   @Get('adjustments')
   @RequirePermissions(HospitalPermission.PHARMACY_ADJUST)
   @ApiOperation({ summary: 'List stock adjustments' })
-  async findAllAdjustments() {
-    return this.pharmacyService.getAdjustments();
+  @ApiQuery({ name: 'branchId', required: false, description: 'Filter by branch ID' })
+  async findAllAdjustments(
+    @Query('branchId') branchId?: number,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.pharmacyService.getAdjustments({ branchId }, user);
   }
 
   @Post('adjustments')
@@ -228,11 +280,12 @@ export class PharmacyController {
   @ApiOperation({ summary: 'Create physical inventory count or stock adjustment' })
   async createStockAdjustment(
     @Body() dto: CreateStockAdjustmentDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthUser,
   ) {
     return this.pharmacyService.createStockAdjustment(
       dto,
-      req.user?.id ? Number(req.user.id) : undefined,
+      user?.id ? Number(user.id) : undefined,
+      user,
     );
   }
 
@@ -243,8 +296,14 @@ export class PharmacyController {
   @Get('returns')
   @RequirePermissions(HospitalPermission.PHARMACY_RETURN)
   @ApiOperation({ summary: 'List pharmacy returns' })
-  async findAllReturns() {
-    return this.pharmacyService.getReturns();
+  @ApiQuery({ name: 'returnType', required: false, description: 'Filter by return type' })
+  @ApiQuery({ name: 'branchId', required: false, description: 'Filter by branch ID' })
+  async findAllReturns(
+    @Query('returnType') returnType?: string,
+    @Query('branchId') branchId?: number,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.pharmacyService.getReturns({ returnType, branchId }, user);
   }
 
   @Post('returns')
@@ -253,11 +312,12 @@ export class PharmacyController {
   @ApiOperation({ summary: 'Process patient return or supplier return' })
   async createPharmacyReturn(
     @Body() dto: CreatePharmacyReturnDto,
-    @Req() req: any,
+    @CurrentUser() user: AuthUser,
   ) {
     return this.pharmacyService.processReturn(
       dto,
-      req.user?.id ? Number(req.user.id) : undefined,
+      user?.id ? Number(user.id) : undefined,
+      user,
     );
   }
 
@@ -265,8 +325,11 @@ export class PharmacyController {
   @RequirePermissions(HospitalPermission.PHARMACY_RETURN)
   @ApiOperation({ summary: 'Get pharmacy return details' })
   @ApiParam({ name: 'id', description: 'Return ID' })
-  async findOneReturn(@Param('id', ParseIntPipe) id: number) {
-    return this.pharmacyService.getReturnById(id);
+  async findOneReturn(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getReturnById(id, user);
   }
 
   // ===========================================================================
@@ -276,8 +339,11 @@ export class PharmacyController {
   @Get('movements')
   @RequirePermissions(HospitalPermission.PHARMACY_VIEW)
   @ApiOperation({ summary: 'Query complete immutable stock movement ledger' })
-  async findAllStockMovements(@Query() query: QueryStockMovementDto) {
-    return this.pharmacyService.getStockLedger(query);
+  async findAllStockMovements(
+    @Query() query: QueryStockMovementDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getStockLedger(query, user);
   }
 
   // ===========================================================================
@@ -287,23 +353,29 @@ export class PharmacyController {
   @Get('reports/valuation')
   @RequirePermissions(HospitalPermission.PHARMACY_REPORTS)
   @ApiOperation({ summary: 'Get current pharmacy inventory valuation report' })
-  async getValuationReport() {
-    return this.pharmacyService.getValuationReport();
+  async getValuationReport(@CurrentUser() user: AuthUser) {
+    return this.pharmacyService.getValuationReport(user);
   }
 
   @Get('reports/expiring')
   @RequirePermissions(HospitalPermission.PHARMACY_REPORTS)
   @ApiOperation({ summary: 'Get batches expiring within N days' })
   @ApiQuery({ name: 'days', required: false, description: 'Days threshold (default 60)' })
-  async getExpiringBatches(@Query('days') days?: string) {
-    return this.pharmacyService.getExpiryReport(days ? parseInt(days, 10) : 60);
+  async getExpiringBatches(
+    @Query('days') days?: string,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.pharmacyService.getExpiryReport(days ? parseInt(days, 10) : 60, user);
   }
 
   @Get('reports/low-stock')
   @RequirePermissions(HospitalPermission.PHARMACY_REPORTS)
   @ApiOperation({ summary: 'Get medicines with low stock below threshold' })
   @ApiQuery({ name: 'threshold', required: false, description: 'Quantity threshold (default 10)' })
-  async getLowStockReport(@Query('threshold') threshold?: string) {
-    return this.pharmacyService.getLowStockReport(threshold ? parseInt(threshold, 10) : 10);
+  async getLowStockReport(
+    @Query('threshold') threshold?: string,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.pharmacyService.getLowStockReport(threshold ? parseInt(threshold, 10) : 10, user);
   }
 }

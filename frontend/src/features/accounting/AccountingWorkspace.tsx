@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useTransition } from 'react';
 import {
   BookOpen,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   TrendingDown,
   CheckCircle,
@@ -585,7 +585,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
             onClick={() => setActiveTab('expenses')}
             style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}
           >
-            <DollarSign size={16} /> Expenses
+            <IndianRupee size={16} /> Expenses
           </button>
           <button
             className={`btn ${activeTab === 'reports' ? 'btn-primary' : 'btn-secondary'}`}
@@ -644,7 +644,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                 <TrendingUp size={20} style={{ color: '#16a34a' }} />
               </div>
               <h3 style={{ fontSize: 24, margin: '8px 0 0 0', color: '#14532d' }}>
-                PKR {metrics.totalRevenueMonth.toLocaleString()}
+                ₹{metrics.totalRevenueMonth.toLocaleString()}
               </h3>
             </div>
 
@@ -654,17 +654,17 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                 <TrendingDown size={20} style={{ color: '#dc2626' }} />
               </div>
               <h3 style={{ fontSize: 24, margin: '8px 0 0 0', color: '#7f1d1d' }}>
-                PKR {metrics.totalExpenseMonth.toLocaleString()}
+                ₹{metrics.totalExpenseMonth.toLocaleString()}
               </h3>
             </div>
 
             <div style={{ background: '#f0f9ff', border: '1px solid #bae6fd', padding: 16, borderRadius: 8 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: 13, color: '#075985', fontWeight: 600 }}>Net Operating Surplus</span>
-                <DollarSign size={20} style={{ color: '#0284c7' }} />
+                <IndianRupee size={20} style={{ color: '#0284c7' }} />
               </div>
               <h3 style={{ fontSize: 24, margin: '8px 0 0 0', color: '#0c4a6e' }}>
-                PKR {metrics.netSurplusMonth.toLocaleString()}
+                ₹{metrics.netSurplusMonth.toLocaleString()}
               </h3>
             </div>
 
@@ -674,7 +674,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                 <Building size={20} style={{ color: '#9333ea' }} />
               </div>
               <h3 style={{ fontSize: 24, margin: '8px 0 0 0', color: '#581c87' }}>
-                PKR {metrics.totalLiquidity.toLocaleString()}
+                ₹{metrics.totalLiquidity.toLocaleString()}
               </h3>
             </div>
 
@@ -684,7 +684,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                 <CreditCard size={20} style={{ color: '#d97706' }} />
               </div>
               <h3 style={{ fontSize: 24, margin: '8px 0 0 0', color: '#78350f' }}>
-                PKR {metrics.totalReceivables.toLocaleString()}
+                ₹{metrics.totalReceivables.toLocaleString()}
               </h3>
             </div>
           </div>
@@ -733,7 +733,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                     <th>Narration</th>
                     <th>Source</th>
                     <th>Status</th>
-                    <th style={{ textAlign: 'right' }}>Total (PKR)</th>
+                    <th style={{ textAlign: 'right' }}>Total (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1064,7 +1064,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                     <td>{exp.category?.name}</td>
                     <td>{exp.description}</td>
                     <td>{exp.vendorName || '-'}</td>
-                    <td style={{ fontWeight: 600 }}>PKR {Number(exp.amount).toLocaleString()}</td>
+                    <td style={{ fontWeight: 600 }}>₹{Number(exp.amount).toLocaleString()}</td>
                     <td>
                       <span
                         className="badge"
@@ -1129,7 +1129,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                             style={{ padding: '4px 8px', fontSize: 12 }}
                             onClick={() => handlePayExpense(exp.id)}
                           >
-                            <DollarSign size={13} /> Pay & Post
+                            <IndianRupee size={13} /> Pay & Post
                           </button>
                         )}
                         {exp.status === 'PAID' && (
@@ -1209,8 +1209,8 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                     <th>Account Code</th>
                     <th>Account Name</th>
                     <th>Type</th>
-                    <th style={{ textAlign: 'right' }}>Debit (PKR)</th>
-                    <th style={{ textAlign: 'right' }}>Credit (PKR)</th>
+                    <th style={{ textAlign: 'right' }}>Debit (₹)</th>
+                    <th style={{ textAlign: 'right' }}>Credit (₹)</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1230,10 +1230,10 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                   <tr style={{ background: '#f8fafc', fontWeight: 700 }}>
                     <td colSpan={3}>TOTAL EQUILIBRIUM</td>
                     <td style={{ textAlign: 'right', color: '#0284c7' }}>
-                      PKR {trialBalance.totalDebitSum.toLocaleString()}
+                      ₹{trialBalance.totalDebitSum.toLocaleString()}
                     </td>
                     <td style={{ textAlign: 'right', color: '#0284c7' }}>
-                      PKR {trialBalance.totalCreditSum.toLocaleString()}
+                      ₹{trialBalance.totalCreditSum.toLocaleString()}
                     </td>
                   </tr>
                 </tbody>
@@ -1256,12 +1256,12 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                   {profitLoss.revenues.map((r) => (
                     <div key={r.accountCode} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <span>{r.accountCode} - {r.accountName}</span>
-                      <span style={{ fontWeight: 600 }}>PKR {r.amount.toLocaleString()}</span>
+                      <span style={{ fontWeight: 600 }}>₹{r.amount.toLocaleString()}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontWeight: 700, color: '#166534' }}>
                     <span>Total Revenue</span>
-                    <span>PKR {profitLoss.totalRevenue.toLocaleString()}</span>
+                    <span>₹{profitLoss.totalRevenue.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -1271,12 +1271,12 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                   {profitLoss.expenses.map((e) => (
                     <div key={e.accountCode} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <span>{e.accountCode} - {e.accountName}</span>
-                      <span style={{ fontWeight: 600 }}>PKR {e.amount.toLocaleString()}</span>
+                      <span style={{ fontWeight: 600 }}>₹{e.amount.toLocaleString()}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontWeight: 700, color: '#991b1b' }}>
                     <span>Total Expense</span>
-                    <span>PKR {profitLoss.totalExpense.toLocaleString()}</span>
+                    <span>₹{profitLoss.totalExpense.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -1284,7 +1284,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
               <div style={{ marginTop: 20, padding: 16, background: '#f8fafc', borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 16, fontWeight: 700 }}>Net Operating Surplus / (Deficit)</span>
                 <span style={{ fontSize: 20, fontWeight: 700, color: profitLoss.netOperatingIncome >= 0 ? '#166534' : '#991b1b' }}>
-                  PKR {profitLoss.netOperatingIncome.toLocaleString()}
+                  ₹{profitLoss.netOperatingIncome.toLocaleString()}
                 </span>
               </div>
             </div>
@@ -1319,12 +1319,12 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                   {balanceSheet.assets.map((a) => (
                     <div key={a.accountCode} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                       <span>{a.accountCode} - {a.accountName}</span>
-                      <span style={{ fontWeight: 600 }}>PKR {a.amount.toLocaleString()}</span>
+                      <span style={{ fontWeight: 600 }}>₹{a.amount.toLocaleString()}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontWeight: 700, color: '#0284c7' }}>
                     <span>Total Assets</span>
-                    <span>PKR {balanceSheet.totalAssets.toLocaleString()}</span>
+                    <span>₹{balanceSheet.totalAssets.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -1335,23 +1335,23 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                   {balanceSheet.liabilities.map((l) => (
                     <div key={l.accountCode} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                       <span>{l.accountCode} - {l.accountName}</span>
-                      <span>PKR {l.amount.toLocaleString()}</span>
+                      <span>₹{l.amount.toLocaleString()}</span>
                     </div>
                   ))}
                   <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-muted)', margin: '12px 0 4px 0' }}>Equity:</div>
                   {balanceSheet.equity.map((e) => (
                     <div key={e.accountCode} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
                       <span>{e.accountCode} - {e.accountName}</span>
-                      <span>PKR {e.amount.toLocaleString()}</span>
+                      <span>₹{e.amount.toLocaleString()}</span>
                     </div>
                   ))}
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', color: '#166534' }}>
                     <span>Current Period Net Surplus</span>
-                    <span>PKR {balanceSheet.currentPeriodNetSurplus.toLocaleString()}</span>
+                    <span>₹{balanceSheet.currentPeriodNetSurplus.toLocaleString()}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, fontWeight: 700, color: '#9333ea', borderTop: '1px solid #e2e8f0', paddingTop: 8 }}>
                     <span>Total Liabilities & Equity</span>
-                    <span>PKR {balanceSheet.totalLiabilitiesAndEquity.toLocaleString()}</span>
+                    <span>₹{balanceSheet.totalLiabilitiesAndEquity.toLocaleString()}</span>
                   </div>
                 </div>
               </div>
@@ -1385,8 +1385,8 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                       <strong>Account: </strong> {generalLedger.account.code} - {generalLedger.account.name}
                     </div>
                     <div>
-                      <strong>Opening Balance: </strong> PKR {generalLedger.openingBalance.toLocaleString()} |{' '}
-                      <strong>Closing Balance: </strong> PKR {generalLedger.closingBalance.toLocaleString()}
+                      <strong>Opening Balance: </strong> ₹{generalLedger.openingBalance.toLocaleString()} |{' '}
+                      <strong>Closing Balance: </strong> ₹{generalLedger.closingBalance.toLocaleString()}
                     </div>
                   </div>
 
@@ -1409,7 +1409,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                           <td>{entry.narration}</td>
                           <td style={{ textAlign: 'right' }}>{entry.debit > 0 ? entry.debit.toLocaleString() : '-'}</td>
                           <td style={{ textAlign: 'right' }}>{entry.credit > 0 ? entry.credit.toLocaleString() : '-'}</td>
-                          <td style={{ textAlign: 'right', fontWeight: 600 }}>PKR {entry.runningBalance.toLocaleString()}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 600 }}>₹{entry.runningBalance.toLocaleString()}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1702,13 +1702,13 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
                 >
                   <div>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Total Debits: </span>
-                    <span>PKR {totalModalDebit.toLocaleString()}</span>
+                    <span>₹{totalModalDebit.toLocaleString()}</span>
                     <span style={{ margin: '0 8px' }}>|</span>
                     <span style={{ fontSize: 13, fontWeight: 600 }}>Total Credits: </span>
-                    <span>PKR {totalModalCredit.toLocaleString()}</span>
+                    <span>₹{totalModalCredit.toLocaleString()}</span>
                   </div>
                   <div style={{ fontWeight: 700, fontSize: 13, color: isJournalBalanced ? '#065f46' : '#991b1b' }}>
-                    {isJournalBalanced ? '✓ Balanced (Sum Dr == Sum Cr)' : `⚠ Out of Balance by PKR ${modalDifference.toFixed(2)}`}
+                    {isJournalBalanced ? '✓ Balanced (Sum Dr == Sum Cr)' : `⚠ Out of Balance by ₹${modalDifference.toFixed(2)}`}
                   </div>
                 </div>
               </div>
@@ -1774,7 +1774,7 @@ export function AccountingWorkspace({ token }: AccountingWorkspaceProps) {
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <div>
-                  <label className="form-label">Amount (PKR)</label>
+                  <label className="form-label">Amount (₹)</label>
                   <input
                     type="number"
                     step="0.01"

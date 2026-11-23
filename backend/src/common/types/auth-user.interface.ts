@@ -1,6 +1,8 @@
 export type HospitalRole =
   | 'SuperAdmin'
   | 'Admin'
+  | 'OrganizationAdmin'
+  | 'ClinicAdmin'
   | 'Doctor'
   | 'Nurse'
   | 'Accountant'
@@ -9,7 +11,8 @@ export type HospitalRole =
   | 'Laboratorist'
   | 'Radiologist'
   | 'Cashier'
-  | 'HR';
+  | 'HR'
+  | 'Unconfigured';
 
 export interface AuthUser {
   id: string;
@@ -20,6 +23,10 @@ export interface AuthUser {
   branchId?: bigint | null;
   staffId?: bigint | null;
   organizationId?: bigint | null;
+  organizationRole?: string | null;
+  organizationEdition?: string | null;
+  organizationStatus?: string | null;
+  isSuperAdmin?: boolean;
 }
 
 export interface JwtPayload {
@@ -31,6 +38,9 @@ export interface JwtPayload {
   branchId?: string | null;
   staffId?: string | null;
   organizationId?: string | null;
+  organizationRole?: string | null;
+  organizationEdition?: string | null;
+  isSuperAdmin?: boolean;
   iat?: number;
   exp?: number;
 }

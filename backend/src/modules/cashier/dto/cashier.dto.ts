@@ -94,7 +94,7 @@ export class ApproveShiftDto {
 export class RejectShiftDto {
   @ApiProperty({
     description: 'Mandatory clinical/managerial reason for shift rejection',
-    example: 'Cash count discrepancy of 500 PKR not explained in notes.',
+    example: 'Cash count discrepancy of 500 INR not explained in notes.',
   })
   @IsString()
   @MaxLength(500)

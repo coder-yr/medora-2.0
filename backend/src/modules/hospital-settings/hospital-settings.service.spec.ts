@@ -72,7 +72,7 @@ describe('HospitalSettingsService', () => {
       const mockSettings = {
         id: BigInt(1),
         hospitalName: 'Medora Central Hospital',
-        defaultCurrency: 'PKR',
+        defaultCurrency: 'INR',
         primaryColor: '#0284c7',
       };
       prisma.hospitalSettings.findFirst.mockResolvedValue(mockSettings);
@@ -87,7 +87,7 @@ describe('HospitalSettingsService', () => {
       prisma.hospitalSettings.create.mockResolvedValue({
         id: BigInt(1),
         hospitalName: 'Medora Central Hospital',
-        defaultCurrency: 'PKR',
+        defaultCurrency: 'INR',
       });
 
       const res = await service.getHospitalSettings();
@@ -218,7 +218,7 @@ describe('HospitalSettingsService', () => {
       const mockHospital = {
         hospitalName: 'Medora Central Hospital',
         defaultTimezone: 'Asia/Karachi',
-        defaultCurrency: 'PKR',
+        defaultCurrency: 'INR',
         receiptHeader: 'Hospital Main Header',
       };
 

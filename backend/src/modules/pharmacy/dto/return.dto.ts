@@ -87,6 +87,12 @@ export class CreatePharmacyReturnDto {
   @IsBoolean()
   restockToInventory?: boolean;
 
+  @ApiPropertyOptional({ description: 'Hospital branch ID for this return' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  branchId?: number;
+
   @ApiProperty({ description: 'Items being returned', type: [PharmacyReturnItemDto] })
   @IsArray()
   @ArrayMinSize(1, { message: 'Must specify at least one return item.' })

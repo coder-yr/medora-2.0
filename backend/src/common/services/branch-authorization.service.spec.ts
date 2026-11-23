@@ -24,8 +24,9 @@ describe('BranchAuthorizationService', () => {
     id: '1',
     email: 'admin@hospital.com',
     name: 'Admin User',
-    group: 'Admin',
-    permissions: [],
+    group: 'SuperAdmin',
+    isSuperAdmin: true,
+    permissions: ['*'],
     branchId: null,
   };
 
@@ -44,7 +45,8 @@ describe('BranchAuthorizationService', () => {
 
     const userWithPerm: AuthUser = {
       ...doctorUser,
-      permissions: [HospitalPermission.BRANCH_VIEW_ALL],
+      isSuperAdmin: true,
+      permissions: ['*'],
     };
     expect(service.isGlobalAdmin(userWithPerm)).toBe(true);
   });

@@ -20,10 +20,16 @@ import {
 import { AmendReportDto } from './dto/amendment.dto';
 import { QueryLabCatalogueDto, QueryLabOrdersDto } from './dto/query-lab.dto';
 import { Prisma } from '@prisma/client';
+import { Optional } from '@nestjs/common';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
 
 @Injectable()
 export class LaboratoryService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   // ===========================================================================
   // 1. SERIALIZATION HELPERS
@@ -311,13 +317,17 @@ export class LaboratoryService {
   // 3. LAB ORDER WORKFLOW & LIFECYCLE
   // ===========================================================================
 
-  async createOrder(dto: CreateLabOrderDto, userId: number) {
+  async createOrder(dto: CreateLabOrderDto, userId: number, user?: AuthUser) {
     const patient = await this.prisma.patient.findUnique({
       where: { id: BigInt(dto.patientId) },
     });
 
     if (!patient) {
       throw new NotFoundException(`Patient #${dto.patientId} not found.`);
+    }
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, patient.branchId, 'patient');
     }
 
     let doctor: any = null;
@@ -578,7 +588,7 @@ export class LaboratoryService {
     });
   }
 
-  async getOrderById(id: number) {
+  async getOrderById(id: number, user?: AuthUser) {
     const order = await this.prisma.lab.findUnique({
       where: { id: BigInt(id) },
       include: {
@@ -611,11 +621,32 @@ export class LaboratoryService {
       throw new NotFoundException(`Lab order #${id} not found.`);
     }
 
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, order.patient?.branchId, 'laboratory order');
+    }
+
     return this.serializeBigInt(order);
   }
 
-  async getOrders(query: QueryLabOrdersDto) {
+  async getOrders(query: QueryLabOrdersDto, user?: AuthUser) {
     const where: Prisma.LabWhereInput = {};
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+      if (isOrg1) {
+        where.patient = {
+          OR: [
+            { branchId: { in: accessibleBranches || [] } },
+            { branchId: null },
+          ],
+        };
+      } else {
+        where.patient = {
+          branchId: { in: accessibleBranches || [] },
+        };
+      }
+    }
 
     if (query.patientId) {
       where.patientId = BigInt(query.patientId);
@@ -714,15 +745,8 @@ export class LaboratoryService {
     return this.serializeBigInt(samples);
   }
 
-  async cancelOrder(id: number, dto: CancelLabOrderDto, _userId: number) {
-    const order = await this.prisma.lab.findUnique({
-      where: { id: BigInt(id) },
-      include: { tests: true },
-    });
-
-    if (!order) {
-      throw new NotFoundException(`Lab order #${id} not found.`);
-    }
+  async cancelOrder(id: number, dto: CancelLabOrderDto, _userId: number, user?: AuthUser) {
+    const order = await this.getOrderById(id, user);
 
     if (order.status === 'COMPLETED' || order.status === 'reported') {
       throw new BadRequestException('Cannot cancel a completed lab order with finalized results.');
@@ -1246,7 +1270,18 @@ export class LaboratoryService {
     };
   }
 
-  async getPatientHistory(patientId: number) {
+  async getPatientHistory(patientId: number, user?: AuthUser) {
+    const patient = await this.prisma.patient.findUnique({
+      where: { id: BigInt(patientId) },
+    });
+    if (!patient) {
+      throw new NotFoundException(`Patient #${patientId} not found.`);
+    }
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, patient.branchId, 'patient');
+    }
+
     const orders = await this.prisma.lab.findMany({
       where: { patientId: BigInt(patientId) },
       include: {

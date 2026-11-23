@@ -7,6 +7,8 @@ import { validateEnv } from './common/config/env.validation';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { BranchAccessGuard } from './common/guards/branch-access.guard';
+import { EntitlementGuard } from './common/guards/entitlement.guard';
+import { ClinicalAccessGuard } from './common/guards/clinical-access.guard';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
@@ -29,6 +31,9 @@ import { StaffModule } from './modules/staff/staff.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { HospitalSettingsModule } from './modules/hospital-settings/hospital-settings.module';
 import { OrganizationModule } from './modules/organization/organization.module';
+import { PlatformModule } from './modules/platform/platform.module';
+import { OrganizationStaffModule } from './modules/organization-staff/organization-staff.module';
+import { OrganizationRegistrationModule } from './modules/organization-registration/organization-registration.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
@@ -68,6 +73,9 @@ import { AppController } from './app.controller';
     AccountingModule,
     HospitalSettingsModule,
     OrganizationModule,
+    PlatformModule,
+    OrganizationStaffModule,
+    OrganizationRegistrationModule,
     NotificationModule,
     DashboardModule,
   ],
@@ -84,6 +92,14 @@ import { AppController } from './app.controller';
     {
       provide: APP_GUARD,
       useClass: BranchAccessGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: EntitlementGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: ClinicalAccessGuard,
     },
     {
       provide: APP_INTERCEPTOR,

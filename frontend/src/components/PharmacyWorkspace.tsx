@@ -3,7 +3,7 @@ import {
   Boxes,
   Package,
   Clock,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   Receipt,
   ShoppingCart,
@@ -672,16 +672,16 @@ export function PharmacyWorkspace({
                   <div className="flex items-center justify-between text-slate-500">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Retail Valuation</span>
                     <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                      <DollarSign className="w-5 h-5" />
+                      <IndianRupee className="w-5 h-5" />
                     </div>
                   </div>
                   <div className="text-2xl font-black text-slate-900 mt-2">
-                    ${dashboard.totalRetailValuation.toLocaleString()}
+                    ₹{dashboard.totalRetailValuation.toLocaleString()}
                   </div>
                   <div className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5 flex-wrap">
-                    <span>Cost: ${dashboard.totalCostValuation.toLocaleString()}</span>
+                    <span>Cost: ₹{dashboard.totalCostValuation.toLocaleString()}</span>
                     <span className="inline-block px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[11px]">
-                      +${(dashboard.totalRetailValuation - dashboard.totalCostValuation).toLocaleString()} Margin
+                      +₹{(dashboard.totalRetailValuation - dashboard.totalCostValuation).toLocaleString()} Margin
                     </span>
                   </div>
                 </div>
@@ -853,7 +853,7 @@ export function PharmacyWorkspace({
                             </div>
                           </div>
                           <div className="text-right shrink-0">
-                            <div className="font-extrabold text-slate-900 text-sm">${po.totalAmount}</div>
+                            <div className="font-extrabold text-slate-900 text-sm">₹{po.totalAmount}</div>
                             {canManage && (
                               <button
                                 onClick={() => {
@@ -1061,7 +1061,7 @@ export function PharmacyWorkspace({
                     Total Dispensation Summary
                   </div>
                   <div className="text-2xl font-black text-emerald-950 mt-1">
-                    $
+                    ₹
                     {dispenseItems
                       .reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
                       .toFixed(2)}
@@ -1135,9 +1135,9 @@ export function PharmacyWorkspace({
                       </div>
                       <div className="text-right">
                         <div>
-                          {item.quantity} x ${item.unitPrice}
+                          {item.quantity} x ₹{item.unitPrice}
                         </div>
-                        <div className="font-bold text-slate-900">${item.totalPrice}</div>
+                        <div className="font-bold text-slate-900">₹{item.totalPrice}</div>
                       </div>
                     </div>
                   ))}
@@ -1145,7 +1145,7 @@ export function PharmacyWorkspace({
 
                 <div className="flex justify-between font-bold text-base text-slate-900 pt-2">
                   <span>Grand Total</span>
-                  <span>${dispensationReceipt.totalAmount}</span>
+                  <span>₹{dispensationReceipt.totalAmount}</span>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-2">
@@ -1267,9 +1267,9 @@ export function PharmacyWorkspace({
                             </span>
                             <span className="text-slate-400 text-xs font-normal"> / {b.initialQuantity}</span>
                           </td>
-                          <td className="py-3 px-4">${b.costPrice}</td>
+                          <td className="py-3 px-4">₹{b.costPrice}</td>
                           <td className="py-3 px-4 font-semibold text-emerald-700">
-                            ${b.sellingPrice || b.costPrice}
+                            ₹{b.sellingPrice || b.costPrice}
                           </td>
                           <td className="py-3 px-4 text-xs text-slate-500">
                             {b.supplier?.name || 'Opening Stock'}
@@ -1373,7 +1373,7 @@ export function PharmacyWorkspace({
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Cost Price ($) *
+                        Cost Price (₹) *
                       </label>
                       <input
                         type="number"
@@ -1386,7 +1386,7 @@ export function PharmacyWorkspace({
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Selling Price ($)
+                        Selling Price (₹)
                       </label>
                       <input
                         type="number"
@@ -1525,7 +1525,7 @@ export function PharmacyWorkspace({
                         <td className="py-3 px-4 text-xs text-slate-500">
                           {po.items.map((i) => `${i.medicine?.name || 'Med'} (${i.quantityOrdered}x)`).join(', ')}
                         </td>
-                        <td className="py-3 px-4 font-bold text-slate-900">${po.totalAmount}</td>
+                        <td className="py-3 px-4 font-bold text-slate-900">₹{po.totalAmount}</td>
                         <td className="py-3 px-4">
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-bold ${
@@ -1586,7 +1586,7 @@ export function PharmacyWorkspace({
                             </div>
                           ))}
                         </td>
-                        <td className="py-3 px-4 font-bold text-slate-900">${grn.totalAmount}</td>
+                        <td className="py-3 px-4 font-bold text-slate-900">₹{grn.totalAmount}</td>
                       </tr>
                     ))
                   )}
@@ -1693,7 +1693,7 @@ export function PharmacyWorkspace({
                         />
                         <input
                           type="number"
-                          placeholder="Cost ($)"
+                          placeholder="Cost (₹)"
                           step="0.01"
                           required
                           value={item.unitCost}
@@ -1852,7 +1852,7 @@ export function PharmacyWorkspace({
                             />
                           </div>
                           <div>
-                            <label className="text-xs text-slate-500">Cost Price ($)</label>
+                            <label className="text-xs text-slate-500">Cost Price (₹)</label>
                             <input
                               type="number"
                               step="0.01"
@@ -1867,7 +1867,7 @@ export function PharmacyWorkspace({
                             />
                           </div>
                           <div>
-                            <label className="text-xs text-slate-500">Retail ($)</label>
+                            <label className="text-xs text-slate-500">Retail (₹)</label>
                             <input
                               type="number"
                               step="0.01"
@@ -2069,7 +2069,7 @@ export function PharmacyWorkspace({
                             <span className="text-rose-600">Damaged / Written-off</span>
                           )}
                         </td>
-                        <td className="py-3 px-4 font-bold text-slate-900">${r.totalRefund}</td>
+                        <td className="py-3 px-4 font-bold text-slate-900">₹{r.totalRefund}</td>
                       </tr>
                     ))
                   )}
@@ -2353,7 +2353,7 @@ export function PharmacyWorkspace({
           {/* Sub Navigation */}
           <div className="flex gap-2 p-1 bg-slate-100 rounded-xl max-w-fit">
             {[
-              { id: 'valuation', label: 'Valuation Report', icon: DollarSign },
+              { id: 'valuation', label: 'Valuation Report', icon: IndianRupee },
               { id: 'expiry', label: 'Expiry Alerts', icon: AlertTriangle },
               { id: 'lowstock', label: 'Low Stock Report', icon: Clock },
               { id: 'movements', label: 'Immutable Audit Ledger', icon: FileSpreadsheet },
@@ -2426,10 +2426,10 @@ export function PharmacyWorkspace({
                         <td className="py-3 px-4 font-semibold text-slate-800">{row.medicineName}</td>
                         <td className="py-3 px-4 font-mono text-emerald-800">{row.batchNumber}</td>
                         <td className="py-3 px-4 font-bold text-slate-900">{row.currentQuantity}</td>
-                        <td className="py-3 px-4">${row.costPrice}</td>
-                        <td className="py-3 px-4">${row.sellingPrice}</td>
-                        <td className="py-3 px-4">${row.costTotal}</td>
-                        <td className="py-3 px-4 font-bold text-emerald-700">${row.retailTotal}</td>
+                        <td className="py-3 px-4">₹{row.costPrice}</td>
+                        <td className="py-3 px-4">₹{row.sellingPrice}</td>
+                        <td className="py-3 px-4">₹{row.costTotal}</td>
+                        <td className="py-3 px-4 font-bold text-emerald-700">₹{row.retailTotal}</td>
                       </tr>
                     ))}
                   </tbody>

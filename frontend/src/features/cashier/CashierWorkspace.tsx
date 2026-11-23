@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
-  DollarSign,
+  IndianRupee,
   Lock,
   Unlock,
   AlertCircle,
@@ -75,9 +75,8 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
   // Shift Close & Denominations
   const [closingNotes, setClosingNotes] = useState<string>('');
   const [denominations, setDenominations] = useState<Record<number, number>>({
-    5000: 0,
-    1000: 0,
     500: 0,
+    200: 0,
     100: 0,
     50: 0,
     20: 0,
@@ -277,7 +276,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
       });
       const data = await res.json();
       if (data.success) {
-        setNotification({ type: 'success', message: `Payout of ${amount} PKR recorded successfully.` });
+        setNotification({ type: 'success', message: `Payout of ₹${amount} recorded successfully.` });
         setPayoutAmount('');
         setPayoutReason('');
         setPayoutRecipient('');
@@ -329,7 +328,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
       if (data.success) {
         setNotification({
           type: 'success',
-          message: `Adjustment of ${amount} PKR (${adjustDirection}) recorded.`,
+          message: `Adjustment of ₹${amount} (${adjustDirection}) recorded.`,
         });
         setAdjustAmount('');
         setAdjustReason('');
@@ -358,7 +357,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
     if (variance !== 0 && !closingNotes.trim()) {
       setNotification({
         type: 'error',
-        message: `Discrepancy detected (${variance > 0 ? '+' : ''}${variance} PKR). You must provide an explanation in Closing Notes.`,
+        message: `Discrepancy detected (${variance > 0 ? '+' : ''}${variance} INR). You must provide an explanation in Closing Notes.`,
       });
       return;
     }
@@ -388,7 +387,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
       if (data.success) {
         setNotification({
           type: 'success',
-          message: `Shift close submitted for supervisor sign-off (Variance: ${variance} PKR).`,
+          message: `Shift close submitted for supervisor sign-off (Variance: ₹${variance}).`,
         });
         await fetchActiveShift();
         await fetchPendingShifts();
@@ -581,7 +580,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
       if (data.success) {
         setNotification({
           type: 'success',
-          message: `Settled ${amount} PKR across ${data.data.invoicesSettledCount} invoice(s)!`,
+          message: `Settled ₹${amount} across ${data.data.invoicesSettledCount} invoice(s)!`,
         });
         setSettleResult(data.data);
         setSettlePreview(null);
@@ -715,7 +714,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 6 }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <DollarSign size={24} color="#059669" /> Cashier, Shift Close & Treasury
+              <IndianRupee size={24} color="#059669" /> Cashier, Shift Close & Treasury
             </h1>
             {activeShift && renderStatusBadge(activeShift.status)}
           </div>
@@ -792,7 +791,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
           <div style={{ background: '#ffffff', padding: 16, borderRadius: 10, border: '1px solid #e2e8f0', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Opening Float</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#334155', marginTop: 4 }}>
-              PKR {fmt(activeShift.liveTotals?.openingFloat ?? activeShift.openingCash)}
+              ₹{fmt(activeShift.liveTotals?.openingFloat ?? activeShift.openingCash)}
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Cash in drawer at start</div>
           </div>
@@ -802,7 +801,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
               <ArrowDownRight size={14} /> Cash Inflow
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#059669', marginTop: 4 }}>
-              + PKR {fmt(activeShift.liveTotals?.cashInflow)}
+              + ₹{fmt(activeShift.liveTotals?.cashInflow)}
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Cash payments received</div>
           </div>
@@ -812,7 +811,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
               <ArrowUpRight size={14} /> Payouts & Outflow
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#dc2626', marginTop: 4 }}>
-              - PKR {fmt(activeShift.liveTotals?.cashOutflow)}
+              - ₹{fmt(activeShift.liveTotals?.cashOutflow)}
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Petty cash / expenses</div>
           </div>
@@ -830,7 +829,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
               Expected Physical Cash
             </div>
             <div style={{ fontSize: 24, fontWeight: 800, color: '#065f46', marginTop: 4 }}>
-              PKR {fmt(activeShift.liveTotals?.expectedCash ?? activeShift.expectedCash)}
+              ₹{fmt(activeShift.liveTotals?.expectedCash ?? activeShift.expectedCash)}
             </div>
             <div style={{ fontSize: 12, color: '#047857', marginTop: 4 }}>Float + Inflow - Outflow</div>
           </div>
@@ -840,7 +839,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
               <CreditCard size={14} /> Non-Cash Collected
             </div>
             <div style={{ fontSize: 20, fontWeight: 700, color: '#0284c7', marginTop: 4 }}>
-              PKR {fmt(activeShift.liveTotals?.nonCashTotal)}
+              ₹{fmt(activeShift.liveTotals?.nonCashTotal)}
             </div>
             <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>Card, Bank, Cheque & Online</div>
           </div>
@@ -956,7 +955,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ color: '#64748b' }}>Opening Float:</span>
-                  <span style={{ fontWeight: 600 }}>PKR {fmt(activeShift.openingCash)}</span>
+                  <span style={{ fontWeight: 600 }}>₹{fmt(activeShift.openingCash)}</span>
                 </div>
                 {activeShift.closingNotes && (
                   <div style={{ marginTop: 8, padding: 10, background: '#f8fafc', borderRadius: 6, fontSize: 13, color: '#475569' }}>
@@ -990,27 +989,27 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ color: '#64748b' }}>Cash Inflow (Drawer):</span>
-                  <span style={{ fontWeight: 700, color: '#059669' }}>PKR {fmt(activeShift.liveTotals.cashInflow)}</span>
+                  <span style={{ fontWeight: 700, color: '#059669' }}>₹{fmt(activeShift.liveTotals.cashInflow)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ color: '#64748b' }}>Card / POS Payments:</span>
-                  <span style={{ fontWeight: 600, color: '#0284c7' }}>PKR {fmt(activeShift.liveTotals.cardTotal)}</span>
+                  <span style={{ fontWeight: 600, color: '#0284c7' }}>₹{fmt(activeShift.liveTotals.cardTotal)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ color: '#64748b' }}>Bank Transfers:</span>
-                  <span style={{ fontWeight: 600, color: '#0284c7' }}>PKR {fmt(activeShift.liveTotals.bankTransferTotal)}</span>
+                  <span style={{ fontWeight: 600, color: '#0284c7' }}>₹{fmt(activeShift.liveTotals.bankTransferTotal)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ color: '#64748b' }}>Cheques:</span>
-                  <span style={{ fontWeight: 600, color: '#0284c7' }}>PKR {fmt(activeShift.liveTotals.chequeTotal)}</span>
+                  <span style={{ fontWeight: 600, color: '#0284c7' }}>₹{fmt(activeShift.liveTotals.chequeTotal)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
                   <span style={{ color: '#64748b' }}>Write-offs / Concessions:</span>
-                  <span style={{ fontWeight: 600, color: '#64748b' }}>PKR {fmt(activeShift.liveTotals.writeOffTotal)}</span>
+                  <span style={{ fontWeight: 600, color: '#64748b' }}>₹{fmt(activeShift.liveTotals.writeOffTotal)}</span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0 0 0', borderTop: '2px solid #e2e8f0', fontWeight: 700 }}>
                   <span>Total Gross Collections:</span>
-                  <span style={{ color: '#0f172a' }}>PKR {fmt(activeShift.liveTotals.totalCollected)}</span>
+                  <span style={{ color: '#0f172a' }}>₹{fmt(activeShift.liveTotals.totalCollected)}</span>
                 </div>
               </div>
             ) : (
@@ -1045,7 +1044,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                   <th style={{ padding: '10px 12px' }}>Source / Patient</th>
                   <th style={{ padding: '10px 12px' }}>Method</th>
                   <th style={{ padding: '10px 12px' }}>Physical Cash?</th>
-                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Amount (PKR)</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'right' }}>Amount (₹)</th>
                   <th style={{ padding: '10px 12px' }}>Timestamp</th>
                 </tr>
               </thead>
@@ -1143,7 +1142,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
             <form onSubmit={handleRecordPayout}>
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                  Payout Amount (PKR) *
+                  Payout Amount (₹) *
                 </label>
                 <input
                   type="number"
@@ -1241,7 +1240,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
 
               <div style={{ marginBottom: 14 }}>
                 <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                  Amount (PKR) *
+                  Amount (₹) *
                 </label>
                 <input
                   type="number"
@@ -1315,7 +1314,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                         borderRadius: 6,
                       }}
                     >
-                      <span style={{ fontWeight: 600, width: 80 }}>PKR {denom}</span>
+                      <span style={{ fontWeight: 600, width: 80 }}>₹{denom}</span>
                       <span style={{ color: '#64748b' }}>×</span>
                       <input
                         type="number"
@@ -1328,7 +1327,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                         }}
                       />
                       <span style={{ fontWeight: 700, width: 110, textAlign: 'right' }}>
-                        = PKR {fmt(denom * (denominations[denom] || 0))}
+                        = ₹{fmt(denom * (denominations[denom] || 0))}
                       </span>
                     </div>
                   ))}
@@ -1351,13 +1350,13 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#64748b' }}>Expected Physical Cash:</span>
                   <span style={{ fontWeight: 700 }}>
-                    PKR {fmt(activeShift?.liveTotals?.expectedCash ?? activeShift?.expectedCash)}
+                    ₹{fmt(activeShift?.liveTotals?.expectedCash ?? activeShift?.expectedCash)}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span style={{ color: '#64748b' }}>Total Counted Cash:</span>
-                  <span style={{ fontWeight: 700, color: '#0f172a' }}>PKR {fmt(totalDenominationCount)}</span>
+                  <span style={{ fontWeight: 700, color: '#0f172a' }}>₹{fmt(totalDenominationCount)}</span>
                 </div>
 
                 {activeShift && (
@@ -1384,7 +1383,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                       0
                         ? '+'
                         : ''}
-                      PKR{' '}
+                      ₹{' '}
                       {fmt(
                         totalDenominationCount -
                           Number(activeShift.liveTotals?.expectedCash ?? activeShift.expectedCash ?? 0),
@@ -1450,9 +1449,9 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0', textAlign: 'left' }}>
                     <th style={{ padding: '10px 12px' }}>Shift #</th>
                     <th style={{ padding: '10px 12px' }}>Cashier</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Expected (PKR)</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Counted (PKR)</th>
-                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Variance (PKR)</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Expected (₹)</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Counted (₹)</th>
+                    <th style={{ padding: '10px 12px', textAlign: 'right' }}>Variance (₹)</th>
                     <th style={{ padding: '10px 12px' }}>Notes</th>
                     <th style={{ padding: '10px 12px', textAlign: 'center' }}>Actions</th>
                   </tr>
@@ -1576,37 +1575,37 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
               <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>CASH</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#059669', marginTop: 2 }}>
-                  PKR {fmt(dayBookReport.collections.cash)}
+                  ₹{fmt(dayBookReport.collections.cash)}
                 </div>
               </div>
               <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>CARD / POS</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#0284c7', marginTop: 2 }}>
-                  PKR {fmt(dayBookReport.collections.card)}
+                  ₹{fmt(dayBookReport.collections.card)}
                 </div>
               </div>
               <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>BANK TRANSFER</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#0284c7', marginTop: 2 }}>
-                  PKR {fmt(dayBookReport.collections.bank_transfer)}
+                  ₹{fmt(dayBookReport.collections.bank_transfer)}
                 </div>
               </div>
               <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>CHEQUE</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#475569', marginTop: 2 }}>
-                  PKR {fmt(dayBookReport.collections.cheque)}
+                  ₹{fmt(dayBookReport.collections.cheque)}
                 </div>
               </div>
               <div style={{ background: '#f8fafc', padding: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}>
                 <div style={{ fontSize: 11, color: '#64748b', fontWeight: 600 }}>WRITE-OFFS</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: '#dc2626', marginTop: 2 }}>
-                  PKR {fmt(dayBookReport.collections.write_off)}
+                  ₹{fmt(dayBookReport.collections.write_off)}
                 </div>
               </div>
               <div style={{ background: '#ecfdf5', padding: 12, borderRadius: 8, border: '1px solid #10b981' }}>
                 <div style={{ fontSize: 11, color: '#047857', fontWeight: 700 }}>TOTAL COLLECTED</div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: '#065f46', marginTop: 2 }}>
-                  PKR {fmt(dayBookReport.collections.total)}
+                  ₹{fmt(dayBookReport.collections.total)}
                 </div>
               </div>
             </div>
@@ -1699,7 +1698,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                 <div style={{ textAlign: 'right' }}>
                   <div style={{ fontSize: 12, color: '#64748b' }}>Total Outstanding Debt:</div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: '#dc2626' }}>
-                    PKR {fmt(settlePreview.totalReceivable)}
+                    ₹{fmt(settlePreview.totalReceivable)}
                   </div>
                 </div>
               </div>
@@ -1740,7 +1739,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                      Payment Amount (PKR)
+                      Payment Amount (₹)
                     </label>
                     <input
                       type="number"
@@ -1786,7 +1785,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 16 }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                      Write-off / Concession Amount (PKR)
+                      Write-off / Concession Amount (₹)
                     </label>
                     <input
                       type="number"
@@ -1830,10 +1829,10 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
                 <CheckCircle2 size={18} /> Settlement Executed Successfully!
               </div>
               <p style={{ margin: 0, fontSize: 13, color: '#065f46' }}>
-                Paid <strong>PKR {fmt(settleResult.amountSettled)}</strong> across{' '}
+                Paid <strong>₹{fmt(settleResult.amountSettled)}</strong> across{' '}
                 <strong>{settleResult.invoicesSettledCount}</strong> invoice(s).
                 {settleResult.amountWrittenOff > 0 && (
-                  <span> Concession applied: <strong>PKR {fmt(settleResult.amountWrittenOff)}</strong>.</span>
+                  <span> Concession applied: <strong>₹{fmt(settleResult.amountWrittenOff)}</strong>.</span>
                 )}
               </p>
             </div>
@@ -1887,7 +1886,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
 
             <div style={{ marginBottom: 14 }}>
               <label style={{ display: 'block', fontSize: 13, fontWeight: 600, marginBottom: 4 }}>
-                Opening Cash Float (PKR)
+                Opening Cash Float (₹)
               </label>
               <input
                 type="number"
@@ -1963,7 +1962,7 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
               <textarea
                 className="form-control"
                 rows={3}
-                placeholder="e.g. Discrepancy in 1000 PKR notes. Please re-count change tin."
+                placeholder="e.g. Discrepancy in 500 INR notes. Please re-count change tin."
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 required
@@ -2052,44 +2051,44 @@ export function CashierWorkspace({ token, userRole: _userRole }: Props) {
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Opening Float:</span>
-                <span>PKR {fmt(slipShift.openingCash)}</span>
+                <span>₹{fmt(slipShift.openingCash)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Cash Inflow:</span>
-                <span>+ PKR {fmt(slipShift.liveTotals?.cashInflow)}</span>
+                <span>+ ₹{fmt(slipShift.liveTotals?.cashInflow)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Cash Payouts:</span>
-                <span>- PKR {fmt(slipShift.liveTotals?.cashOutflow)}</span>
+                <span>- ₹{fmt(slipShift.liveTotals?.cashOutflow)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, margin: '4px 0' }}>
                 <span>Expected Drawer Cash:</span>
-                <span>PKR {fmt(slipShift.liveTotals?.expectedCash ?? slipShift.expectedCash)}</span>
+                <span>₹{fmt(slipShift.liveTotals?.expectedCash ?? slipShift.expectedCash)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                 <span>Physical Counted Cash:</span>
-                <span>PKR {fmt(slipShift.countedCash ?? totalDenominationCount)}</span>
+                <span>₹{fmt(slipShift.countedCash ?? totalDenominationCount)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 800, marginTop: 4 }}>
                 <span>Variance:</span>
                 <span>
                   {Number(slipShift.cashVariance ?? 0) > 0 ? '+' : ''}
-                  PKR {fmt(slipShift.cashVariance ?? 0)}
+                  ₹{fmt(slipShift.cashVariance ?? 0)}
                 </span>
               </div>
               <div style={{ margin: '8px 0', borderBottom: '1px dashed #94a3b8' }} />
 
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Card Total:</span>
-                <span>PKR {fmt(slipShift.liveTotals?.cardTotal)}</span>
+                <span>₹{fmt(slipShift.liveTotals?.cardTotal)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span>Bank Transfer:</span>
-                <span>PKR {fmt(slipShift.liveTotals?.bankTransferTotal)}</span>
+                <span>₹{fmt(slipShift.liveTotals?.bankTransferTotal)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
                 <span>Gross Collections:</span>
-                <span>PKR {fmt(slipShift.liveTotals?.totalCollected)}</span>
+                <span>₹{fmt(slipShift.liveTotals?.totalCollected)}</span>
               </div>
 
               {slipShift.closingNotes && (

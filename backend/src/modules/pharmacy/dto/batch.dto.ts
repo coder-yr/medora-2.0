@@ -33,13 +33,13 @@ export class CreateBatchDto {
   @IsDateString({}, { message: 'Expiry date must be a valid ISO date string.' })
   expiryDate!: string;
 
-  @ApiProperty({ description: 'Acquisition / wholesale cost price per unit in PKR', example: 12.5 })
+  @ApiProperty({ description: 'Acquisition / wholesale cost price per unit in INR', example: 12.5 })
   @Type(() => Number)
   @IsNumber({}, { message: 'Cost price must be a valid number.' })
   @Min(0, { message: 'Cost price cannot be negative.' })
   costPrice!: number;
 
-  @ApiPropertyOptional({ description: 'Retail patient selling price per unit in PKR (defaults to catalogue s_price if omitted)', example: 18.0 })
+  @ApiPropertyOptional({ description: 'Retail patient selling price per unit in INR (defaults to catalogue s_price if omitted)', example: 18.0 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber({}, { message: 'Selling price must be a valid number.' })
@@ -62,6 +62,12 @@ export class CreateBatchDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Hospital branch ID for this batch inventory' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  branchId?: number;
 }
 
 export class UpdateBatchStatusDto {

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  DollarSign,
+  IndianRupee,
   Lock,
   Unlock,
   Receipt,
@@ -179,7 +179,7 @@ export const CashierDashboard: React.FC = () => {
         userRole="Cashier POS"
         branchName={activeBranch.name}
         branchCode={activeBranch.code}
-        icon={DollarSign}
+        icon={IndianRupee}
         onRefresh={handleManualRefresh}
         isRefreshing={refreshing}
         actions={
@@ -228,7 +228,7 @@ export const CashierDashboard: React.FC = () => {
         <DashboardAlert
           type="info"
           title={`Active Shift: #${activeShift.shiftNumber} in ${activeShift.cashDrawer?.name || 'Main POS Drawer'}`}
-          message={`Shift opened at ${new Date(activeShift.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} with PKR ${Number(activeShift.openingCash).toLocaleString()} opening float.`}
+          message={`Shift opened at ${new Date(activeShift.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} with ₹${Number(activeShift.openingCash).toLocaleString()} opening float.`}
           actionText="Go to POS Register"
           onAction={() => navigate('/cashier')}
         />
@@ -261,7 +261,7 @@ export const CashierDashboard: React.FC = () => {
           {/* Card 2: Opening Cash Float */}
           <DashboardMetricCard
             title="Opening Cash Float"
-            value={activeShift ? `PKR ${Number(activeShift.openingCash).toLocaleString()}` : 'PKR 0'}
+            value={activeShift ? `₹${Number(activeShift.openingCash).toLocaleString()}` : '₹0'}
             subtext="Declared at shift start"
             icon={Building2}
             variant="primary"
@@ -272,13 +272,13 @@ export const CashierDashboard: React.FC = () => {
             title="Expected Cash In Drawer"
             value={
               activeShift?.liveTotals
-                ? `PKR ${Number(activeShift.liveTotals.expectedCash || 0).toLocaleString()}`
+                ? `₹${Number(activeShift.liveTotals.expectedCash || 0).toLocaleString()}`
                 : activeShift
-                ? `PKR ${Number(activeShift.openingCash).toLocaleString()}`
-                : 'PKR 0'
+                ? `₹${Number(activeShift.openingCash).toLocaleString()}`
+                : '₹0'
             }
             subtext="Float + cash inflows - payouts"
-            icon={DollarSign}
+            icon={IndianRupee}
             variant="teal"
           />
 
@@ -287,12 +287,12 @@ export const CashierDashboard: React.FC = () => {
             title="Collections This Shift"
             value={
               activeShift?.liveTotals
-                ? `PKR ${Number(activeShift.liveTotals.totalCollected || 0).toLocaleString()}`
-                : 'PKR 0'
+                ? `₹${Number(activeShift.liveTotals.totalCollected || 0).toLocaleString()}`
+                : '₹0'
             }
             subtext={
               activeShift?.liveTotals
-                ? `Card: PKR ${Number(activeShift.liveTotals.cardTotal || 0).toLocaleString()}`
+                ? `Card: ₹${Number(activeShift.liveTotals.cardTotal || 0).toLocaleString()}`
                 : 'Gross shift revenue'
             }
             icon={Receipt}
@@ -313,7 +313,7 @@ export const CashierDashboard: React.FC = () => {
           <DashboardMetricCard
             title="Pending Patient Invoices"
             value={unpaidInvoices.length}
-            subtext={`PKR ${totalOutstandingBalance.toLocaleString()} balance due`}
+            subtext={`₹${totalOutstandingBalance.toLocaleString()} balance due`}
             icon={AlertCircle}
             variant={unpaidInvoices.length > 0 ? 'amber' : 'slate'}
             badge={unpaidInvoices.length > 0 ? 'Awaiting POS' : undefined}
@@ -394,10 +394,10 @@ export const CashierDashboard: React.FC = () => {
                         </span>
                       </td>
                       <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>
-                        PKR {Number(inv.grossTotal || 0).toLocaleString()}
+                        ₹{Number(inv.grossTotal || 0).toLocaleString()}
                       </td>
                       <td style={{ padding: '12px 14px', fontWeight: 700, color: '#dc2626' }}>
-                        PKR {Number(inv.balance || 0).toLocaleString()}
+                        ₹{Number(inv.balance || 0).toLocaleString()}
                       </td>
                       <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                         <button
@@ -451,27 +451,27 @@ export const CashierDashboard: React.FC = () => {
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Opening Cash Float</span>
-                  <strong>PKR {Number(activeShift.openingCash).toLocaleString()}</strong>
+                  <strong>₹{Number(activeShift.openingCash).toLocaleString()}</strong>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cash Inflow (Sales)</span>
                   <span style={{ color: '#059669', fontWeight: 600 }}>
-                    +PKR {Number(activeShift.liveTotals?.cashInflow || 0).toLocaleString()}
+                    +₹{Number(activeShift.liveTotals?.cashInflow || 0).toLocaleString()}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Card & Digital Collections</span>
                   <span style={{ color: '#7c3aed', fontWeight: 600 }}>
-                    PKR {Number(activeShift.liveTotals?.cardTotal || 0).toLocaleString()}
+                    ₹{Number(activeShift.liveTotals?.cardTotal || 0).toLocaleString()}
                   </span>
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                   <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>Cash Payouts</span>
                   <span style={{ color: '#dc2626', fontWeight: 600 }}>
-                    -PKR {Number(activeShift.liveTotals?.cashOutflow || 0).toLocaleString()}
+                    -₹{Number(activeShift.liveTotals?.cashOutflow || 0).toLocaleString()}
                   </span>
                 </div>
 
@@ -487,7 +487,7 @@ export const CashierDashboard: React.FC = () => {
                 >
                   <span style={{ fontWeight: 700, color: '#0369a1', fontSize: 14 }}>Expected Physical Cash</span>
                   <span style={{ fontWeight: 800, color: '#0369a1', fontSize: 16 }}>
-                    PKR {Number(activeShift.liveTotals?.expectedCash ?? activeShift.openingCash).toLocaleString()}
+                    ₹{Number(activeShift.liveTotals?.expectedCash ?? activeShift.openingCash).toLocaleString()}
                   </span>
                 </div>
 
@@ -664,7 +664,7 @@ export const CashierDashboard: React.FC = () => {
 
               <div style={{ marginBottom: 14 }}>
                 <label className="form-label" style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, display: 'block' }}>
-                  Opening Cash Float (PKR) *
+                  Opening Cash Float (₹) *
                 </label>
                 <input
                   type="number"

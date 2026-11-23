@@ -21,7 +21,7 @@ export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
 
 export class CreatePaymentDto {
   @ApiProperty({
-    description: 'Payment installment amount in PKR. Cannot exceed outstanding balance.',
+    description: 'Payment installment amount in INR. Cannot exceed outstanding balance.',
     example: 300.0,
   })
   @IsNotEmpty({ message: 'Amount is required.' })

@@ -43,7 +43,7 @@ export class CreateInvoiceItemDto {
   quantity!: number;
 
   @ApiPropertyOptional({
-    description: 'Unit price in PKR. If omitted, uses default price from PriceList catalogue.',
+    description: 'Unit price in INR. If omitted, uses default price from PriceList catalogue.',
     example: 500.0,
   })
   @IsOptional()

@@ -19,6 +19,7 @@ import {
 } from './navigation-utils';
 import { NotificationCenter } from '../features/notifications/NotificationCenter';
 import { ChangePasswordModal } from '../features/auth/ChangePasswordModal';
+import { WorkspaceSelector } from '../components/WorkspaceSelector';
 
 export const AppShell: React.FC = () => {
   const {
@@ -253,6 +254,9 @@ export const AppShell: React.FC = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {/* Multi-Organization Workspace Selector */}
+            <WorkspaceSelector />
+
             {/* Live Backend Connection Indicator */}
             <div
               style={{

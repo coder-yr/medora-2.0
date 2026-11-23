@@ -14,6 +14,11 @@ export interface AuthUser {
   permissions?: string[];
   branches?: UserBranch[];
   branchId?: string;
+  organizationId?: string;
+  organizationRole?: string;
+  organizationEdition?: string;
+  organizationStatus?: string;
+  isSuperAdmin?: boolean;
 }
 
 export interface AuthResponse {

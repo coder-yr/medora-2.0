@@ -835,7 +835,7 @@ export const SettingsWorkspace: React.FC<SettingsWorkspaceProps> = ({
               <input
                 type="text"
                 className="form-input"
-                value={hospitalForm.defaultCurrency || 'PKR'}
+                value={hospitalForm.defaultCurrency || 'INR'}
                 onChange={(e) =>
                   setHospitalForm({ ...hospitalForm, defaultCurrency: e.target.value })
                 }

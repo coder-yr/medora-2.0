@@ -22,7 +22,7 @@ describe('OrganizationService', () => {
       organizationId: 1n,
       legalName: 'Medora Healthcare System (Pvt) Ltd',
       email: 'info@medora.hospital',
-      defaultCurrency: 'PKR',
+      defaultCurrency: 'INR',
       defaultTimezone: 'Asia/Karachi',
     },
     branches: [
@@ -80,7 +80,7 @@ describe('OrganizationService', () => {
       expect(result.id).toBe('1');
       expect(result.code).toBe('MEDORA-HOSP-01');
       expect(result.type).toBe('HOSPITAL');
-      expect(result.settings?.defaultCurrency).toBe('PKR');
+      expect(result.settings?.defaultCurrency).toBe('INR');
       expect(result.branches).toHaveLength(2);
     });
 
@@ -100,7 +100,7 @@ describe('OrganizationService', () => {
         code: 'TARIQ-PEDS',
         type: 'CLINIC',
         status: 'ACTIVE',
-        settings: { legalName: 'Dr. Tariq Pediatric Clinic', defaultCurrency: 'PKR' },
+        settings: { legalName: 'Dr. Tariq Pediatric Clinic', defaultCurrency: 'INR' },
       };
       mockPrismaService.organization.create.mockResolvedValue(newOrg);
       mockPrismaService.organizationSettings.create.mockResolvedValue({ id: 2n, organizationId: 2n });
@@ -184,7 +184,7 @@ describe('OrganizationService', () => {
             code: 'CLIFTON-DX',
             type: 'DIAGNOSTIC_CENTER',
             status: 'ACTIVE',
-            settings: { defaultCurrency: 'PKR' },
+            settings: { defaultCurrency: 'INR' },
           },
         },
       ]);
@@ -223,7 +223,7 @@ describe('OrganizationService', () => {
         organizationId: 1n,
         legalName: 'Medora Healthcare Trust',
         taxNumber: 'NTN-123456',
-        defaultCurrency: 'PKR',
+        defaultCurrency: 'INR',
         defaultTimezone: 'Asia/Karachi',
       });
 

@@ -22,6 +22,8 @@ import { RadiologyService } from './radiology.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { ClinicalAccessGuard } from '../../common/guards/clinical-access.guard';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -51,10 +53,11 @@ import { QueryRadiologyOrderDto, QueryRadiologyExamDto } from './dto/query.dto';
 
 @ApiTags('Radiology & Diagnostic Imaging (RIS)')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, ClinicalAccessGuard)
+@ProtectClinicalAccess()
 @Controller('radiology')
 export class RadiologyController {
-  constructor(private readonly radiologyService: RadiologyService) {}
+  constructor(private readonly radiologyService: RadiologyService) { }
 
   // =========================================================================
   // 1. DASHBOARD & KPIS
@@ -167,8 +170,11 @@ export class RadiologyController {
   @Get('orders/:id')
   @RequirePermissions(HospitalPermission.RADIOLOGY_VIEW)
   @ApiOperation({ summary: 'Get radiology order details and patient imaging history' })
-  async getOrderById(@Param('id', ParseIntPipe) id: number) {
-    return this.radiologyService.getOrderById(id);
+  async getOrderById(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user?: AuthUser,
+  ) {
+    return this.radiologyService.getOrderById(id, user);
   }
 
   // =========================================================================

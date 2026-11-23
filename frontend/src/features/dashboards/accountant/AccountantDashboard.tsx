@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CreditCard,
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   AlertCircle,
   CheckCircle2,
@@ -194,7 +194,7 @@ export const AccountantDashboard: React.FC = () => {
           {/* Card 1: Revenue Recognized Today */}
           <DashboardMetricCard
             title="Revenue Recognized Today"
-            value={overview?.financial ? `PKR ${overview.financial.recognizedRevenue.toLocaleString()}` : 'PKR 0'}
+            value={overview?.financial ? `₹${overview.financial.recognizedRevenue.toLocaleString()}` : '₹0'}
             subtext="Earned clinical & diagnostic services"
             icon={TrendingUp}
             variant="primary"
@@ -204,13 +204,13 @@ export const AccountantDashboard: React.FC = () => {
           {/* Card 2: Total Collections Today */}
           <DashboardMetricCard
             title="Collections Today"
-            value={`PKR ${totalCollectionsToday.toLocaleString()}`}
+            value={`₹${totalCollectionsToday.toLocaleString()}`}
             subtext={
               overview?.financial
-                ? `Cash: PKR ${overview.financial.cashCollections.toLocaleString()} • Non-Cash: PKR ${overview.financial.nonCashCollections.toLocaleString()}`
+                ? `Cash: ₹${overview.financial.cashCollections.toLocaleString()} • Non-Cash: ₹${overview.financial.nonCashCollections.toLocaleString()}`
                 : 'Settled payments'
             }
-            icon={DollarSign}
+            icon={IndianRupee}
             variant="emerald"
             badge="Cash Flow"
           />
@@ -220,10 +220,10 @@ export const AccountantDashboard: React.FC = () => {
             title="Outstanding Receivables (A/R)"
             value={
               accountingMetrics
-                ? `PKR ${accountingMetrics.totalReceivables.toLocaleString()}`
+                ? `₹${accountingMetrics.totalReceivables.toLocaleString()}`
                 : overview?.financial
-                ? `PKR ${overview.financial.accountsReceivable.toLocaleString()}`
-                : 'PKR 0'
+                ? `₹${overview.financial.accountsReceivable.toLocaleString()}`
+                : '₹0'
             }
             subtext={`${unpaidInvoices.length} folios with unpaid balances`}
             icon={AlertCircle}
@@ -235,10 +235,10 @@ export const AccountantDashboard: React.FC = () => {
           {/* Card 4: Revenue This Month */}
           <DashboardMetricCard
             title="Revenue This Month (GL)"
-            value={accountingMetrics ? `PKR ${accountingMetrics.totalRevenueMonth.toLocaleString()}` : 'PKR 0'}
+            value={accountingMetrics ? `₹${accountingMetrics.totalRevenueMonth.toLocaleString()}` : '₹0'}
             subtext={
               accountingMetrics
-                ? `Net Operating Surplus: PKR ${accountingMetrics.netSurplusMonth.toLocaleString()}`
+                ? `Net Operating Surplus: ₹${accountingMetrics.netSurplusMonth.toLocaleString()}`
                 : 'Posted journal revenue'
             }
             icon={PieChart}
@@ -359,10 +359,10 @@ export const AccountantDashboard: React.FC = () => {
                           {inv.date || 'Recent'}
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: 600, color: 'var(--text-main)' }}>
-                          PKR {Number(inv.grossTotal || 0).toLocaleString()}
+                          ₹{Number(inv.grossTotal || 0).toLocaleString()}
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: 700, color: '#dc2626' }}>
-                          PKR {Number(inv.balance || 0).toLocaleString()}
+                          ₹{Number(inv.balance || 0).toLocaleString()}
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                           <button
@@ -417,7 +417,7 @@ export const AccountantDashboard: React.FC = () => {
                           {shift.cashDrawer?.name || 'Main POS Drawer'}
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: 700, color: '#059669' }}>
-                          PKR {Number(shift.expectedCash || 0).toLocaleString()}
+                          ₹{Number(shift.expectedCash || 0).toLocaleString()}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <span
@@ -489,7 +489,7 @@ export const AccountantDashboard: React.FC = () => {
                           {exp.expenseDate}
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: 700, color: '#dc2626' }}>
-                          PKR {Number(exp.amount || 0).toLocaleString()}
+                          ₹{Number(exp.amount || 0).toLocaleString()}
                         </td>
                         <td style={{ padding: '12px 14px', textAlign: 'right' }}>
                           <button
@@ -541,7 +541,7 @@ export const AccountantDashboard: React.FC = () => {
                           {j.description}
                         </td>
                         <td style={{ padding: '12px 14px', fontWeight: 700, color: '#059669' }}>
-                          PKR {Number(j.totalDebit || 0).toLocaleString()}
+                          ₹{Number(j.totalDebit || 0).toLocaleString()}
                         </td>
                         <td style={{ padding: '12px 14px' }}>
                           <span
@@ -580,7 +580,7 @@ export const AccountantDashboard: React.FC = () => {
                 <div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Total Cash & Bank Liquidity</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#059669', marginTop: 2 }}>
-                    PKR {accountingMetrics ? accountingMetrics.totalLiquidity.toLocaleString() : '0'}
+                    ₹{accountingMetrics ? accountingMetrics.totalLiquidity.toLocaleString() : '0'}
                   </div>
                 </div>
                 <CreditCard size={24} style={{ color: '#059669' }} />
@@ -590,7 +590,7 @@ export const AccountantDashboard: React.FC = () => {
                 <div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>Current Month Operating Expenses</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#dc2626', marginTop: 2 }}>
-                    PKR {accountingMetrics ? accountingMetrics.totalExpenseMonth.toLocaleString() : '0'}
+                    ₹{accountingMetrics ? accountingMetrics.totalExpenseMonth.toLocaleString() : '0'}
                   </div>
                 </div>
                 <Scale size={24} style={{ color: '#dc2626' }} />
@@ -600,7 +600,7 @@ export const AccountantDashboard: React.FC = () => {
                 <div>
                   <div style={{ fontSize: 12, color: '#166534', fontWeight: 600 }}>Net Monthly Surplus</div>
                   <div style={{ fontSize: 18, fontWeight: 700, color: '#166534', marginTop: 2 }}>
-                    PKR {accountingMetrics ? accountingMetrics.netSurplusMonth.toLocaleString() : '0'}
+                    ₹{accountingMetrics ? accountingMetrics.netSurplusMonth.toLocaleString() : '0'}
                   </div>
                 </div>
                 <TrendingUp size={24} style={{ color: '#166534' }} />
@@ -639,7 +639,7 @@ export const AccountantDashboard: React.FC = () => {
                   justifyContent: 'flex-start',
                 }}
               >
-                <DollarSign size={15} style={{ color: '#10b981' }} />
+                <IndianRupee size={15} style={{ color: '#10b981' }} />
                 <span>Shift Approval</span>
               </button>
 

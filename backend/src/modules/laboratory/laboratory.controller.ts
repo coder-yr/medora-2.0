@@ -18,6 +18,10 @@ import { LaboratoryService } from './laboratory.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ClinicalAccessGuard } from '../../common/guards/clinical-access.guard';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import {
@@ -37,7 +41,8 @@ import { QueryLabCatalogueDto, QueryLabOrdersDto } from './dto/query-lab.dto';
 
 @ApiTags('Laboratory')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, ClinicalAccessGuard)
+@ProtectClinicalAccess()
 @Controller('lab')
 export class LaboratoryController {
   constructor(private readonly labService: LaboratoryService) {}
@@ -130,23 +135,23 @@ export class LaboratoryController {
   @ApiResponse({ status: 201, description: 'Lab order created successfully' })
   async createOrder(@Body() dto: CreateLabOrderDto, @Req() req: any) {
     const userId = req.user?.id ? Number(req.user.id) : 1;
-    return this.labService.createOrder(dto, userId);
+    return this.labService.createOrder(dto, userId, req.user);
   }
 
   @Get('orders')
   @RequirePermissions(HospitalPermission.LAB_VIEW)
   @ApiOperation({ summary: 'List and filter laboratory requisition orders' })
   @ApiResponse({ status: 200, description: 'Paginated laboratory orders' })
-  async getOrders(@Query() query: QueryLabOrdersDto) {
-    return this.labService.getOrders(query);
+  async getOrders(@Query() query: QueryLabOrdersDto, @Req() req: any) {
+    return this.labService.getOrders(query, req.user);
   }
 
   @Get('orders/:id')
   @RequirePermissions(HospitalPermission.LAB_VIEW)
   @ApiOperation({ summary: 'Get complete laboratory order detail with tests and samples' })
   @ApiResponse({ status: 200, description: 'Laboratory order details' })
-  async getOrderById(@Param('id', ParseIntPipe) id: number) {
-    return this.labService.getOrderById(id);
+  async getOrderById(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.labService.getOrderById(id, req.user);
   }
 
   @Post('orders/:id/cancel')
@@ -160,15 +165,15 @@ export class LaboratoryController {
     @Req() req: any,
   ) {
     const userId = req.user?.id ? Number(req.user.id) : 1;
-    return this.labService.cancelOrder(id, dto, userId);
+    return this.labService.cancelOrder(id, dto, userId, req.user);
   }
 
   @Get('patients/:patientId/history')
   @RequirePermissions(HospitalPermission.LAB_VIEW)
   @ApiOperation({ summary: 'Get longitudinal laboratory test history for a patient' })
   @ApiResponse({ status: 200, description: 'Patient laboratory test history' })
-  async getPatientHistory(@Param('patientId', ParseIntPipe) patientId: number) {
-    return this.labService.getPatientHistory(patientId);
+  async getPatientHistory(@Param('patientId', ParseIntPipe) patientId: number, @Req() req: any) {
+    return this.labService.getPatientHistory(patientId, req.user);
   }
 
   // ===========================================================================

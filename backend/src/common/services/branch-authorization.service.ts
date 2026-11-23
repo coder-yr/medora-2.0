@@ -14,44 +14,49 @@ export class BranchAuthorizationService {
 
   isGlobalAdmin(user: AuthUser): boolean {
     if (!user) return false;
-    if (user.group === 'SuperAdmin') return true;
-    if (
-      Array.isArray(user.permissions) &&
-      (user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL) ||
-        user.permissions.includes('*'))
-    ) {
-      return true;
-    }
-    if (user.group === 'Admin' && (!user.branchId || user.branchId === null)) {
-      return true;
-    }
-    return false;
+    // Strict invariant: Global platform administration requires server-verified isSuperAdmin = true
+    return Boolean(
+      user.isSuperAdmin === true &&
+        (user.group === 'SuperAdmin' ||
+          (Array.isArray(user.permissions) && user.permissions.includes('*'))),
+    );
   }
 
   async resolveAccessibleBranchIds(user: AuthUser): Promise<bigint[] | null> {
     if (this.isGlobalAdmin(user)) {
-      return null; // Null indicates unrestricted hospital-wide access
+      return null; // Null indicates unrestricted platform-wide access
     }
 
     const userId = BigInt(user.id);
+    const userOrgId = user.organizationId ? BigInt(user.organizationId) : null;
+
     const memberships = await this.prisma.userBranchMembership.findMany({
       where: {
         userId,
         isActive: true,
-        branch: { active: true, deletedAt: null },
+        branch: {
+          active: true,
+          deletedAt: null,
+          ...(userOrgId ? { organizationId: userOrgId } : {}),
+        },
       },
       select: { branchId: true },
     });
 
-    const branchIds = memberships.map((m) => m.branchId);
+    const branchIds = (memberships || []).map((m) => m.branchId);
 
-    // If user has a home branchId, ensure it's not explicitly revoked and is active
+    // If user has a home branchId, ensure it belongs to user's organization, not revoked, and active
     if (user.branchId) {
       const homeId = BigInt(user.branchId);
       if (!branchIds.some((id) => id === homeId)) {
         const [homeBranch, revoked] = await Promise.all([
           this.prisma.hospitalBranch.findFirst({
-            where: { id: homeId, active: true, deletedAt: null },
+            where: {
+              id: homeId,
+              active: true,
+              deletedAt: null,
+              ...(userOrgId ? { organizationId: userOrgId } : {}),
+            },
             select: { id: true },
           }),
           this.prisma.userBranchMembership.findFirst({
@@ -94,6 +99,25 @@ export class BranchAuthorizationService {
       return branchIdBigInt;
     }
 
+    // Tenant boundary enforcement
+    const branch = await this.prisma.hospitalBranch.findFirst({
+      where: { id: branchIdBigInt, deletedAt: null },
+      select: { id: true, active: true, name: true, organizationId: true },
+    });
+    if (!branch) {
+      throw new NotFoundException(`Hospital branch #${branchIdBigInt} not found`);
+    }
+
+    if (
+      user.organizationId &&
+      branch.organizationId &&
+      branch.organizationId !== BigInt(user.organizationId)
+    ) {
+      throw new ForbiddenException(
+        `Cross-organization access denied. Branch #${branchIdBigInt} belongs to a different organization.`,
+      );
+    }
+
     const accessible = await this.resolveAccessibleBranchIds(user);
     if (!accessible || !accessible.some((id) => id === branchIdBigInt)) {
       throw new ForbiddenException(
@@ -109,13 +133,33 @@ export class BranchAuthorizationService {
     resourceBranchId: bigint | number | string | null | undefined,
     resourceLabel = 'Resource',
   ): Promise<void> {
+    if (this.isGlobalAdmin(user)) {
+      return;
+    }
+
     if (!resourceBranchId) {
-      return; // Global or unscoped resource
+      // Legacy branchless records belong exclusively to Organization #1 (primary host)
+      if (user.organizationId && BigInt(user.organizationId) !== 1n) {
+        throw new ForbiddenException(
+          `Cross-tenant access denied: Unscoped legacy records are not accessible by secondary organizations.`,
+        );
+      }
+      return;
     }
 
     const branchId = BigInt(resourceBranchId);
-    if (this.isGlobalAdmin(user)) {
-      return;
+
+    // Verify branch belongs to user's organization
+    if (user.organizationId) {
+      const branch = await this.prisma.hospitalBranch.findUnique({
+        where: { id: branchId },
+        select: { organizationId: true },
+      });
+      if (branch?.organizationId && branch.organizationId !== BigInt(user.organizationId)) {
+        throw new ForbiddenException(
+          `Cross-tenant access denied: ${resourceLabel} belongs to another organization.`,
+        );
+      }
     }
 
     const accessible = await this.resolveAccessibleBranchIds(user);

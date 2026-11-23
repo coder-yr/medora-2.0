@@ -726,7 +726,7 @@ export function InpatientWorkspace({
                 <option value="all">All Wards / Categories</option>
                 {wards.map((w) => (
                   <option key={String(w.id)} value={String(w.id)}>
-                    {w.category || w.name} (PKR {w.baseRate}/day)
+                    {w.category || w.name} (₹{w.baseRate}/day)
                   </option>
                 ))}
               </select>
@@ -1102,7 +1102,7 @@ export function InpatientWorkspace({
                       {w.code || '—'}
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0284c7' }}>
-                      PKR {Number(w.baseRate).toLocaleString()} / {w.billingUnit}
+                      ₹{Number(w.baseRate).toLocaleString()} / {w.billingUnit}
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <span style={{ fontWeight: 600 }}>{w.totalBeds || 0} beds</span>
@@ -1299,7 +1299,7 @@ export function InpatientWorkspace({
                     <option value="">-- Choose Vacant Bed --</option>
                     {availableBeds.map((b) => {
                       const cleanCategory = (b.category?.category || 'Ward').replace(/_\d{10,}/g, '').replace(/\s+\d{10,}/g, '');
-                      const rate = b.category?.baseRate ? ` • PKR ${Number(b.category.baseRate).toLocaleString()}/day` : '';
+                      const rate = b.category?.baseRate ? ` • ₹${Number(b.category.baseRate).toLocaleString()}/day` : '';
                       return (
                         <option key={String(b.id)} value={String(b.id)}>
                           Bed {b.number} — {cleanCategory}{rate}
@@ -1406,7 +1406,7 @@ export function InpatientWorkspace({
                   <option value="">-- Choose New Bed --</option>
                   {availableBeds.map((b) => {
                     const cleanCategory = (b.category?.category || 'Ward').replace(/_\d{10,}/g, '').replace(/\s+\d{10,}/g, '');
-                    const rate = b.category?.baseRate ? ` • PKR ${Number(b.category.baseRate).toLocaleString()}/day` : '';
+                    const rate = b.category?.baseRate ? ` • ₹${Number(b.category.baseRate).toLocaleString()}/day` : '';
                     return (
                       <option key={String(b.id)} value={String(b.id)}>
                         Bed {b.number} — {cleanCategory}{rate}
@@ -1548,19 +1548,19 @@ export function InpatientWorkspace({
               <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total Accrued Charges</span>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>
-                  PKR {Number(activeFolio.totalCharges).toLocaleString()}
+                  ₹{Number(activeFolio.totalCharges).toLocaleString()}
                 </div>
               </div>
               <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Total Amount Paid</span>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#10b981' }}>
-                  PKR {Number(activeFolio.totalPaid).toLocaleString()}
+                  ₹{Number(activeFolio.totalPaid).toLocaleString()}
                 </div>
               </div>
               <div style={{ padding: 12, background: '#f8fafc', borderRadius: 6 }}>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Outstanding Balance</span>
                 <div style={{ fontSize: 20, fontWeight: 700, color: '#e11d48' }}>
-                  PKR {Number(activeFolio.balance).toLocaleString()}
+                  ₹{Number(activeFolio.balance).toLocaleString()}
                 </div>
               </div>
             </div>
@@ -1580,7 +1580,7 @@ export function InpatientWorkspace({
                       fontWeight: 500,
                     }}
                   >
-                    {cat}: PKR {Number(amt).toLocaleString()}
+                    {cat}: ₹{Number(amt).toLocaleString()}
                   </span>
                 ))}
               </div>
@@ -1614,8 +1614,8 @@ export function InpatientWorkspace({
                       <td style={{ padding: 8, fontWeight: 600 }}>{item.sourceModule}</td>
                       <td style={{ padding: 8 }}>{item.description}</td>
                       <td style={{ padding: 8 }}>{item.quantity}</td>
-                      <td style={{ padding: 8 }}>PKR {Number(item.unitPrice).toLocaleString()}</td>
-                      <td style={{ padding: 8, fontWeight: 600 }}>PKR {Number(item.totalAmount).toLocaleString()}</td>
+                      <td style={{ padding: 8 }}>₹{Number(item.unitPrice).toLocaleString()}</td>
+                      <td style={{ padding: 8, fontWeight: 600 }}>₹{Number(item.totalAmount).toLocaleString()}</td>
                       <td style={{ padding: 8 }}>
                         {item.isReversed ? (
                           <span style={{ color: '#e11d48', fontSize: 11, fontWeight: 600 }}>REVERSED</span>
@@ -1802,7 +1802,7 @@ export function InpatientWorkspace({
                 />
               </div>
               <div className="form-group" style={{ marginBottom: 12 }}>
-                <label className="form-label">Daily Base Rate (PKR)</label>
+                <label className="form-label">Daily Base Rate (₹)</label>
                 <input
                   type="number"
                   className="form-input"

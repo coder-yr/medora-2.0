@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PERMISSIONS_KEY } from '../decorators/permissions.decorator';
 import { AuthUser } from '../types/auth-user.interface';
@@ -20,7 +20,7 @@ export class PermissionsGuard implements CanActivate {
     const { user } = context.switchToHttp().getRequest<{ user?: AuthUser }>();
 
     if (!user) {
-      throw new ForbiddenException('User context is missing');
+      throw new UnauthorizedException('User context is missing');
     }
 
     // Role-based administrative access:

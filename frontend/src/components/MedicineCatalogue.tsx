@@ -789,11 +789,11 @@ export function MedicineCatalogue({
                       </td>
                       <td>
                         <div>
-                          <strong>PKR {med.sPrice != null ? Number(med.sPrice).toFixed(2) : '—'}</strong>
+                          <strong>₹{med.sPrice != null ? Number(med.sPrice).toFixed(2) : '—'}</strong>
                         </div>
                         {med.price != null && Number(med.price) > 0 && (
                           <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                            Cost: PKR {Number(med.price).toFixed(2)}
+                            Cost: ₹{Number(med.price).toFixed(2)}
                           </div>
                         )}
                       </td>
@@ -1232,13 +1232,13 @@ export function MedicineCatalogue({
               <div>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Retail Sale Price</span>
                 <div style={{ fontWeight: 600, color: 'var(--success)' }}>
-                  PKR {viewMedicine.sPrice != null ? Number(viewMedicine.sPrice).toFixed(2) : '—'}
+                  ₹{viewMedicine.sPrice != null ? Number(viewMedicine.sPrice).toFixed(2) : '—'}
                 </div>
               </div>
               <div>
                 <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Hospital Cost Price</span>
                 <div style={{ fontWeight: 600 }}>
-                  PKR {viewMedicine.price != null ? Number(viewMedicine.price).toFixed(2) : '—'}
+                  ₹{viewMedicine.price != null ? Number(viewMedicine.price).toFixed(2) : '—'}
                 </div>
               </div>
             </div>
@@ -1400,7 +1400,7 @@ export function MedicineCatalogue({
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Cost Price (PKR)</label>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Cost Price (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -1411,7 +1411,7 @@ export function MedicineCatalogue({
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Retail Sale Price (PKR)</label>
+                  <label style={{ fontSize: '12px', fontWeight: 600 }}>Retail Sale Price (₹)</label>
                   <input
                     type="number"
                     step="0.01"

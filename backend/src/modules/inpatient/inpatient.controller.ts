@@ -23,6 +23,8 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { RequireEntitlement } from '../../common/decorators/entitlement.decorator';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../common/types/auth-user.interface';
@@ -41,6 +43,8 @@ import { QueryAdmissionDto, QueryBedDto } from './dto/query.dto';
 @ApiTags('Inpatient & Bed Management (IPD)')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@RequireEntitlement('inpatient')
+@ProtectClinicalAccess()
 @Controller('inpatient')
 export class InpatientController {
   constructor(private readonly inpatientService: InpatientService) {}
@@ -54,10 +58,11 @@ export class InpatientController {
   @ApiOperation({ summary: 'Get operational inpatient KPIs and bed occupancy statistics' })
   @ApiResponse({ status: 200, description: 'Occupancy rate, counts by bed status, active stays' })
   async getDashboard(@CurrentUser() user?: AuthUser) {
-    const isGlobalAdmin =
-      user?.group === 'Admin' ||
-      (Array.isArray(user?.permissions) &&
-        user.permissions.includes(HospitalPermission.BRANCH_VIEW_ALL));
+    const isGlobalAdmin = Boolean(
+      user?.isSuperAdmin === true &&
+        (user?.group === 'SuperAdmin' ||
+          (Array.isArray(user?.permissions) && user.permissions.includes('*'))),
+    );
     const branchId = user?.branchId ? BigInt(user.branchId) : null;
     return this.inpatientService.getDashboardMetrics(branchId, isGlobalAdmin);
   }

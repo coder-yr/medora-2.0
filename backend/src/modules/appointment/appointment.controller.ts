@@ -25,6 +25,8 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ClinicalAccessGuard } from '../../common/guards/clinical-access.guard';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthUser } from '../../common/types/auth-user.interface';
 import { AppointmentService } from './appointment.service';
@@ -39,7 +41,8 @@ import { UpdateAppointmentDto } from './dto/update-appointment.dto';
 
 @ApiTags('Appointments')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, ClinicalAccessGuard)
+@ProtectClinicalAccess()
 @Controller('appointments')
 export class AppointmentController {
   constructor(private readonly appointmentService: AppointmentService) {}
@@ -130,8 +133,11 @@ export class AppointmentController {
     type: AppointmentResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Appointment not found.' })
-  async findOne(@Param('id') id: string): Promise<AppointmentResponseDto> {
-    return this.appointmentService.findOne(id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    return this.appointmentService.findOne(id, user);
   }
 
   @Patch(':id')

@@ -892,7 +892,7 @@ export function RadiologyWorkspace({ token, userRole }: Props) {
                         </td>
                         <td className="py-3 px-4 text-slate-400">{exam.category?.name || 'General'}</td>
                         <td className="py-3 px-4 font-mono text-emerald-400">
-                          ${exam.price !== null && exam.price !== undefined ? Number(exam.price).toFixed(2) : '0.00'}
+                          ₹{exam.price !== null && exam.price !== undefined ? Number(exam.price).toFixed(2) : '0.00'}
                         </td>
                         <td className="py-3 px-4 text-slate-400 font-mono">{exam.turnaroundHours || 24}h</td>
                         <td className="py-3 px-4 text-slate-400 max-w-xs truncate">
@@ -1666,7 +1666,7 @@ export function RadiologyWorkspace({ token, userRole }: Props) {
                         />
                         <span className="font-mono text-cyan-400">{exam.code}</span>
                         <span className="text-slate-200 flex-1">{exam.name}</span>
-                        <span className="text-emerald-400 font-mono">${Number(exam.price || 0).toFixed(2)}</span>
+                        <span className="text-emerald-400 font-mono">₹{Number(exam.price || 0).toFixed(2)}</span>
                       </label>
                     );
                   })}
@@ -1890,7 +1890,7 @@ export function RadiologyWorkspace({ token, userRole }: Props) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-400 mb-1">Price ($)</label>
+                  <label className="block text-slate-400 mb-1">Price (₹)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -2080,7 +2080,7 @@ export function RadiologyWorkspace({ token, userRole }: Props) {
               </button>
             </div>
             <p><span className="text-slate-400">Modality:</span> <span className="uppercase font-mono text-indigo-400 font-bold">{selectedExam.modality}</span></p>
-            <p><span className="text-slate-400">Price:</span> <span className="text-emerald-400 font-mono font-bold">${Number(selectedExam.price || 0).toFixed(2)}</span></p>
+            <p><span className="text-slate-400">Price:</span> <span className="text-emerald-400 font-mono font-bold">₹{Number(selectedExam.price || 0).toFixed(2)}</span></p>
             <p><span className="text-slate-400">Turnaround:</span> {selectedExam.turnaroundHours || 24} hours</p>
             <p><span className="text-slate-400">Preparation:</span> {selectedExam.preparationInstructions || 'Standard procedure preparation.'}</p>
             {selectedExam.reportTemplate && (

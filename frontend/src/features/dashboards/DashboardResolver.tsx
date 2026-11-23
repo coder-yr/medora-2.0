@@ -21,8 +21,8 @@ export const DashboardResolver: React.FC = () => {
     return <SuperAdminDashboard />;
   }
 
-  // 2. Hospital Admin: Branch Operations Administration
-  if (userRole === 'Hospital Admin') {
+  // 2. Hospital & Organization Admin: Operations & Staff Administration
+  if (userRole === 'Hospital Admin' || userRole === 'Organization Admin' || userRole === 'Clinic Admin') {
     return <HospitalAdminDashboard />;
   }
 

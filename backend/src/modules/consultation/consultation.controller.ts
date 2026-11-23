@@ -24,6 +24,8 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ClinicalAccessGuard } from '../../common/guards/clinical-access.guard';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
 import { ConsultationService } from './consultation.service';
 import { CreateConsultTemplateDto } from './dto/consult-template.dto';
 import { ConsultationQueryDto } from './dto/consultation-query.dto';
@@ -37,7 +39,8 @@ import { SaveConsultationDto } from './dto/save-consultation.dto';
 
 @ApiTags('Consultations')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, ClinicalAccessGuard)
+@ProtectClinicalAccess()
 @Controller('consultations')
 export class ConsultationController {
   constructor(private readonly consultationService: ConsultationService) {}

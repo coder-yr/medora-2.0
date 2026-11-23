@@ -1,9 +1,15 @@
 import React from 'react';
 import { ShieldAlert, LogOut, RefreshCw } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
+import { resolveUserRole } from '../../../app/role-resolution';
 
 export const UnconfiguredRoleView: React.FC = () => {
   const { currentUser, userRole, handleLogout, refreshIdentity } = useAuth();
+
+  const handleCheckPermissions = () => {
+    // Revalidates identity and permissions against the server
+    void refreshIdentity();
+  };
 
   return (
     <div
@@ -67,7 +73,7 @@ export const UnconfiguredRoleView: React.FC = () => {
 
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
         <button
-          onClick={() => void refreshIdentity()}
+          onClick={handleCheckPermissions}
           className="btn btn-secondary"
           style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px', fontSize: 13 }}
         >

@@ -86,7 +86,7 @@ export class CreateRadiologyExamDto {
   @IsOptional()
   paymentCategoryId?: number;
 
-  @ApiPropertyOptional({ description: 'Service charge in PKR' })
+  @ApiPropertyOptional({ description: 'Service charge in INR' })
   @IsNumber()
   @Min(0)
   @IsOptional()

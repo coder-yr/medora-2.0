@@ -3,7 +3,7 @@ import {
   Users,
   Calendar,
   BedDouble,
-  DollarSign,
+  IndianRupee,
   AlertTriangle,
   RefreshCw,
   GitBranch,
@@ -378,13 +378,13 @@ export const DashboardWorkspace: React.FC<DashboardWorkspaceProps> = ({
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ fontSize: 12, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase' }}>Recognized Revenue</span>
-                  <DollarSign size={18} style={{ color: '#d97706' }} />
+                  <IndianRupee size={18} style={{ color: '#d97706' }} />
                 </div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: '#111827', marginTop: 8 }}>
-                  ${overview.financial.recognizedRevenue.toLocaleString()}
+                  ₹{overview.financial.recognizedRevenue.toLocaleString()}
                 </div>
                 <div style={{ fontSize: 12, color: '#4b5563', marginTop: 4 }}>
-                  Cash Collections: ${overview.financial.cashCollections.toLocaleString()}
+                  Cash Collections: ₹{overview.financial.cashCollections.toLocaleString()}
                 </div>
               </div>
             ) : (

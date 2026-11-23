@@ -9,7 +9,8 @@ import {
   Microscope,
   Radio,
   BedDouble,
-  DollarSign,
+  IndianRupee,
+  IndianRupee as DollarSign,
   Building2,
   UserCheck,
   FileText,
@@ -144,7 +145,7 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     id: 'cashier',
     label: 'Cashier & Shifts (POS)',
     path: '/cashier',
-    icon: DollarSign,
+    icon: IndianRupee,
     category: 'Inpatient & Billing',
     requiredPermissions: ['cashier_view'],
     order: 11,
@@ -259,6 +260,8 @@ export interface RoleDepartmentMeta {
 export const ROLE_DEPARTMENT_META: Record<string, RoleDepartmentMeta> = {
   'Super Admin': { badge: 'GLOBAL GOVERNANCE', subtext: 'Hospital Network Federation' },
   'Hospital Admin': { badge: 'FACILITY OPERATIONS', subtext: 'Campus Administrative Core' },
+  'Organization Admin': { badge: 'ORGANIZATION ADMIN', subtext: 'Tenant Operations & Staff' },
+  'Clinic Admin': { badge: 'CLINICAL FACILITY', subtext: 'Ambulatory Care Administration' },
   'Doctor': { badge: 'CLINICAL SERVICES', subtext: 'Consultant & OPD Workstation' },
   'Receptionist': { badge: 'PATIENT ACCESS', subtext: 'Front Desk & Ambulatory Registration' },
   'Nurse': { badge: 'INPATIENT CARE', subtext: 'Ward Station & Bedside Nursing' },
@@ -286,10 +289,17 @@ export const ROLE_NAVIGATION_CONFIG: Record<string, RoleNavigationSection[]> = {
           requiredPermissions: ['dashboard_view'],
         },
         {
+          id: 'platform-governance',
+          label: 'Platform Organizations',
+          path: '/platform',
+          icon: Building2,
+          requiredPermissions: [],
+        },
+        {
           id: 'hospital-network',
           label: 'Hospital Network',
           path: '/settings',
-          icon: Building2,
+          icon: Sliders,
           requiredPermissions: ['hospital_settings_view'],
         },
         {
@@ -381,6 +391,13 @@ export const ROLE_NAVIGATION_CONFIG: Record<string, RoleNavigationSection[]> = {
           label: 'Hospital Staff Directory',
           path: '/staff',
           icon: UserCheck,
+          requiredPermissions: ['staff_view'],
+        },
+        {
+          id: 'staff-management',
+          label: 'Staff Onboarding & Access',
+          path: '/staff-management',
+          icon: Users,
           requiredPermissions: ['staff_view'],
         },
         {
@@ -581,7 +598,7 @@ export const ROLE_NAVIGATION_CONFIG: Record<string, RoleNavigationSection[]> = {
           id: 'rec-cashier',
           label: 'Front Desk Cashier Till',
           path: '/cashier',
-          icon: DollarSign,
+          icon: IndianRupee,
           requiredPermissions: ['cashier_view'],
         },
       ],
@@ -765,14 +782,14 @@ export const ROLE_NAVIGATION_CONFIG: Record<string, RoleNavigationSection[]> = {
           id: 'cash-dashboard',
           label: 'Cashier Till Dashboard',
           path: '/dashboard',
-          icon: DollarSign,
+          icon: IndianRupee,
           requiredPermissions: ['dashboard_view'],
         },
         {
           id: 'cash-shift',
           label: 'Active Shift & Drawer Till',
           path: '/cashier',
-          icon: DollarSign,
+          icon: IndianRupee,
           requiredPermissions: ['cashier_view'],
         },
         {
@@ -825,7 +842,7 @@ export const ROLE_NAVIGATION_CONFIG: Record<string, RoleNavigationSection[]> = {
           id: 'acc-cashier',
           label: 'Cashier Shift Supervisor Sign-off',
           path: '/cashier',
-          icon: DollarSign,
+          icon: IndianRupee,
           requiredPermissions: ['cashier_view'],
         },
       ],
@@ -1121,7 +1138,7 @@ export const ROLE_QUICK_ACTIONS: Record<string, RoleQuickAction[]> = {
       id: 'cash-shift',
       label: 'Open Cash Drawer Shift',
       path: '/cashier',
-      icon: DollarSign,
+      icon: IndianRupee,
       color: '#059669',
       requiredPermission: 'cashier_view',
     },
@@ -1156,7 +1173,7 @@ export const ROLE_QUICK_ACTIONS: Record<string, RoleQuickAction[]> = {
       id: 'acc-audit',
       label: 'Audit Cashier Shift Drawer',
       path: '/cashier',
-      icon: DollarSign,
+      icon: IndianRupee,
       color: '#16a34a',
       requiredPermission: 'cashier_view',
     },
@@ -1197,3 +1214,10 @@ export const ROLE_QUICK_ACTIONS: Record<string, RoleQuickAction[]> = {
     },
   ],
 };
+
+// Aliases for Organization and Clinic Administration
+ROLE_NAVIGATION_CONFIG['Organization Admin'] = ROLE_NAVIGATION_CONFIG['Hospital Admin'];
+ROLE_NAVIGATION_CONFIG['Clinic Admin'] = ROLE_NAVIGATION_CONFIG['Hospital Admin'];
+
+ROLE_QUICK_ACTIONS['Organization Admin'] = ROLE_QUICK_ACTIONS['Hospital Admin'];
+ROLE_QUICK_ACTIONS['Clinic Admin'] = ROLE_QUICK_ACTIONS['Hospital Admin'];

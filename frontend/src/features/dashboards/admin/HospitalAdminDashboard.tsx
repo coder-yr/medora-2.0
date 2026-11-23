@@ -7,7 +7,7 @@ import {
   BedDouble,
   CreditCard,
   Building2,
-  DollarSign,
+  IndianRupee,
   Boxes,
   Microscope,
   UserCheck,
@@ -251,8 +251,8 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 5. Recognized Revenue */}
           <DashboardMetricCard
             title="Recognized Revenue"
-            value={overview?.financial ? `PKR ${overview.financial.recognizedRevenue.toLocaleString()}` : 'PKR 0'}
-            subtext={`PKR ${(overview?.financial?.cashCollections || 0).toLocaleString()} collected cash`}
+            value={overview?.financial ? `₹${overview.financial.recognizedRevenue.toLocaleString()}` : '₹0'}
+            subtext={`₹${(overview?.financial?.cashCollections || 0).toLocaleString()} collected cash`}
             icon={CreditCard}
             variant="purple"
             onClick={() => navigate('/billing')}
@@ -261,9 +261,9 @@ export const HospitalAdminDashboard: React.FC = () => {
           {/* 6. Outstanding Receivables */}
           <DashboardMetricCard
             title="Accounts Receivable"
-            value={overview?.financial ? `PKR ${overview.financial.accountsReceivable.toLocaleString()}` : 'PKR 0'}
+            value={overview?.financial ? `₹${overview.financial.accountsReceivable.toLocaleString()}` : '₹0'}
             subtext="Unsettled patient invoices"
-            icon={DollarSign}
+            icon={IndianRupee}
             variant="rose"
             onClick={() => navigate('/billing')}
           />

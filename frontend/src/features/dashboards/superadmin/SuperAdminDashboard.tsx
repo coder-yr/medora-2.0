@@ -9,7 +9,7 @@ import {
   Layers,
   FileText,
   Bell,
-  DollarSign,
+  IndianRupee,
 } from 'lucide-react';
 import { useAuth } from '../../../context/AuthContext';
 import { DashboardHeader } from '../components/DashboardHeader';
@@ -219,9 +219,9 @@ export const SuperAdminDashboard: React.FC = () => {
           />
           <DashboardMetricCard
             title="Network Gross Revenue"
-            value={`PKR ${(overview?.financial?.recognizedRevenue || totalNetworkRevenue || 0).toLocaleString()}`}
+            value={`₹${(overview?.financial?.recognizedRevenue || totalNetworkRevenue || 0).toLocaleString()}`}
             subtext="Consolidated recognized billings"
-            icon={DollarSign}
+            icon={IndianRupee}
             variant="emerald"
             onClick={() => navigate('/accounting')}
           />
@@ -295,10 +295,10 @@ export const SuperAdminDashboard: React.FC = () => {
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>{appointments.toLocaleString()}</td>
                       <td style={{ padding: '10px 14px', textAlign: 'right' }}>{admissions.toLocaleString()}</td>
                       <td style={{ padding: '10px 14px', textAlign: 'right', fontWeight: 600 }}>
-                        PKR {grossRev.toLocaleString()}
+                        ₹{grossRev.toLocaleString()}
                       </td>
                       <td style={{ padding: '10px 14px', textAlign: 'right', color: '#16a34a', fontWeight: 600 }}>
-                        PKR {netRev.toLocaleString()}
+                        ₹{netRev.toLocaleString()}
                       </td>
                     </tr>
                   );

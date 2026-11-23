@@ -2,8 +2,11 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { CreatePrescriptionDto, PrescriptionItemDto } from './dto/create-prescription.dto';
 import { PrescriptionQueryDto } from './dto/prescription-query.dto';
 import {
@@ -23,7 +26,10 @@ interface CleanedItem {
 
 @Injectable()
 export class PrescriptionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   /**
    * Search hospital medicine catalog for autocomplete when writing prescriptions
@@ -82,7 +88,7 @@ export class PrescriptionService {
   /**
    * Returns a paginated list of prescriptions filterable by patient, doctor, and drug name
    */
-  async findAll(query: PrescriptionQueryDto): Promise<PaginatedPrescriptionsDto> {
+  async findAll(query: PrescriptionQueryDto, user?: AuthUser): Promise<PaginatedPrescriptionsDto> {
     const page = Math.max(1, query.page || 1);
     const limit = Math.min(100, Math.max(1, query.limit || 25));
     const skip = (page - 1) * limit;
@@ -107,6 +113,23 @@ export class PrescriptionService {
           },
         },
       };
+    }
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+      if (isOrg1) {
+        where.patient = {
+          OR: [
+            { branchId: { in: accessibleBranches || [] } },
+            { branchId: null },
+          ],
+        };
+      } else {
+        where.patient = {
+          branchId: { in: accessibleBranches || [] },
+        };
+      }
     }
 
     const [total, records] = await Promise.all([
@@ -153,7 +176,7 @@ export class PrescriptionService {
   /**
    * Retrieve a single prescription with items and clinician metadata
    */
-  async findById(id: number | bigint): Promise<PrescriptionResponseDto> {
+  async findById(id: number | bigint, user?: AuthUser): Promise<PrescriptionResponseDto> {
     const prescription = await this.prisma.prescription.findUnique({
       where: { id: BigInt(id) },
       include: {
@@ -163,6 +186,7 @@ export class PrescriptionService {
             name: true,
             patientId: true,
             phone: true,
+            branchId: true,
           },
         },
         doctor: {
@@ -182,19 +206,27 @@ export class PrescriptionService {
       throw new NotFoundException(`Prescription #${id} not found.`);
     }
 
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, prescription.patient?.branchId, 'prescription');
+    }
+
     return this.mapToResponse(prescription);
   }
 
   /**
    * Create a new prescription with relational line items and synced legacy summary
    */
-  async create(dto: CreatePrescriptionDto): Promise<PrescriptionResponseDto> {
+  async create(dto: CreatePrescriptionDto, user?: AuthUser): Promise<PrescriptionResponseDto> {
     // 1. Verify patient exists
     const patient = await this.prisma.patient.findUnique({
       where: { id: BigInt(dto.patientId) },
     });
     if (!patient) {
       throw new NotFoundException(`Patient #${dto.patientId} does not exist.`);
+    }
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, patient.branchId, 'prescription patient');
     }
 
     // 2. Verify doctor exists
@@ -275,13 +307,9 @@ export class PrescriptionService {
   async update(
     id: number | bigint,
     dto: UpdatePrescriptionDto,
+    user?: AuthUser,
   ): Promise<PrescriptionResponseDto> {
-    const existing = await this.prisma.prescription.findUnique({
-      where: { id: BigInt(id) },
-    });
-    if (!existing) {
-      throw new NotFoundException(`Prescription #${id} not found.`);
-    }
+    const existing = await this.findById(id, user);
 
     if (dto.patientId) {
       const patient = await this.prisma.patient.findUnique({
@@ -289,6 +317,9 @@ export class PrescriptionService {
       });
       if (!patient) {
         throw new NotFoundException(`Patient #${dto.patientId} does not exist.`);
+      }
+      if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+        await this.branchAuth.assertResourceAccess(user, patient.branchId, 'prescription patient');
       }
     }
 
@@ -380,13 +411,8 @@ export class PrescriptionService {
   /**
    * Delete a prescription and its associated line items
    */
-  async remove(id: number | bigint): Promise<{ success: boolean; message: string }> {
-    const existing = await this.prisma.prescription.findUnique({
-      where: { id: BigInt(id) },
-    });
-    if (!existing) {
-      throw new NotFoundException(`Prescription #${id} not found.`);
-    }
+  async remove(id: number | bigint, user?: AuthUser): Promise<{ success: boolean; message: string }> {
+    const existing = await this.findById(id, user);
 
     await this.prisma.$transaction(
       async (tx) => {

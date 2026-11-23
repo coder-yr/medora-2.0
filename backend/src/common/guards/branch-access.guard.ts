@@ -5,6 +5,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../modules/prisma/prisma.service';
@@ -19,7 +20,7 @@ export class BranchAccessGuard implements CanActivate {
   constructor(
     private readonly prisma: PrismaService,
     private readonly reflector: Reflector,
-  ) {}
+  ) { }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // 1. Bypass on public endpoints
@@ -51,7 +52,7 @@ export class BranchAccessGuard implements CanActivate {
     const user: AuthUser = req.user;
 
     if (!user) {
-      throw new ForbiddenException('User context is missing');
+      throw new UnauthorizedException('User context is missing');
     }
 
     // 3. Resolve candidate branch ID from Header, Query, Params, or Body

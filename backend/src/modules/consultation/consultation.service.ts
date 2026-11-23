@@ -484,10 +484,10 @@ export class ConsultationService {
       throw new NotFoundException(`Consultation #${idStr} not found.`);
     }
 
-    if (this.branchAuth && user && found.appointment?.branchId) {
+    if (this.branchAuth && user) {
       await this.branchAuth.assertResourceAccess(
         user,
-        String(found.appointment.branchId),
+        found.appointment?.branchId ? String(found.appointment.branchId) : null,
         'consultation',
       );
     }

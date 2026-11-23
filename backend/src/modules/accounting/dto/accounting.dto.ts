@@ -94,7 +94,7 @@ export class CreateAccountDto {
   @IsOptional()
   allowManualPosting?: boolean;
 
-  @ApiPropertyOptional({ description: 'Currency code', default: 'PKR' })
+  @ApiPropertyOptional({ description: 'Currency code', default: 'INR' })
   @IsString()
   @IsOptional()
   currency?: string;
@@ -481,7 +481,7 @@ export class CreateExpenseDto {
   @IsNotEmpty()
   description!: string;
 
-  @ApiProperty({ description: 'Expense amount (PKR)', example: 15000.0 })
+  @ApiProperty({ description: 'Expense amount (INR)', example: 15000.0 })
   @IsNumber()
   @IsPositive()
   @Type(() => Number)

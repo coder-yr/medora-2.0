@@ -26,7 +26,7 @@ export class PurchaseOrderItemDto {
   @Min(1)
   quantityOrdered!: number;
 
-  @ApiProperty({ description: 'Agreed unit cost in PKR', example: 15.0 })
+  @ApiProperty({ description: 'Agreed unit cost in INR', example: 15.0 })
   @Type(() => Number)
   @IsNumber()
   @Min(0)
@@ -53,6 +53,12 @@ export class CreatePurchaseOrderDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Target hospital branch ID' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  branchId?: number;
 
   @ApiProperty({ description: 'Order line items', type: [PurchaseOrderItemDto] })
   @IsArray()
@@ -95,13 +101,13 @@ export class GoodsReceiptItemDto {
   @Min(1)
   quantityReceived!: number;
 
-  @ApiProperty({ description: 'Invoiced unit cost in PKR', example: 15.0 })
+  @ApiProperty({ description: 'Invoiced unit cost in INR', example: 15.0 })
   @Type(() => Number)
   @IsNumber()
   @Min(0)
   unitCost!: number;
 
-  @ApiPropertyOptional({ description: 'Target patient retail price in PKR' })
+  @ApiPropertyOptional({ description: 'Target patient retail price in INR' })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -135,6 +141,12 @@ export class CreateGoodsReceiptDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Target hospital branch ID' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  branchId?: number;
 
   @ApiProperty({ description: 'Delivered batch line items', type: [GoodsReceiptItemDto] })
   @IsArray()

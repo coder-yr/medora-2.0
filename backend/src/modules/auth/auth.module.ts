@@ -8,6 +8,8 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { AccountLockoutService } from './account-lockout.service';
 import { PasswordResetService } from './password-reset.service';
 
+import { MfaService } from './mfa.service';
+
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -32,11 +34,13 @@ import { PasswordResetService } from './password-reset.service';
     JwtStrategy,
     AccountLockoutService,
     PasswordResetService,
+    MfaService,
   ],
   exports: [
     AuthService,
     AccountLockoutService,
     PasswordResetService,
+    MfaService,
     PassportModule,
     JwtModule,
   ],

@@ -172,7 +172,7 @@ export class AccountingService {
         accountSubType: dto.accountSubType,
         parentAccountId: dto.parentAccountId ? BigInt(dto.parentAccountId) : null,
         allowManualPosting: dto.allowManualPosting ?? true,
-        currency: dto.currency || 'PKR',
+        currency: dto.currency || 'INR',
         branchId: dto.branchId ? BigInt(dto.branchId) : null,
         isSystemAccount: false,
       },

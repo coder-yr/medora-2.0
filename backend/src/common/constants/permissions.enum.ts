@@ -257,6 +257,23 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<HospitalRole, string[]> = {
       p !== HospitalPermission.BRANCH_CREATE &&
       p !== HospitalPermission.BRANCH_DEACTIVATE,
   ),
+  OrganizationAdmin: Object.values(HospitalPermission).filter(
+    (p) =>
+      p !== HospitalPermission.BRANCH_VIEW_ALL &&
+      p !== HospitalPermission.BACKUP_MANAGE &&
+      p !== HospitalPermission.SYSTEM_SETTINGS &&
+      p !== HospitalPermission.BRANCH_CREATE &&
+      p !== HospitalPermission.BRANCH_DEACTIVATE,
+  ),
+  ClinicAdmin: Object.values(HospitalPermission).filter(
+    (p) =>
+      p !== HospitalPermission.BRANCH_VIEW_ALL &&
+      p !== HospitalPermission.BACKUP_MANAGE &&
+      p !== HospitalPermission.SYSTEM_SETTINGS &&
+      p !== HospitalPermission.BRANCH_CREATE &&
+      p !== HospitalPermission.BRANCH_DEACTIVATE,
+  ),
+  Unconfigured: [],
   Doctor: [
     HospitalPermission.PATIENT_VIEW,
     HospitalPermission.PATIENT_MEDICAL_HISTORY,

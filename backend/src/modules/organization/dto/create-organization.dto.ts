@@ -60,7 +60,7 @@ export class CreateOrganizationDto {
   @MaxLength(200)
   legalName?: string;
 
-  @ApiPropertyOptional({ description: 'Default billing currency', example: 'PKR', default: 'PKR' })
+  @ApiPropertyOptional({ description: 'Default billing currency', example: 'INR', default: 'INR' })
   @IsString()
   @IsOptional()
   @MaxLength(10)

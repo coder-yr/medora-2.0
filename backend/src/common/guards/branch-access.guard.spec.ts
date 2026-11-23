@@ -1,4 +1,4 @@
-import { ExecutionContext, ForbiddenException, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException, NotFoundException, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { BranchAccessGuard } from './branch-access.guard';
 import { HospitalPermission } from '../constants/permissions.enum';
 
@@ -61,9 +61,9 @@ describe('BranchAccessGuard', () => {
     expect(req.activeBranchId).toBeNull();
   });
 
-  it('should throw ForbiddenException if user context is missing', async () => {
+  it('should throw UnauthorizedException if user context is missing', async () => {
     const ctx = createMockContext({});
-    await expect(guard.canActivate(ctx)).rejects.toThrow(ForbiddenException);
+    await expect(guard.canActivate(ctx)).rejects.toThrow(UnauthorizedException);
   });
 
   it('should throw BadRequestException if branch ID has an invalid format', async () => {

@@ -4,9 +4,12 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { CreateBatchDto, UpdateBatchStatusDto } from './dto/batch.dto';
 import { CreateGoodsReceiptDto, CreatePurchaseOrderDto } from './dto/purchase.dto';
 import { DispensePrescriptionDto } from './dto/dispensation.dto';
@@ -22,7 +25,10 @@ import {
 export class PharmacyService {
   private readonly logger = new Logger(PharmacyService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional() private readonly branchAuth?: BranchAuthorizationService,
+  ) {}
 
   /**
    * Safe serializer to convert BigInt IDs and Decimals to standard JSON primitives.
@@ -38,16 +44,91 @@ export class PharmacyService {
     );
   }
 
+  /**
+   * Resolves authoritative branch and organization scope for multi-tenant pharmacy operations.
+   */
+  private async resolveBranchScope(
+    user?: AuthUser,
+    requestedBranchId?: bigint | number | string | null,
+  ): Promise<{ organizationId: bigint | null; branchId: bigint | null }> {
+    let branchId: bigint | null = null;
+    let organizationId: bigint | null = user?.organizationId ? BigInt(user.organizationId) : null;
+
+    if (requestedBranchId) {
+      if (user && this.branchAuth) {
+        branchId = await this.branchAuth.assertBranchAccess(user, requestedBranchId);
+      } else {
+        branchId = BigInt(requestedBranchId);
+      }
+    } else if (user?.branchId) {
+      branchId = BigInt(user.branchId);
+    } else if (user && this.branchAuth) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      if (accessible && accessible.length > 0) {
+        branchId = accessible[0];
+      }
+    }
+
+    if (branchId && !organizationId) {
+      const branch = await this.prisma.hospitalBranch.findUnique({
+        where: { id: branchId },
+        select: { organizationId: true },
+      });
+      if (branch?.organizationId) {
+        organizationId = branch.organizationId;
+      }
+    }
+
+    if (!organizationId) {
+      organizationId = 1n;
+    }
+
+    return { organizationId, branchId };
+  }
+
+  /**
+   * Constructs strict branch-filtering clause:
+   * - Host Organization (Org 1) users can see assigned branches or legacy unassigned records.
+   * - Secondary Tenant (Org 2+) users are strictly quarantined to their accessible branches.
+   */
+  private async buildBranchFilter(
+    user?: AuthUser,
+    requestedBranchId?: bigint | number | string | null,
+  ) {
+    if (!user || !this.branchAuth || this.branchAuth.isGlobalAdmin(user)) {
+      if (requestedBranchId) {
+        return { branchId: BigInt(requestedBranchId) };
+      }
+      return {};
+    }
+
+    const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+    if (requestedBranchId) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, requestedBranchId);
+      return isOrg1
+        ? { OR: [{ branchId: authorizedBranchId }, { branchId: null }] }
+        : { branchId: authorizedBranchId };
+    }
+
+    const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+    const branchIds = accessible || [];
+    return isOrg1
+      ? { OR: [{ branchId: { in: branchIds } }, { branchId: null }] }
+      : { branchId: { in: branchIds } };
+  }
+
   // ===========================================================================
   // 1. DASHBOARD & SUMMARY METRICS
   // ===========================================================================
 
-  async getDashboard() {
+  async getDashboard(user?: AuthUser) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     const thirtyDaysAhead = new Date(today);
     thirtyDaysAhead.setDate(thirtyDaysAhead.getDate() + 30);
+
+    const branchFilter = await this.buildBranchFilter(user);
 
     const [
       totalMedicines,
@@ -60,7 +141,7 @@ export class PharmacyService {
       this.prisma.medicine.count({ where: { isActive: true } }),
       this.prisma.medicine.count({ where: { isActive: true, quantity: { lte: 10 } } }),
       this.prisma.medicineBatch.findMany({
-        where: { currentQuantity: { gt: 0 } },
+        where: { currentQuantity: { gt: 0 }, ...branchFilter },
         select: {
           currentQuantity: true,
           costPrice: true,
@@ -70,6 +151,7 @@ export class PharmacyService {
         },
       }),
       this.prisma.stockMovement.findMany({
+        where: branchFilter,
         take: 10,
         orderBy: { createdAt: 'desc' },
         include: {
@@ -78,13 +160,13 @@ export class PharmacyService {
         },
       }),
       this.prisma.purchaseOrder.findMany({
-        where: { status: { in: ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'] } },
+        where: { status: { in: ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'] }, ...branchFilter },
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: { supplier: { select: { name: true } } },
       }),
       this.prisma.pharmacyDispensation.findMany({
-        where: { dispenseDate: today.toISOString().split('T')[0] },
+        where: { dispenseDate: today.toISOString().split('T')[0], ...branchFilter },
         select: { totalAmount: true },
       }),
     ]);
@@ -130,7 +212,7 @@ export class PharmacyService {
   // 2. BATCH MANAGEMENT
   // ===========================================================================
 
-  async createBatch(dto: CreateBatchDto, userId?: number | string) {
+  async createBatch(dto: CreateBatchDto, userId?: number | string, user?: AuthUser) {
     const medicine = await this.prisma.medicine.findUnique({
       where: { id: BigInt(dto.medicineId) },
     });
@@ -138,17 +220,29 @@ export class PharmacyService {
       throw new NotFoundException(`Medicine #${dto.medicineId} not found.`);
     }
 
-    const existing = await this.prisma.medicineBatch.findUnique({
-      where: {
-        medicineId_batchNumber: {
+    const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
+
+    const existing =
+      (await this.prisma.medicineBatch.findFirst({
+        where: {
+          branchId: branchId ?? null,
           medicineId: BigInt(dto.medicineId),
           batchNumber: dto.batchNumber.trim(),
         },
-      },
-    });
+      })) ||
+      (this.prisma.medicineBatch.findUnique
+        ? await this.prisma.medicineBatch.findUnique({
+            where: {
+              medicineId_batchNumber: {
+                medicineId: BigInt(dto.medicineId),
+                batchNumber: dto.batchNumber.trim(),
+              },
+            } as any,
+          }).catch(() => null)
+        : null);
     if (existing) {
       throw new ConflictException(
-        `Batch "${dto.batchNumber}" already exists for ${medicine.name}. Receive more into this batch via Goods Receipt.`,
+        `Batch "${dto.batchNumber}" already exists for ${medicine.name} in this branch. Receive more into this batch via Goods Receipt.`,
       );
     }
 
@@ -174,6 +268,8 @@ export class PharmacyService {
           supplierId: dto.supplierId ? BigInt(dto.supplierId) : null,
           status: initialStatus,
           notes: dto.notes,
+          organizationId,
+          branchId,
         },
       });
 
@@ -200,6 +296,8 @@ export class PharmacyService {
           referenceId: batch.id,
           performedBy: userId ? BigInt(userId) : null,
           reason: dto.notes || 'Initial batch intake',
+          organizationId,
+          branchId,
         },
       });
 
@@ -207,12 +305,14 @@ export class PharmacyService {
     });
   }
 
-  async getBatches(query: QueryBatchDto) {
+  async getBatches(query: QueryBatchDto, user?: AuthUser) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const branchFilter = await this.buildBranchFilter(user, query.branchId || (query as any).branch_id);
+    const where: any = { ...branchFilter };
+
     if (query.medicineId) {
       where.medicineId = BigInt(query.medicineId);
     }
@@ -250,6 +350,7 @@ export class PharmacyService {
             select: { id: true, name: true, generic: true, box: true, strength: true },
           },
           supplier: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
         },
       }),
     ]);
@@ -265,12 +366,13 @@ export class PharmacyService {
     };
   }
 
-  async getBatchById(id: number | string) {
+  async getBatchById(id: number | string, user?: AuthUser) {
     const batch = await this.prisma.medicineBatch.findUnique({
       where: { id: BigInt(id) },
       include: {
         medicine: true,
         supplier: true,
+        branch: true,
         stockMovements: {
           take: 15,
           orderBy: { createdAt: 'desc' },
@@ -280,15 +382,24 @@ export class PharmacyService {
     if (!batch) {
       throw new NotFoundException(`Batch #${id} not found.`);
     }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, batch.branchId, 'medicine batch');
+    }
+
     return this.serialize(batch);
   }
 
-  async updateBatchStatus(id: number | string, dto: UpdateBatchStatusDto) {
+  async updateBatchStatus(id: number | string, dto: UpdateBatchStatusDto, user?: AuthUser) {
     const batch = await this.prisma.medicineBatch.findUnique({
       where: { id: BigInt(id) },
     });
     if (!batch) {
       throw new NotFoundException(`Batch #${id} not found.`);
+    }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, batch.branchId, 'medicine batch');
     }
 
     const updated = await this.prisma.medicineBatch.update({
@@ -306,7 +417,7 @@ export class PharmacyService {
   // 3. PURCHASE ORDERS & GOODS RECEIPTS
   // ===========================================================================
 
-  async createPurchaseOrder(dto: CreatePurchaseOrderDto, userId?: number | string) {
+  async createPurchaseOrder(dto: CreatePurchaseOrderDto, userId?: number | string, user?: AuthUser) {
     const supplier = await this.prisma.supplier.findUnique({
       where: { id: BigInt(dto.supplierId) },
     });
@@ -314,6 +425,7 @@ export class PharmacyService {
       throw new NotFoundException(`Supplier #${dto.supplierId} not found.`);
     }
 
+    const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
     const poNumber = `PO-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     let totalAmount = 0;
@@ -339,6 +451,8 @@ export class PharmacyService {
         status: 'ORDERED',
         notes: dto.notes,
         createdById: userId ? BigInt(userId) : null,
+        organizationId,
+        branchId,
         items: {
           create: itemsData,
         },
@@ -352,12 +466,17 @@ export class PharmacyService {
     return this.serialize(po);
   }
 
-  async getPurchaseOrders(query: { supplierId?: number; status?: string; page?: number; limit?: number }) {
+  async getPurchaseOrders(
+    query: { supplierId?: number; status?: string; branchId?: number; page?: number; limit?: number },
+    user?: AuthUser,
+  ) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const branchFilter = await this.buildBranchFilter(user, query.branchId);
+    const where: any = { ...branchFilter };
+
     if (query.supplierId) where.supplierId = BigInt(query.supplierId);
     if (query.status) where.status = query.status;
 
@@ -371,6 +490,7 @@ export class PharmacyService {
         include: {
           supplier: { select: { id: true, name: true, phone: true } },
           items: { include: { medicine: { select: { id: true, name: true, box: true } } } },
+          branch: { select: { id: true, name: true } },
         },
       }),
     ]);
@@ -381,11 +501,12 @@ export class PharmacyService {
     };
   }
 
-  async getPurchaseOrderById(id: number | string) {
+  async getPurchaseOrderById(id: number | string, user?: AuthUser) {
     const po = await this.prisma.purchaseOrder.findUnique({
       where: { id: BigInt(id) },
       include: {
         supplier: true,
+        branch: true,
         items: { include: { medicine: true } },
         goodsReceipts: { include: { items: true } },
       },
@@ -393,10 +514,15 @@ export class PharmacyService {
     if (!po) {
       throw new NotFoundException(`Purchase Order #${id} not found.`);
     }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, po.branchId, 'purchase order');
+    }
+
     return this.serialize(po);
   }
 
-  async createGoodsReceipt(dto: CreateGoodsReceiptDto, userId?: number | string) {
+  async createGoodsReceipt(dto: CreateGoodsReceiptDto, userId?: number | string, user?: AuthUser) {
     const supplier = await this.prisma.supplier.findUnique({
       where: { id: BigInt(dto.supplierId) },
     });
@@ -404,6 +530,7 @@ export class PharmacyService {
       throw new NotFoundException(`Supplier #${dto.supplierId} not found.`);
     }
 
+    const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
     const receiptNumber = `GRN-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     return this.prisma.$transaction(async (tx) => {
@@ -422,15 +549,25 @@ export class PharmacyService {
         const lineTotal = item.quantityReceived * item.unitCost;
         grnTotal += lineTotal;
 
-        // Upsert or create MedicineBatch
-        let batch = await tx.medicineBatch.findUnique({
-          where: {
-            medicineId_batchNumber: {
+        // Upsert or create MedicineBatch scoped to target branch
+        let batch =
+          (await tx.medicineBatch.findFirst({
+            where: {
+              branchId: branchId ?? null,
               medicineId: BigInt(item.medicineId),
               batchNumber: item.batchNumber.trim(),
             },
-          },
-        });
+          })) ||
+          (tx.medicineBatch.findUnique
+            ? await tx.medicineBatch.findUnique({
+                where: {
+                  medicineId_batchNumber: {
+                    medicineId: BigInt(item.medicineId),
+                    batchNumber: item.batchNumber.trim(),
+                  },
+                } as any,
+              }).catch(() => null)
+            : null);
 
         const sellingPrice =
           item.sellingPrice !== undefined ? item.sellingPrice : medicine.sPrice ? Number(medicine.sPrice) : item.unitCost;
@@ -448,7 +585,7 @@ export class PharmacyService {
             },
           });
         } else {
-          // Create new lot
+          // Create new lot in branch
           batch = await tx.medicineBatch.create({
             data: {
               medicineId: BigInt(item.medicineId),
@@ -461,6 +598,8 @@ export class PharmacyService {
               currentQuantity: item.quantityReceived,
               supplierId: BigInt(dto.supplierId),
               status: 'ACTIVE',
+              organizationId,
+              branchId,
             },
           });
         }
@@ -487,6 +626,8 @@ export class PharmacyService {
             referenceType: 'GOODS_RECEIPT',
             performedBy: userId ? BigInt(userId) : null,
             reason: `GRN received from ${supplier.name}`,
+            organizationId,
+            branchId,
           },
         });
 
@@ -536,6 +677,8 @@ export class PharmacyService {
           totalAmount: grnTotal,
           notes: dto.notes,
           receivedById: userId ? BigInt(userId) : null,
+          organizationId,
+          branchId,
           items: {
             create: receiptItemsToCreate,
           },
@@ -550,12 +693,17 @@ export class PharmacyService {
     });
   }
 
-  async getGoodsReceipts(query: { supplierId?: number; page?: number; limit?: number }) {
+  async getGoodsReceipts(
+    query: { supplierId?: number; branchId?: number; page?: number; limit?: number },
+    user?: AuthUser,
+  ) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const branchFilter = await this.buildBranchFilter(user, query.branchId);
+    const where: any = { ...branchFilter };
+
     if (query.supplierId) where.supplierId = BigInt(query.supplierId);
 
     const [total, items] = await Promise.all([
@@ -568,6 +716,7 @@ export class PharmacyService {
         include: {
           supplier: { select: { id: true, name: true } },
           items: { include: { medicine: { select: { id: true, name: true, box: true } } } },
+          branch: { select: { id: true, name: true } },
         },
       }),
     ]);
@@ -578,18 +727,24 @@ export class PharmacyService {
     };
   }
 
-  async getGoodsReceiptById(id: number | string) {
+  async getGoodsReceiptById(id: number | string, user?: AuthUser) {
     const grn = await this.prisma.goodsReceipt.findUnique({
       where: { id: BigInt(id) },
       include: {
         supplier: true,
         purchaseOrder: true,
+        branch: true,
         items: { include: { medicine: true, batch: true } },
       },
     });
     if (!grn) {
       throw new NotFoundException(`Goods Receipt #${id} not found.`);
     }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, grn.branchId, 'goods receipt');
+    }
+
     return this.serialize(grn);
   }
 
@@ -598,11 +753,19 @@ export class PharmacyService {
   // ===========================================================================
 
   /**
-   * Returns active, unexpired batches for a medicine ordered by expiry date (FEFO).
+   * Returns active, unexpired batches for a medicine ordered by expiry date (FEFO),
+   * strictly scoped to the requesting branch/organization context.
    */
-  async getFefoBatches(medicineId: number | string, requestedQty?: number) {
+  async getFefoBatches(
+    medicineId: number | string,
+    requestedQty?: number,
+    branchId?: bigint | number | string | null,
+    user?: AuthUser,
+  ) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const branchFilter = await this.buildBranchFilter(user, branchId);
 
     const batches = await this.prisma.medicineBatch.findMany({
       where: {
@@ -610,6 +773,7 @@ export class PharmacyService {
         status: 'ACTIVE',
         currentQuantity: { gt: 0 },
         expiryDate: { gte: today },
+        ...branchFilter,
       },
       orderBy: [{ expiryDate: 'asc' }, { id: 'asc' }],
     });
@@ -646,11 +810,11 @@ export class PharmacyService {
     };
   }
 
-  async getPrescriptionDispenseContext(prescriptionId: number | string) {
+  async getPrescriptionDispenseContext(prescriptionId: number | string, user?: AuthUser) {
     const prescription = await this.prisma.prescription.findUnique({
       where: { id: BigInt(prescriptionId) },
       include: {
-        patient: { select: { id: true, name: true, patientId: true, age: true, sex: true, phone: true } },
+        patient: { select: { id: true, name: true, patientId: true, age: true, sex: true, phone: true, branchId: true } },
         doctor: { select: { id: true, name: true } },
         medicines: true,
       },
@@ -659,8 +823,17 @@ export class PharmacyService {
       throw new NotFoundException(`Prescription #${prescriptionId} not found.`);
     }
 
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(
+        user,
+        prescription.patient?.branchId || (prescription as any).branchId,
+        'prescription',
+      );
+    }
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const targetBranchId = prescription.patient?.branchId || user?.branchId;
 
     const estimatePrescriptionQuantity = (dosage?: string | null, duration?: string | null): number => {
       let dailyDoses = 1;
@@ -696,6 +869,8 @@ export class PharmacyService {
       return Math.max(1, dailyDoses * days);
     };
 
+    const branchFilter = await this.buildBranchFilter(user, targetBranchId);
+
     const enrichedLines = await Promise.all(
       prescription.medicines.map(async (line) => {
         let medicine: any = null;
@@ -725,13 +900,19 @@ export class PharmacyService {
               status: 'ACTIVE',
               currentQuantity: { gt: 0 },
               expiryDate: { gte: today },
+              ...branchFilter,
             },
             orderBy: [{ expiryDate: 'asc' }, { id: 'asc' }],
           });
           availableStock = batches.reduce((acc, b) => acc + b.currentQuantity, 0);
 
           if (quantityRemaining > 0) {
-            fefoPlan = await this.getFefoBatches(medicine.id.toString(), quantityRemaining);
+            fefoPlan = await this.getFefoBatches(
+              medicine.id.toString(),
+              quantityRemaining,
+              targetBranchId,
+              user,
+            );
           }
         }
 
@@ -761,22 +942,33 @@ export class PharmacyService {
   }
 
   /**
-   * Concurrency-safe, transactional dispensing with row locks and FEFO auto-allocation.
+   * Concurrency-safe, transactional dispensing with branch-scoped row locks and FEFO auto-allocation.
    */
-  async dispense(dto: DispensePrescriptionDto, userId?: number | string) {
+  async dispense(dto: DispensePrescriptionDto, userId?: number | string, user?: AuthUser) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // If prescription specified, verify prescription exists
+    const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
+
+    // If prescription specified, verify prescription exists and user has access
     let prescription: any = null;
     if (dto.prescriptionId) {
       prescription = await this.prisma.prescription.findUnique({
         where: { id: BigInt(dto.prescriptionId) },
-        include: { medicines: true },
+        include: { medicines: true, patient: { select: { id: true, branchId: true } } },
       });
       if (!prescription) {
         throw new NotFoundException(`Prescription #${dto.prescriptionId} not found.`);
       }
+
+      if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+        await this.branchAuth.assertResourceAccess(
+          user,
+          prescription.patient?.branchId || (prescription as any).branchId,
+          'prescription',
+        );
+      }
+
       if (prescription.state === 'dispensed') {
         throw new BadRequestException(
           `Prescription #${dto.prescriptionId} is already fully dispensed.`,
@@ -785,6 +977,7 @@ export class PharmacyService {
     }
 
     const dispensationNumber = `DSP-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const isOrg1 = !organizationId || organizationId === 1n;
 
     return this.prisma.$transaction(async (tx) => {
       let subtotal = 0;
@@ -825,9 +1018,9 @@ export class PharmacyService {
         if (item.batchId) {
           // Row lock batch
           const lockedRows = await tx.$queryRaw<
-            Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any }>
+            Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any; branch_id: bigint | null }>
           >`
-            SELECT id, batch_number, current_quantity, expiry_date, status, selling_price
+            SELECT id, batch_number, current_quantity, expiry_date, status, selling_price, branch_id
             FROM medicine_batch
             WHERE id = ${BigInt(item.batchId)} AND medicine_id = ${BigInt(item.medicineId)}
             FOR UPDATE
@@ -840,6 +1033,10 @@ export class PharmacyService {
           }
 
           const lockedBatch = lockedRows[0];
+
+          if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+            await this.branchAuth.assertResourceAccess(user, lockedBatch.branch_id, 'medicine batch');
+          }
 
           if (lockedBatch.status !== 'ACTIVE') {
             throw new BadRequestException(
@@ -897,6 +1094,8 @@ export class PharmacyService {
             balanceAfter: lockedBatch.current_quantity - item.quantity,
             unitCost: price,
             referenceType: 'DISPENSATION',
+            organizationId,
+            branchId,
           });
 
           if (item.prescriptionMedicineId) {
@@ -904,24 +1103,52 @@ export class PharmacyService {
             prescriptionLinesToUpdate.set(pmId, (prescriptionLinesToUpdate.get(pmId) || 0) + item.quantity);
           }
         } else {
-          // Automatic FEFO allocation
-          const activeBatches = await tx.$queryRaw<
-            Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any }>
-          >`
-            SELECT id, batch_number, current_quantity, expiry_date, status, selling_price
-            FROM medicine_batch
-            WHERE medicine_id = ${BigInt(item.medicineId)}
-              AND status = 'ACTIVE'
-              AND current_quantity > 0
-              AND expiry_date >= ${today}
-            ORDER BY expiry_date ASC, id ASC
-            FOR UPDATE
-          `;
+          // Automatic FEFO allocation strictly within branch
+          const activeBatches = branchId
+            ? isOrg1
+              ? await tx.$queryRaw<
+                  Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any; branch_id: bigint | null }>
+                >`
+                  SELECT id, batch_number, current_quantity, expiry_date, status, selling_price, branch_id
+                  FROM medicine_batch
+                  WHERE medicine_id = ${BigInt(item.medicineId)}
+                    AND status = 'ACTIVE'
+                    AND current_quantity > 0
+                    AND expiry_date >= ${today}
+                    AND (branch_id = ${branchId} OR branch_id IS NULL)
+                  ORDER BY expiry_date ASC, id ASC
+                  FOR UPDATE
+                `
+              : await tx.$queryRaw<
+                  Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any; branch_id: bigint | null }>
+                >`
+                  SELECT id, batch_number, current_quantity, expiry_date, status, selling_price, branch_id
+                  FROM medicine_batch
+                  WHERE medicine_id = ${BigInt(item.medicineId)}
+                    AND status = 'ACTIVE'
+                    AND current_quantity > 0
+                    AND expiry_date >= ${today}
+                    AND branch_id = ${branchId}
+                  ORDER BY expiry_date ASC, id ASC
+                  FOR UPDATE
+                `
+            : await tx.$queryRaw<
+                Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any; branch_id: bigint | null }>
+              >`
+                SELECT id, batch_number, current_quantity, expiry_date, status, selling_price, branch_id
+                FROM medicine_batch
+                WHERE medicine_id = ${BigInt(item.medicineId)}
+                  AND status = 'ACTIVE'
+                  AND current_quantity > 0
+                  AND expiry_date >= ${today}
+                ORDER BY expiry_date ASC, id ASC
+                FOR UPDATE
+              `;
 
           const totalAvailable = activeBatches.reduce((acc, b) => acc + b.current_quantity, 0);
           if (totalAvailable < item.quantity) {
             throw new BadRequestException(
-              `Only ${totalAvailable} of ${medicine.name} left in saleable stock, but the dispensation requests ${item.quantity}.`,
+              `Only ${totalAvailable} of ${medicine.name} left in saleable stock for this branch, but the dispensation requests ${item.quantity}.`,
             );
           }
 
@@ -967,6 +1194,8 @@ export class PharmacyService {
               balanceAfter: batch.current_quantity - takeQty,
               unitCost: price,
               referenceType: 'DISPENSATION',
+              organizationId,
+              branchId,
             });
 
             remainingToFulfill -= takeQty;
@@ -1006,7 +1235,7 @@ export class PharmacyService {
         }
       }
 
-      // Optional Outpatient InvoiceModule integration (only when not inpatient)
+      // Optional Outpatient InvoiceModule integration
       let invoiceId: bigint | null = null;
       if (!admissionId && dto.generateInvoice && patientId) {
         const invoice = await tx.payment.create({
@@ -1052,6 +1281,8 @@ export class PharmacyService {
           invoiceId,
           admissionId,
           dispensedById: userId ? BigInt(userId) : null,
+          organizationId,
+          branchId,
           notes: dto.notes,
           items: {
             create: dispensationItemsData,
@@ -1061,6 +1292,7 @@ export class PharmacyService {
           items: true,
           patient: { select: { id: true, name: true, patientId: true } },
           doctor: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
         },
       });
 
@@ -1123,12 +1355,10 @@ export class PharmacyService {
           });
         }
 
-        // Re-read updated prescription lines to determine complete or partial status
         const allLines = await tx.prescriptionMedicine.findMany({
           where: { prescriptionId: prescription.id },
         });
 
-        // Any line dispensed marks prescription partially_dispensed; all non-zero marks dispensed
         const anyDispensed = allLines.some((l) => l.dispensedQuantity > 0);
         await tx.prescription.update({
           where: { id: prescription.id },
@@ -1140,12 +1370,14 @@ export class PharmacyService {
     });
   }
 
-  async getDispensations(query: QueryDispensationDto) {
+  async getDispensations(query: QueryDispensationDto, user?: AuthUser) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const branchFilter = await this.buildBranchFilter(user, query.branchId || (query as any).branch_id);
+    const where: any = { ...branchFilter };
+
     if (query.patientId) where.patientId = BigInt(query.patientId);
     if (query.prescriptionId) where.prescriptionId = BigInt(query.prescriptionId);
     if (query.date) where.dispenseDate = query.date;
@@ -1168,6 +1400,7 @@ export class PharmacyService {
         include: {
           patient: { select: { id: true, name: true, patientId: true } },
           doctor: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
           items: true,
         },
       }),
@@ -1179,12 +1412,13 @@ export class PharmacyService {
     };
   }
 
-  async getDispensationById(id: number | string) {
+  async getDispensationById(id: number | string, user?: AuthUser) {
     const dispensation = await this.prisma.pharmacyDispensation.findUnique({
       where: { id: BigInt(id) },
       include: {
         patient: true,
         doctor: true,
+        branch: true,
         prescription: {
           include: { medicines: true },
         },
@@ -1199,6 +1433,11 @@ export class PharmacyService {
     if (!dispensation) {
       throw new NotFoundException(`Dispensation #${id} not found.`);
     }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, dispensation.branchId, 'dispensation');
+    }
+
     return this.serialize(dispensation);
   }
 
@@ -1206,7 +1445,8 @@ export class PharmacyService {
   // 5. RETURNS & ADJUSTMENTS
   // ===========================================================================
 
-  async processReturn(dto: CreatePharmacyReturnDto, userId?: number | string) {
+  async processReturn(dto: CreatePharmacyReturnDto, userId?: number | string, user?: AuthUser) {
+    const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
     const returnNumber = `RET-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     return this.prisma.$transaction(async (tx) => {
@@ -1270,6 +1510,8 @@ export class PharmacyService {
             balanceAfter: updatedBatch?.currentQuantity || 0,
             unitCost: unitPrice,
             reason: dto.reason,
+            organizationId,
+            branchId,
           });
         } else if (item.condition !== 'SALEABLE') {
           // Log write-off movement for damaged/expired returned item
@@ -1281,6 +1523,8 @@ export class PharmacyService {
             balanceAfter: 0,
             unitCost: unitPrice,
             reason: `Return rejected from saleable inventory: condition ${item.condition} - ${dto.reason}`,
+            organizationId,
+            branchId,
           });
         }
 
@@ -1306,6 +1550,8 @@ export class PharmacyService {
           totalRefund,
           restockToInventory: dto.restockToInventory ?? true,
           processedById: userId ? BigInt(userId) : null,
+          organizationId,
+          branchId,
           items: {
             create: returnItemsData,
           },
@@ -1314,6 +1560,7 @@ export class PharmacyService {
           items: true,
           dispensation: true,
           supplier: true,
+          branch: true,
         },
       });
 
@@ -1332,12 +1579,17 @@ export class PharmacyService {
     });
   }
 
-  async getReturns(query?: { returnType?: string; page?: number; limit?: number }) {
+  async getReturns(
+    query?: { returnType?: string; branchId?: number; page?: number; limit?: number },
+    user?: AuthUser,
+  ) {
     const page = Math.max(1, query?.page || 1);
     const limit = Math.max(1, Math.min(100, query?.limit || 20));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const branchFilter = await this.buildBranchFilter(user, query?.branchId);
+    const where: any = { ...branchFilter };
+
     if (query?.returnType) where.returnType = query.returnType;
 
     const [total, items] = await Promise.all([
@@ -1350,6 +1602,7 @@ export class PharmacyService {
         include: {
           dispensation: { select: { id: true, dispensationNumber: true, patientName: true } },
           supplier: { select: { id: true, name: true } },
+          branch: { select: { id: true, name: true } },
           items: true,
         },
       }),
@@ -1361,22 +1614,29 @@ export class PharmacyService {
     };
   }
 
-  async getReturnById(id: number | string) {
+  async getReturnById(id: number | string, user?: AuthUser) {
     const ret = await this.prisma.pharmacyReturn.findUnique({
       where: { id: BigInt(id) },
       include: {
         dispensation: true,
         supplier: true,
+        branch: true,
         items: { include: { batch: true } },
       },
     });
     if (!ret) {
       throw new NotFoundException(`Return #${id} not found.`);
     }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, ret.branchId, 'return');
+    }
+
     return this.serialize(ret);
   }
 
-  async createStockAdjustment(dto: CreateStockAdjustmentDto, userId?: number | string) {
+  async createStockAdjustment(dto: CreateStockAdjustmentDto, userId?: number | string, user?: AuthUser) {
+    const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
     const adjustmentNumber = `ADJ-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     return this.prisma.$transaction(async (tx) => {
@@ -1385,9 +1645,9 @@ export class PharmacyService {
 
       for (const item of dto.items) {
         const batch = await tx.$queryRaw<
-          Array<{ id: bigint; current_quantity: number; cost_price: any; batch_number: string }>
+          Array<{ id: bigint; current_quantity: number; cost_price: any; batch_number: string; branch_id: bigint | null }>
         >`
-          SELECT id, current_quantity, cost_price, batch_number
+          SELECT id, current_quantity, cost_price, batch_number, branch_id
           FROM medicine_batch
           WHERE id = ${BigInt(item.batchId)} AND medicine_id = ${BigInt(item.medicineId)}
           FOR UPDATE
@@ -1398,6 +1658,11 @@ export class PharmacyService {
         }
 
         const b = batch[0];
+
+        if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+          await this.branchAuth.assertResourceAccess(user, b.branch_id, 'medicine batch');
+        }
+
         const systemQty = b.current_quantity;
         const diff = item.physicalQuantity - systemQty;
 
@@ -1432,6 +1697,8 @@ export class PharmacyService {
             balanceAfter: item.physicalQuantity,
             unitCost: Number(b.cost_price),
             reason: `Physical count variance (${dto.reason}): ${diff > 0 ? '+' : ''}${diff}`,
+            organizationId,
+            branchId,
           });
         }
 
@@ -1453,6 +1720,8 @@ export class PharmacyService {
           status: 'APPROVED',
           adjustedById: userId ? BigInt(userId) : null,
           approvedById: userId ? BigInt(userId) : null,
+          organizationId,
+          branchId,
           notes: dto.notes,
           items: {
             create: itemsToCreate,
@@ -1460,6 +1729,7 @@ export class PharmacyService {
         },
         include: {
           items: { include: { medicine: true, batch: true } },
+          branch: { select: { id: true, name: true } },
         },
       });
 
@@ -1478,19 +1748,24 @@ export class PharmacyService {
     });
   }
 
-  async getAdjustments(query?: { page?: number; limit?: number }) {
+  async getAdjustments(query?: { branchId?: number; page?: number; limit?: number }, user?: AuthUser) {
     const page = Math.max(1, query?.page || 1);
     const limit = Math.max(1, Math.min(100, query?.limit || 20));
     const skip = (page - 1) * limit;
 
+    const branchFilter = await this.buildBranchFilter(user, query?.branchId);
+    const where: any = { ...branchFilter };
+
     const [total, items] = await Promise.all([
-      this.prisma.stockAdjustment.count(),
+      this.prisma.stockAdjustment.count({ where }),
       this.prisma.stockAdjustment.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { id: 'desc' },
         include: {
           items: { include: { medicine: { select: { id: true, name: true, box: true } }, batch: true } },
+          branch: { select: { id: true, name: true } },
         },
       }),
     ]);
@@ -1505,12 +1780,14 @@ export class PharmacyService {
   // 6. LEDGER & REPORTS
   // ===========================================================================
 
-  async getStockLedger(query: QueryStockMovementDto) {
+  async getStockLedger(query: QueryStockMovementDto, user?: AuthUser) {
     const page = Math.max(1, query.page || 1);
     const limit = Math.max(1, Math.min(100, query.limit || 25));
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const branchFilter = await this.buildBranchFilter(user, query.branchId || (query as any).branch_id);
+    const where: any = { ...branchFilter };
+
     if (query.medicineId) where.medicineId = BigInt(query.medicineId);
     if (query.batchId) where.batchId = BigInt(query.batchId);
     if (query.movementType) where.movementType = query.movementType;
@@ -1525,6 +1802,7 @@ export class PharmacyService {
         include: {
           medicine: { select: { id: true, name: true, generic: true, box: true } },
           batch: { select: { id: true, batchNumber: true, expiryDate: true } },
+          branch: { select: { id: true, name: true } },
         },
       }),
     ]);
@@ -1535,21 +1813,25 @@ export class PharmacyService {
     };
   }
 
-  async getExpiryReport(daysAhead = 90) {
+  async getExpiryReport(daysAhead = 90, user?: AuthUser) {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const target = new Date(now);
     target.setDate(target.getDate() + daysAhead);
 
+    const branchFilter = await this.buildBranchFilter(user);
+
     const batches = await this.prisma.medicineBatch.findMany({
       where: {
         currentQuantity: { gt: 0 },
         expiryDate: { lte: target },
+        ...branchFilter,
       },
       orderBy: { expiryDate: 'asc' },
       include: {
         medicine: { select: { id: true, name: true, generic: true, box: true } },
         supplier: { select: { id: true, name: true, phone: true } },
+        branch: { select: { id: true, name: true } },
       },
     });
 
@@ -1566,7 +1848,9 @@ export class PharmacyService {
     };
   }
 
-  async getLowStockReport(threshold = 10) {
+  async getLowStockReport(threshold = 10, user?: AuthUser) {
+    const branchFilter = await this.buildBranchFilter(user);
+
     const medicines = await this.prisma.medicine.findMany({
       where: {
         isActive: true,
@@ -1575,8 +1859,8 @@ export class PharmacyService {
       orderBy: { quantity: 'asc' },
       include: {
         batches: {
-          where: { currentQuantity: { gt: 0 }, status: 'ACTIVE' },
-          select: { id: true, batchNumber: true, currentQuantity: true, expiryDate: true },
+          where: { currentQuantity: { gt: 0 }, status: 'ACTIVE', ...branchFilter },
+          select: { id: true, batchNumber: true, currentQuantity: true, expiryDate: true, branchId: true },
         },
       },
     });
@@ -1584,11 +1868,14 @@ export class PharmacyService {
     return this.serialize(medicines);
   }
 
-  async getValuationReport() {
+  async getValuationReport(user?: AuthUser) {
+    const branchFilter = await this.buildBranchFilter(user);
+
     const batches = await this.prisma.medicineBatch.findMany({
-      where: { currentQuantity: { gt: 0 } },
+      where: { currentQuantity: { gt: 0 }, ...branchFilter },
       include: {
         medicine: { select: { id: true, name: true, generic: true, categoryId: true } },
+        branch: { select: { id: true, name: true } },
       },
     });
 
@@ -1612,6 +1899,8 @@ export class PharmacyService {
         sellingPrice: Number(b.sellingPrice || b.costPrice),
         costTotal: Math.round(costTotal * 100) / 100,
         retailTotal: Math.round(retailTotal * 100) / 100,
+        branchId: b.branch?.id ? b.branch.id.toString() : null,
+        branchName: b.branch?.name || null,
       };
     });
 

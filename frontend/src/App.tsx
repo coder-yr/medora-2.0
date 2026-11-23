@@ -3,14 +3,21 @@ import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from
 
 // Authentication & Core Context
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { ProtectedRoute, RequirePermission } from './app/RouteGuard';
+import { ProtectedRoute, RequirePermission, RequireSuperAdmin } from './app/RouteGuard';
 import { AppShell } from './app/AppShell';
 import { getDefaultRouteForRole } from './app/navigation-utils';
 import { resolveUserRole } from './app/role-resolution';
 
 // Features & Workspaces
 import { LoginView } from './features/auth/LoginView';
+import { AcceptInvitationView } from './features/auth/AcceptInvitationView';
+import { OrganizationRegistrationView } from './features/registration/OrganizationRegistrationView';
+import { VerifyEmailView } from './features/registration/VerifyEmailView';
+import { RegistrationStatusView } from './features/registration/RegistrationStatusView';
+import { OnboardingWorkspace } from './features/onboarding/OnboardingWorkspace';
 import { DashboardResolver } from './features/dashboards/DashboardResolver';
+import { PlatformAdminWorkspace } from './features/platform/PlatformAdminWorkspace';
+import { StaffManagementWorkspace } from './features/organization/StaffManagementWorkspace';
 import { PatientWorkspace } from './features/patients/PatientWorkspace';
 import { AppointmentWorkspace } from './features/appointments/AppointmentWorkspace';
 import { ConsultationWorkspace } from './features/consultations/ConsultationWorkspace';
@@ -329,8 +336,13 @@ export function App() {
     <BrowserRouter>
       <AuthProvider>
         <Routes>
-          {/* Public Auth Route */}
+          {/* Public Auth Routes */}
           <Route path="/login" element={<LoginRoute />} />
+          <Route path="/accept-invitation" element={<AcceptInvitationView />} />
+          <Route path="/register-organization" element={<OrganizationRegistrationView />} />
+          <Route path="/verify-email" element={<VerifyEmailView />} />
+          <Route path="/registration-status" element={<RegistrationStatusView />} />
+          <Route path="/registration-status/:reference" element={<RegistrationStatusView />} />
 
           {/* Protected Application Shell */}
           <Route
@@ -485,6 +497,28 @@ export function App() {
                   <NotificationRoute />
                 </RequirePermission>
               }
+            />
+
+            {/* Platform & Organization Administration (Phase 10.2) */}
+            <Route
+              path="/platform"
+              element={
+                <RequireSuperAdmin>
+                  <PlatformAdminWorkspace />
+                </RequireSuperAdmin>
+              }
+            />
+            <Route
+              path="/staff-management"
+              element={
+                <RequirePermission permission="staff_view">
+                  <StaffManagementWorkspace />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/onboarding"
+              element={<OnboardingWorkspace />}
             />
 
             {/* Root & Fallback Redirects */}

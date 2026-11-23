@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Lock,
   Mail,
@@ -14,6 +15,8 @@ import {
   Building,
   UserPlus,
   LogIn,
+  Key,
+  Search,
 } from 'lucide-react';
 import type { AuthResponse } from '../../types/auth';
 
@@ -22,64 +25,6 @@ interface LoginViewProps {
   onLoginSuccess: (auth: AuthResponse) => void;
 }
 
-const DEMO_PERSONAS: Record<string, { role: string; name: string; permissions: string[] }> = {
-  'superadmin.test@medora.hospital': {
-    role: 'Super Admin',
-    name: 'Dr. Evelyn Cross',
-    permissions: ['*'],
-  },
-  'admin.test@medora.hospital': {
-    role: 'Hospital Admin',
-    name: 'Sarah Jenkins',
-    permissions: ['hospital:*', 'branch:*', 'patient:*', 'appointment:*', 'billing:*'],
-  },
-  'doctor.test@medora.hospital': {
-    role: 'Doctor',
-    name: 'Dr. Michael Chen',
-    permissions: ['doctor:*', 'patient:read', 'consultation:*', 'prescription:*', 'lab:order', 'radiology:order'],
-  },
-  'receptionist.test@medora.hospital': {
-    role: 'Receptionist',
-    name: 'Emma Watson',
-    permissions: ['patient:create', 'patient:read', 'appointment:create', 'appointment:read'],
-  },
-  'nurse.test@medora.hospital': {
-    role: 'Nurse',
-    name: 'David Miller',
-    permissions: ['inpatient:read', 'inpatient:update', 'patient:read', 'vitals:*'],
-  },
-  'pharmacist.test@medora.hospital': {
-    role: 'Pharmacist',
-    name: 'Rachel Adams',
-    permissions: ['pharmacy:*', 'medicine:*', 'prescription:read', 'prescription:dispense'],
-  },
-  'laboratorist.test@medora.hospital': {
-    role: 'Laboratorist',
-    name: 'Dr. Alex Wong',
-    permissions: ['lab:*', 'patient:read'],
-  },
-  'radiologist.test@medora.hospital': {
-    role: 'Radiologist',
-    name: 'Dr. Olivia Taylor',
-    permissions: ['radiology:*', 'patient:read'],
-  },
-  'cashier.test@medora.hospital': {
-    role: 'Cashier',
-    name: 'James Wilson',
-    permissions: ['billing:*', 'cashier:*', 'invoice:read', 'payment:create'],
-  },
-  'accountant.test@medora.hospital': {
-    role: 'Accountant',
-    name: 'Robert Davis',
-    permissions: ['accounting:*', 'report:*', 'invoice:*'],
-  },
-  'hr.test@medora.hospital': {
-    role: 'HR',
-    name: 'Jessica Lee',
-    permissions: ['staff:*', 'department:*'],
-  },
-};
-
 export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess }) => {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
 
@@ -87,6 +32,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // Multi-Factor Authentication State
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaTicket, setMfaTicket] = useState('');
+  const [mfaCode, setMfaCode] = useState('');
+  const [isRecoveryMode, setIsRecoveryMode] = useState(false);
 
   // Registration Form State
   const [regName, setRegName] = useState('');
@@ -144,35 +95,59 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
       });
       const data = await res.json();
 
+      if (res.ok && data.success) {
+        if (data.data?.mfaRequired) {
+          setMfaRequired(true);
+          setMfaTicket(data.data.mfaTicket);
+          setError(null);
+          return;
+        }
+        if (data.data?.accessToken) {
+          onLoginSuccess(data.data);
+          return;
+        }
+      }
+      const msg = data.error?.message || data.message || 'Invalid email or password.';
+      if (typeof msg === 'string' && msg.toLowerCase().includes('locked')) {
+        setIsLocked(true);
+      }
+      setError(Array.isArray(msg) ? msg.join(', ') : msg);
+    } catch {
+      setError('Unable to connect to the hospital authentication service.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMfaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mfaCode.trim()) {
+      setError(isRecoveryMode ? 'Please enter your recovery backup code.' : 'Please enter the 6-digit authenticator code.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/v1/auth/mfa/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mfaTicket,
+          code: mfaCode.trim(),
+          isRecovery: isRecoveryMode,
+        }),
+      });
+      const data = await res.json();
+
       if (res.ok && data.success && data.data?.accessToken) {
         onLoginSuccess(data.data);
       } else {
-        const msg = data.error?.message || data.message || 'Invalid email or password.';
-        if (typeof msg === 'string' && msg.toLowerCase().includes('locked')) {
-          setIsLocked(true);
-        }
+        const msg = data.error?.message || data.message || 'MFA verification failed. Please try again.';
         setError(Array.isArray(msg) ? msg.join(', ') : msg);
       }
     } catch {
-      const demoUser = DEMO_PERSONAS[email.trim().toLowerCase()];
-      if (demoUser) {
-        onLoginSuccess({
-          accessToken: `demo_token_${Date.now()}`,
-          user: {
-            id: '1',
-            doctorId: demoUser.role === 'Doctor' ? '1' : undefined,
-            email: email.trim().toLowerCase(),
-            name: demoUser.name,
-            role: demoUser.role,
-            group: demoUser.role === 'Hospital Admin' ? 'Admin' : (demoUser.role === 'Super Admin' ? 'SuperAdmin' : demoUser.role),
-            permissions: demoUser.permissions,
-            branchId: '1',
-            branches: [{ id: '1', name: 'Main City Hospital', code: 'MAIN-01', isMain: true }],
-          },
-        });
-        return;
-      }
-      setError('Unable to connect to the hospital authentication service.');
+      setError('Unable to verify MFA code with the authentication server.');
     } finally {
       setLoading(false);
     }
@@ -233,32 +208,21 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
       });
       const data = await res.json();
 
-      if (res.ok && data.success && data.data?.accessToken) {
-        onLoginSuccess(data.data);
-        return;
-      } else {
-        const msg = data.error?.message || data.message || `Authentication failed for ${roleName}.`;
-        setError(Array.isArray(msg) ? msg.join(', ') : msg);
+      if (res.ok && data.success) {
+        if (data.data?.mfaRequired) {
+          setMfaRequired(true);
+          setMfaTicket(data.data.mfaTicket);
+          setError(null);
+          return;
+        }
+        if (data.data?.accessToken) {
+          onLoginSuccess(data.data);
+          return;
+        }
       }
+      const msg = data.error?.message || data.message || `Authentication failed for ${roleName}.`;
+      setError(Array.isArray(msg) ? msg.join(', ') : msg);
     } catch {
-      const demoUser = DEMO_PERSONAS[roleEmail.toLowerCase()];
-      if (demoUser) {
-        onLoginSuccess({
-          accessToken: `demo_token_${Date.now()}`,
-          user: {
-            id: '1',
-            doctorId: demoUser.role === 'Doctor' ? '1' : undefined,
-            email: roleEmail.toLowerCase(),
-            name: demoUser.name,
-            role: demoUser.role,
-            group: demoUser.role === 'Hospital Admin' ? 'Admin' : (demoUser.role === 'Super Admin' ? 'SuperAdmin' : demoUser.role),
-            permissions: demoUser.permissions,
-            branchId: '1',
-            branches: [{ id: '1', name: 'Main City Hospital', code: 'MAIN-01', isMain: true }],
-          },
-        });
-        return;
-      }
       setError(`Unable to connect to the hospital authentication server to sign in as ${roleName}.`);
     } finally {
       setLoading(false);
@@ -374,7 +338,132 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
           </div>
         </div>
 
-        {/* Tab Switcher: Sign In vs Register */}
+        {mfaRequired ? (
+          <div>
+            <div style={{ textAlign: 'center', marginBottom: 20 }}>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 52,
+                height: 52,
+                borderRadius: 14,
+                background: '#f0fdf4',
+                color: '#16a34a',
+                marginBottom: 12,
+                boxShadow: '0 4px 12px rgba(22, 163, 74, 0.15)',
+              }}>
+                <Key size={26} />
+              </div>
+              <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 6px 0', color: '#0f172a' }}>
+                Two-Factor Authentication
+              </h2>
+              <p style={{ margin: 0, fontSize: 13, color: '#64748b', lineHeight: 1.4 }}>
+                {isRecoveryMode
+                  ? 'Enter one of your 10-character emergency backup recovery keys.'
+                  : 'Enter the 6-digit verification code from your authenticator application.'}
+              </p>
+            </div>
+
+            {error && (
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: 10,
+                padding: '12px 14px',
+                borderRadius: 10,
+                marginBottom: 20,
+                background: '#fff1f2',
+                border: '1px solid #fecdd3',
+                color: '#991b1b',
+                fontSize: 13,
+                lineHeight: 1.4,
+              }}>
+                <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: 2, color: '#dc2626' }} />
+                <div>
+                  <div style={{ fontWeight: 700 }}>Verification Failed</div>
+                  <div>{error}</div>
+                </div>
+              </div>
+            )}
+
+            <form onSubmit={handleMfaSubmit}>
+              <div className="form-group" style={{ marginBottom: 20 }}>
+                <label className="form-label" style={{ fontSize: 12.5 }}>
+                  {isRecoveryMode ? 'Emergency Recovery Key' : '6-Digit Authenticator Code'}
+                </label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder={isRecoveryMode ? 'XXXX-XXXX' : '000000'}
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value.toUpperCase())}
+                  autoFocus
+                  style={{
+                    letterSpacing: isRecoveryMode ? '0.1em' : '0.25em',
+                    textAlign: 'center',
+                    fontSize: 18,
+                    fontWeight: 700,
+                  }}
+                  disabled={loading}
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '10px 16px', fontSize: 14, fontWeight: 700 }}
+                disabled={loading}
+              >
+                {loading ? 'Verifying...' : 'Verify & Continue'}
+              </button>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 16 }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsRecoveryMode(!isRecoveryMode);
+                    setMfaCode('');
+                    setError(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#0284c7',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  {isRecoveryMode ? 'Use Authenticator App' : 'Lost device? Use backup recovery key'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMfaRequired(false);
+                    setMfaTicket('');
+                    setMfaCode('');
+                    setError(null);
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#64748b',
+                    fontSize: 12,
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                >
+                  Back to Sign In
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <>
+            {/* Tab Switcher: Sign In vs Register */}
         <div style={{
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
@@ -614,6 +703,51 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
           </form>
         )}
 
+        {/* Healthcare Facility Registration Section */}
+        <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0', textAlign: 'center' }}>
+          <p style={{ margin: '0 0 10px', fontSize: 13, color: '#64748b' }}>
+            Setting up a new clinic, polyclinic, or hospital network?
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center' }}>
+            <Link
+              to="/register-organization"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 8,
+                background: '#f0f9ff',
+                color: '#0284c7',
+                border: '1px solid #bae6fd',
+                fontSize: 12.5,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              <Building size={14} /> Register Organization
+            </Link>
+            <Link
+              to="/registration-status"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                borderRadius: 8,
+                background: '#f8fafc',
+                color: '#475569',
+                border: '1px solid #cbd5e1',
+                fontSize: 12.5,
+                fontWeight: 600,
+                textDecoration: 'none',
+              }}
+            >
+              <Search size={14} /> Track Status
+            </Link>
+          </div>
+        </div>
+
         {/* Authorized Persona Quick Links (Available in all environments) */}
         {true && (
           <div style={{ marginTop: 24, paddingTop: 18, borderTop: '1px solid #f1f5f9' }}>
@@ -734,6 +868,8 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
               </button>
             </div>
           </div>
+        )}
+          </>
         )}
       </div>
 

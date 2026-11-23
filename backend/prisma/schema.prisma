@@ -37,6 +37,10 @@ model User {
   description String?    @map("desc") @db.VarChar(255)
   branchId    BigInt?    @map("branch_id")
   photo       String?    @db.VarChar(255)
+  isSuperAdmin Boolean   @default(false) @map("is_super_admin")
+  isMfaEnabled Boolean   @default(false) @map("is_mfa_enabled")
+  mfaSecret   String?    @map("mfa_secret") @db.VarChar(255)
+  mfaRecoveryCodes Json?  @default("[]") @map("mfa_recovery_codes")
   createdAt   DateTime?  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt   DateTime?  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -75,6 +79,13 @@ model User {
   branchMembershipsRevoked   UserBranchMembership[]     @relation("MembershipRevoker")
   notificationRecipients     NotificationRecipient[]
   notificationPreferences    NotificationPreference?
+  platformAuditLogs          PlatformAuditLog[]         @relation("PlatformAuditActor")
+  supportGrantsReceived      EmergencySupportGrant[]    @relation("SupportGrantRecipient")
+  supportGrantsAuthorized    EmergencySupportGrant[]    @relation("SupportGrantAuthorizer")
+  staffInvitationsAuthored   StaffInvitation[]          @relation("StaffInvitationAuthor")
+  registrationsApproved      OrganizationRegistration[] @relation("RegistrationApprover")
+  registrationsRejected      OrganizationRegistration[] @relation("RegistrationRejector")
+  onboardingsCompleted       OrganizationOnboarding[]   @relation("OnboardingCompleter")
 
   @@map("users")
 }
@@ -135,22 +146,50 @@ enum OrganizationStatus {
   @@map("organization_status")
 }
 
+enum OrganizationEdition {
+  CLINIC
+  PROFESSIONAL
+  HOSPITAL
+  ENTERPRISE
+
+  @@map("organization_edition")
+}
+
 model Organization {
-  id               BigInt             @id @default(autoincrement())
-  name             String             @db.VarChar(150)
-  code             String             @unique @db.VarChar(50)
-  type             OrganizationType   @default(HOSPITAL)
-  status           OrganizationStatus @default(ACTIVE)
-  createdAt        DateTime?          @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt        DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
-  deletedAt        DateTime?          @map("deleted_at") @db.Timestamptz
+  id                     BigInt               @id @default(autoincrement())
+  name                   String               @db.VarChar(150)
+  code                   String               @unique @db.VarChar(50)
+  type                   OrganizationType     @default(HOSPITAL)
+  status                 OrganizationStatus   @default(ACTIVE)
+  edition                OrganizationEdition  @default(HOSPITAL)
+  subscriptionTier       String?              @default("STANDARD") @map("subscription_tier") @db.VarChar(50)
+  subscriptionExpiresAt  DateTime?            @map("subscription_expires_at") @db.Timestamptz
+  maxBranches            Int                  @default(10) @map("max_branches")
+  maxUsers               Int                  @default(100) @map("max_users")
+  createdAt              DateTime?            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt              DateTime?            @updatedAt @map("updated_at") @db.Timestamptz
+  deletedAt              DateTime?            @map("deleted_at") @db.Timestamptz
 
   // Relations
-  settings         OrganizationSettings?
-  branches         HospitalBranch[]
-  users            User[]
-  userMemberships  UserOrganizationMembership[]
-  hospitalSettings HospitalSettings[]
+  settings               OrganizationSettings?
+  branches               HospitalBranch[]
+  users                  User[]
+  userMemberships        UserOrganizationMembership[]
+  hospitalSettings       HospitalSettings[]
+  platformAuditLogs      PlatformAuditLog[]
+  emergencySupportGrants EmergencySupportGrant[]
+  staffInvitations       StaffInvitation[]
+  registration           OrganizationRegistration?
+  onboarding             OrganizationOnboarding?
+  // Pharmacy & Inventory relations (Phase 10.4)
+  medicineBatches        MedicineBatch[]
+  stockMovements         StockMovement[]
+  purchaseOrders         PurchaseOrder[]
+  goodsReceipts          GoodsReceipt[]
+  stockAdjustments       StockAdjustment[]
+  pharmacyReturns        PharmacyReturn[]
+  pharmacyDispensations  PharmacyDispensation[]
+  suppliers              Supplier[]
 
   @@map("organizations")
 }
@@ -166,8 +205,8 @@ model OrganizationSettings {
   website               String?        @db.VarChar(150)
   address               String?        @db.VarChar(255)
   defaultLocale         String         @default("en") @map("default_locale") @db.VarChar(10)
-  defaultTimezone       String         @default("Asia/Karachi") @map("default_timezone") @db.VarChar(50)
-  defaultCurrency       String         @default("PKR") @map("default_currency") @db.VarChar(10)
+  defaultTimezone       String         @default("Asia/Kolkata") @map("default_timezone") @db.VarChar(50)
+  defaultCurrency       String         @default("INR") @map("default_currency") @db.VarChar(10)
   dateFormat            String         @default("YYYY-MM-DD") @map("date_format") @db.VarChar(20)
   timeFormat            String         @default("HH:mm") @map("time_format") @db.VarChar(20)
   logoUrl               String?        @map("logo_url") @db.VarChar(500)
@@ -187,6 +226,104 @@ model OrganizationSettings {
   updatedBy             User?          @relation("OrgSettingsUpdater", fields: [updatedById], references: [id])
 
   @@map("organization_settings")
+}
+
+// =============================================================================
+// 2b. ORGANIZATION REGISTRATION, APPROVAL & ONBOARDING (PHASE 10.3)
+// =============================================================================
+
+enum RegistrationStatus {
+  DRAFT
+  PENDING_EMAIL_VERIFICATION
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  PROVISIONING
+  ACTIVE
+  SUSPENDED
+
+  @@map("registration_status")
+}
+
+model OrganizationRegistration {
+  id                         BigInt              @id @default(autoincrement())
+  reference                  String              @unique @db.VarChar(50)
+  status                     RegistrationStatus  @default(PENDING_EMAIL_VERIFICATION)
+
+  // Organization Info
+  organizationName           String              @map("organization_name") @db.VarChar(150)
+  organizationType           OrganizationType    @default(HOSPITAL) @map("organization_type")
+  requestedEdition           OrganizationEdition @default(HOSPITAL) @map("requested_edition")
+  healthcareSpecialization   String?             @map("healthcare_specialization") @db.VarChar(100)
+  licenseNumber              String?             @map("license_number") @db.VarChar(100)
+  organizationEmail          String              @map("organization_email") @db.VarChar(100)
+  contactPhone               String              @map("contact_phone") @db.VarChar(50)
+  country                    String              @default("Pakistan") @db.VarChar(100)
+  state                      String?             @db.VarChar(100)
+  city                       String              @db.VarChar(100)
+  address                    String?             @db.VarChar(255)
+  postalCode                 String?             @map("postal_code") @db.VarChar(20)
+  website                    String?             @db.VarChar(150)
+
+  // Initial Admin Contact
+  adminFullName              String              @map("admin_full_name") @db.VarChar(100)
+  adminEmail                 String              @map("admin_email") @db.VarChar(100)
+  adminPhone                 String?             @map("admin_phone") @db.VarChar(50)
+  adminDesignation           String?             @map("admin_designation") @db.VarChar(100)
+
+  // Email Verification (SHA-256 hash at rest)
+  emailVerificationToken     String?             @map("email_verification_token") @db.VarChar(255)
+  emailVerificationExpiresAt DateTime?           @map("email_verification_expires_at") @db.Timestamptz
+  isEmailVerified            Boolean             @default(false) @map("is_email_verified")
+  emailVerifiedAt            DateTime?           @map("email_verified_at") @db.Timestamptz
+  verificationAttempts       Int                 @default(0) @map("verification_attempts")
+  lastVerificationSentAt     DateTime?           @map("last_verification_sent_at") @db.Timestamptz
+
+  // Super Admin Approval / Review
+  approvedById               BigInt?             @map("approved_by_id")
+  approvedAt                 DateTime?           @map("approved_at") @db.Timestamptz
+  rejectedById               BigInt?             @map("rejected_by_id")
+  rejectedAt                 DateTime?           @map("rejected_at") @db.Timestamptz
+  rejectionReason            String?             @map("rejection_reason") @db.Text
+  approvedEdition            OrganizationEdition? @map("approved_edition")
+  approvedModules            Json?               @default("[]") @map("approved_modules")
+
+  // Provisioning
+  organizationId             BigInt?             @unique @map("organization_id")
+  provisionedAt              DateTime?           @map("provisioned_at") @db.Timestamptz
+  provisioningError          String?             @map("provisioning_error") @db.Text
+
+  createdAt                  DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                  DateTime            @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization               Organization?       @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  approvedBy                 User?               @relation("RegistrationApprover", fields: [approvedById], references: [id])
+  rejectedBy                 User?               @relation("RegistrationRejector", fields: [rejectedById], references: [id])
+
+  @@index([status])
+  @@index([organizationEmail])
+  @@index([adminEmail])
+  @@index([createdAt])
+  @@map("organization_registrations")
+}
+
+model OrganizationOnboarding {
+  id              BigInt       @id @default(autoincrement())
+  organizationId  BigInt       @unique @map("organization_id")
+  isCompleted     Boolean      @default(false) @map("is_completed")
+  completedAt     DateTime?    @map("completed_at") @db.Timestamptz
+  completedById   BigInt?      @map("completed_by_id")
+  currentStep     String       @default("profile") @map("current_step") @db.VarChar(50)
+  checklist       Json         @default("{}")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  completedBy     User?        @relation("OnboardingCompleter", fields: [completedById], references: [id])
+
+  @@map("organization_onboardings")
 }
 
 model UserOrganizationMembership {
@@ -212,6 +349,102 @@ model UserOrganizationMembership {
   @@index([userId])
   @@index([organizationId])
   @@map("user_organization_memberships")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  SUSPEND
+  REACTIVATE
+  LOGIN
+  PASSWORD_RESET
+  MEMBER_INVITE
+  MEMBER_ROLE_CHANGE
+  MEMBER_REVOKE
+  PERMISSION_OVERRIDE
+  EDITION_CHANGE
+  ENTITLEMENT_TOGGLE
+  BREAK_GLASS_ACCESS
+
+  @@map("audit_action")
+}
+
+model PlatformAuditLog {
+  id             BigInt       @id @default(autoincrement())
+  action         String       @db.VarChar(50)
+  targetType     String       @map("target_type") @db.VarChar(50)
+  targetId       String?      @map("target_id") @db.VarChar(50)
+  actorUserId    BigInt?      @map("actor_user_id")
+  actorEmail     String?      @map("actor_email") @db.VarChar(100)
+  actorRole      String?      @map("actor_role") @db.VarChar(50)
+  organizationId BigInt?      @map("organization_id")
+  details        Json?
+  ipAddress      String?      @map("ip_address") @db.VarChar(50)
+  userAgent      String?      @map("user_agent") @db.VarChar(255)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  // Relations
+  actorUser      User?        @relation("PlatformAuditActor", fields: [actorUserId], references: [id])
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@index([actorUserId])
+  @@index([organizationId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("platform_audit_logs")
+}
+
+model EmergencySupportGrant {
+  id              BigInt       @id @default(autoincrement())
+  organizationId  BigInt       @map("organization_id")
+  grantedToUserId BigInt       @map("granted_to_user_id")
+  requestedReason String       @map("requested_reason") @db.VarChar(255)
+  authorizedById  BigInt?      @map("authorized_by_id")
+  expiresAt       DateTime     @map("expires_at") @db.Timestamptz
+  isRevoked       Boolean      @default(false) @map("is_revoked")
+  revokedAt       DateTime?    @map("revoked_at") @db.Timestamptz
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  grantedToUser   User         @relation("SupportGrantRecipient", fields: [grantedToUserId], references: [id])
+  authorizedBy    User?        @relation("SupportGrantAuthorizer", fields: [authorizedById], references: [id])
+
+  @@index([organizationId])
+  @@index([grantedToUserId])
+  @@map("emergency_support_grants")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+
+  @@map("invitation_status")
+}
+
+model StaffInvitation {
+  id             BigInt           @id @default(autoincrement())
+  token          String           @unique @db.VarChar(100)
+  email          String           @db.VarChar(100)
+  name           String?          @db.VarChar(100)
+  organizationId BigInt           @map("organization_id")
+  branchId       BigInt?          @map("branch_id")
+  role           String           @default("Doctor") @db.VarChar(50)
+  status         InvitationStatus @default(PENDING)
+  expiresAt      DateTime         @map("expires_at") @db.Timestamptz
+  invitedById    BigInt           @map("invited_by_id")
+  acceptedAt     DateTime?        @map("accepted_at") @db.Timestamptz
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branch         HospitalBranch?  @relation(fields: [branchId], references: [id])
+  invitedBy      User             @relation("StaffInvitationAuthor", fields: [invitedById], references: [id])
+
+  @@index([organizationId])
+  @@index([email])
+  @@map("staff_invitations")
 }
 
 model HospitalBranch {
@@ -248,6 +481,15 @@ model HospitalBranch {
   auditLogs           ConfigurationAuditLog[]
   documentSequences   BranchDocumentSequence[]
   notifications       Notification[]
+  staffInvitations    StaffInvitation[]
+  // Pharmacy & Inventory relations (Phase 10.4)
+  medicineBatches       MedicineBatch[]
+  stockMovements        StockMovement[]
+  purchaseOrders        PurchaseOrder[]
+  goodsReceipts         GoodsReceipt[]
+  stockAdjustments      StockAdjustment[]
+  pharmacyReturns       PharmacyReturn[]
+  pharmacyDispensations PharmacyDispensation[]
 
   @@index([organizationId])
   @@map("hospital_branch")
@@ -266,8 +508,8 @@ model HospitalSettings {
   website            String?       @db.VarChar(150)
   address            String?       @db.VarChar(255)
   defaultLocale      String        @default("en") @map("default_locale") @db.VarChar(10)
-  defaultTimezone    String        @default("Asia/Karachi") @map("default_timezone") @db.VarChar(50)
-  defaultCurrency    String        @default("PKR") @map("default_currency") @db.VarChar(10)
+  defaultTimezone    String        @default("Asia/Kolkata") @map("default_timezone") @db.VarChar(50)
+  defaultCurrency    String        @default("INR") @map("default_currency") @db.VarChar(10)
   dateFormat         String        @default("YYYY-MM-DD") @map("date_format") @db.VarChar(20)
   timeFormat         String        @default("HH:mm") @map("time_format") @db.VarChar(20)
   logoUrl            String?       @map("logo_url") @db.VarChar(500)
@@ -1044,7 +1286,7 @@ model VisitFee {
   visitType     String       @map("visit_type") @db.VarChar(20)
   patientTypeId BigInt?      @map("patient_type_id")
   amount        Decimal      @db.Decimal(10, 2)
-  currency      String       @default("PKR") @db.VarChar(3)
+  currency      String       @default("INR") @db.VarChar(3)
   active        Boolean      @default(true)
   createdAt     DateTime?    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime?    @updatedAt @map("updated_at") @db.Timestamptz
@@ -1550,16 +1792,19 @@ model Supplier {
   phone         String?   @db.VarChar(50)
   address       String?   @db.Text
   isActive      Boolean   @default(true) @map("is_active")
+  organizationId BigInt?  @map("organization_id")
   createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
+  organization   Organization?   @relation(fields: [organizationId], references: [id])
   medicines      Medicine[]
   batches        MedicineBatch[]
   purchaseOrders PurchaseOrder[]
   goodsReceipts  GoodsReceipt[]
   returns        PharmacyReturn[]
 
+  @@index([organizationId])
   @@map("supplier")
 }
 
@@ -1668,11 +1913,15 @@ model MedicineBatch {
   supplierId      BigInt?   @map("supplier_id")
   status          String    @default("ACTIVE") @db.VarChar(30) // ACTIVE, QUARANTINE, DEPLETED, EXPIRED, RECALLED
   notes           String?   @db.Text
+  organizationId  BigInt?   @map("organization_id")
+  branchId        BigInt?   @map("branch_id")
   createdAt       DateTime? @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime? @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   medicine              Medicine                  @relation(fields: [medicineId], references: [id])
+  organization          Organization?             @relation(fields: [organizationId], references: [id])
+  branch                HospitalBranch?           @relation(fields: [branchId], references: [id])
   supplier              Supplier?                 @relation(fields: [supplierId], references: [id])
   stockMovements        StockMovement[]
   goodsReceiptItems     GoodsReceiptItem[]
@@ -1680,7 +1929,9 @@ model MedicineBatch {
   adjustmentItems       StockAdjustmentItem[]
   returnItems           PharmacyReturnItem[]
 
-  @@unique([medicineId, batchNumber])
+  @@unique([branchId, medicineId, batchNumber])
+  @@index([organizationId])
+  @@index([branchId])
   @@index([medicineId])
   @@index([expiryDate])
   @@index([status])
@@ -1700,12 +1951,18 @@ model StockMovement {
   referenceId   BigInt?   @map("reference_id")
   performedBy   BigInt?   @map("performed_by")
   reason        String?   @db.Text
+  organizationId BigInt?  @map("organization_id")
+  branchId       BigInt?  @map("branch_id")
   createdAt     DateTime? @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
-  medicine Medicine       @relation(fields: [medicineId], references: [id])
-  batch    MedicineBatch? @relation(fields: [batchId], references: [id])
+  medicine     Medicine        @relation(fields: [medicineId], references: [id])
+  batch        MedicineBatch?  @relation(fields: [batchId], references: [id])
+  organization Organization?   @relation(fields: [organizationId], references: [id])
+  branch       HospitalBranch? @relation(fields: [branchId], references: [id])
 
+  @@index([organizationId])
+  @@index([branchId])
   @@index([medicineId])
   @@index([batchId])
   @@index([movementType])
@@ -1724,14 +1981,20 @@ model PurchaseOrder {
   status       String              @default("ORDERED") @db.VarChar(30) // DRAFT, ORDERED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
   notes        String?             @db.Text
   createdById  BigInt?             @map("created_by_id")
+  organizationId BigInt?           @map("organization_id")
+  branchId       BigInt?           @map("branch_id")
   createdAt    DateTime?           @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime?           @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   supplier     Supplier            @relation(fields: [supplierId], references: [id])
+  organization Organization?       @relation(fields: [organizationId], references: [id])
+  branch       HospitalBranch?     @relation(fields: [branchId], references: [id])
   items        PurchaseOrderItem[]
   goodsReceipts GoodsReceipt[]
 
+  @@index([organizationId])
+  @@index([branchId])
   @@index([supplierId])
   @@index([status])
   @@map("purchase_order")
@@ -1766,14 +2029,20 @@ model GoodsReceipt {
   totalAmount           Decimal            @default(0.00) @map("total_amount") @db.Decimal(12, 2)
   notes                 String?            @db.Text
   receivedById          BigInt?            @map("received_by_id")
+  organizationId        BigInt?            @map("organization_id")
+  branchId              BigInt?            @map("branch_id")
   createdAt             DateTime?          @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime?          @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
   purchaseOrder         PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
   supplier              Supplier           @relation(fields: [supplierId], references: [id])
+  organization          Organization?      @relation(fields: [organizationId], references: [id])
+  branch                HospitalBranch?    @relation(fields: [branchId], references: [id])
   items                 GoodsReceiptItem[]
 
+  @@index([organizationId])
+  @@index([branchId])
   @@index([purchaseOrderId])
   @@index([supplierId])
   @@map("goods_receipt")
@@ -1822,6 +2091,8 @@ model PharmacyDispensation {
   dispensedById      BigInt?                    @map("dispensed_by_id")
   admissionId        BigInt?                    @map("admission_id")
   notes              String?                    @db.Text
+  organizationId     BigInt?                    @map("organization_id")
+  branchId           BigInt?                    @map("branch_id")
   createdAt          DateTime?                  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime?                  @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -1831,9 +2102,13 @@ model PharmacyDispensation {
   doctor             Doctor?                    @relation(fields: [doctorId], references: [id])
   invoice            Payment?                   @relation(fields: [invoiceId], references: [id])
   admission          Admission?                 @relation(fields: [admissionId], references: [id])
+  organization       Organization?              @relation(fields: [organizationId], references: [id])
+  branch             HospitalBranch?            @relation(fields: [branchId], references: [id])
   items              PharmacyDispensationItem[]
   returns            PharmacyReturn[]
 
+  @@index([organizationId])
+  @@index([branchId])
   @@index([prescriptionId])
   @@index([patientId])
   @@index([doctorId])
@@ -1879,12 +2154,18 @@ model StockAdjustment {
   adjustedById     BigInt?               @map("adjusted_by_id")
   approvedById     BigInt?               @map("approved_by_id")
   notes            String?               @db.Text
+  organizationId   BigInt?               @map("organization_id")
+  branchId         BigInt?               @map("branch_id")
   createdAt        DateTime?             @default(now()) @map("created_at") @db.Timestamptz
   updatedAt        DateTime?             @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
+  organization     Organization?         @relation(fields: [organizationId], references: [id])
+  branch           HospitalBranch?       @relation(fields: [branchId], references: [id])
   items            StockAdjustmentItem[]
 
+  @@index([organizationId])
+  @@index([branchId])
   @@index([adjustmentDate])
   @@index([status])
   @@map("stock_adjustment")
@@ -1922,13 +2203,19 @@ model PharmacyReturn {
   totalRefund        Decimal               @default(0.00) @map("total_refund") @db.Decimal(12, 2)
   restockToInventory Boolean               @default(true) @map("restock_to_inventory")
   processedById      BigInt?               @map("processed_by_id")
+  organizationId     BigInt?               @map("organization_id")
+  branchId           BigInt?               @map("branch_id")
   createdAt          DateTime?             @default(now()) @map("created_at") @db.Timestamptz
 
   // Relations
   dispensation       PharmacyDispensation? @relation(fields: [dispensationId], references: [id])
   supplier           Supplier?             @relation(fields: [supplierId], references: [id])
+  organization       Organization?         @relation(fields: [organizationId], references: [id])
+  branch             HospitalBranch?       @relation(fields: [branchId], references: [id])
   items              PharmacyReturnItem[]
 
+  @@index([organizationId])
+  @@index([branchId])
   @@index([dispensationId])
   @@index([supplierId])
   @@index([returnType])
@@ -2314,7 +2601,7 @@ model Account {
   isSystemAccount    Boolean       @default(false) @map("is_system_account")
   isActive           Boolean       @default(true) @map("is_active")
   allowManualPosting Boolean       @default(true) @map("allow_manual_posting")
-  currency           String        @default("PKR") @db.VarChar(10)
+  currency           String        @default("INR") @db.VarChar(10)
   branchId           BigInt?       @map("branch_id")
   createdAt          DateTime?     @default(now()) @map("created_at") @db.Timestamptz
   updatedAt          DateTime?     @updatedAt @map("updated_at") @db.Timestamptz

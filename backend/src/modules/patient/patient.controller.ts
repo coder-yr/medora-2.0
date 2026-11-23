@@ -15,8 +15,10 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
 import { AuthUser } from '../../common/types/auth-user.interface';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
+import { ClinicalAccessGuard } from '../../common/guards/clinical-access.guard';
 import { CreatePatientDto } from './dto/create-patient.dto';
 import { PaginatedPatientsDto, PatientResponseDto } from './dto/patient-response.dto';
 import { PatientQueryDto } from './dto/patient-query.dto';
@@ -25,7 +27,8 @@ import { PatientService } from './patient.service';
 
 @ApiTags('Patient Registry & Demographics')
 @ApiBearerAuth()
-@UseGuards(PermissionsGuard)
+@UseGuards(PermissionsGuard, ClinicalAccessGuard)
+@ProtectClinicalAccess()
 @Controller('patients')
 export class PatientController {
   constructor(private readonly patientService: PatientService) {}
@@ -52,8 +55,11 @@ export class PatientController {
   @ApiOperation({ summary: 'Retrieve patient demographics by ID or 6-digit patient_id' })
   @ApiResponse({ status: 200, type: PatientResponseDto, description: 'Patient details' })
   @ApiResponse({ status: 404, description: 'Patient not found' })
-  async findOne(@Param('id') id: string): Promise<PatientResponseDto> {
-    return this.patientService.findById(id);
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PatientResponseDto> {
+    return this.patientService.findById(id, user);
   }
 
   @Post()

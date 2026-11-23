@@ -22,9 +22,13 @@ import {
 } from '@nestjs/swagger';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { ClinicalAccessGuard } from '../../common/guards/clinical-access.guard';
+import { ProtectClinicalAccess } from '../../common/decorators/clinical-access.decorator';
 import { CreatePrescriptionDto } from './dto/create-prescription.dto';
 import { PrescriptionQueryDto } from './dto/prescription-query.dto';
 import {
@@ -37,7 +41,8 @@ import { PrescriptionService } from './prescription.service';
 
 @ApiTags('Prescriptions')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PermissionsGuard, ClinicalAccessGuard)
+@ProtectClinicalAccess()
 @Controller('prescriptions')
 export class PrescriptionController {
   constructor(private readonly prescriptionService: PrescriptionService) {}
@@ -74,8 +79,9 @@ export class PrescriptionController {
   })
   async findAll(
     @Query() query: PrescriptionQueryDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PaginatedPrescriptionsDto> {
-    return this.prescriptionService.findAll(query);
+    return this.prescriptionService.findAll(query, user);
   }
 
   @Get(':id')
@@ -93,8 +99,9 @@ export class PrescriptionController {
   @ApiResponse({ status: 404, description: 'Prescription not found.' })
   async findById(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
   ): Promise<PrescriptionResponseDto> {
-    return this.prescriptionService.findById(id);
+    return this.prescriptionService.findById(id, user);
   }
 
   @Post()
@@ -117,8 +124,9 @@ export class PrescriptionController {
   @ApiResponse({ status: 404, description: 'Patient or Doctor not found.' })
   async create(
     @Body() dto: CreatePrescriptionDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PrescriptionResponseDto> {
-    return this.prescriptionService.create(dto);
+    return this.prescriptionService.create(dto, user);
   }
 
   @Put(':id')
@@ -138,8 +146,9 @@ export class PrescriptionController {
   async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdatePrescriptionDto,
+    @CurrentUser() user: AuthUser,
   ): Promise<PrescriptionResponseDto> {
-    return this.prescriptionService.update(id, dto);
+    return this.prescriptionService.update(id, dto, user);
   }
 
   @Delete(':id')
@@ -157,7 +166,8 @@ export class PrescriptionController {
   @ApiResponse({ status: 404, description: 'Prescription not found.' })
   async remove(
     @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
   ): Promise<{ success: boolean; message: string }> {
-    return this.prescriptionService.remove(id);
+    return this.prescriptionService.remove(id, user);
   }
 }

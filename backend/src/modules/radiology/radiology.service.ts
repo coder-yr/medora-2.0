@@ -566,10 +566,14 @@ export class RadiologyService {
       where.branchId = authorizedBranchId;
     } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
       const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
-      if (accessible && accessible.length > 0) {
-        where.branchId = { in: accessible };
+      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+      if (isOrg1) {
+        where.OR = [
+          { branchId: { in: accessible || [] } },
+          { branchId: null },
+        ];
       } else {
-        where.branchId = -1n;
+        where.branchId = { in: accessible || [] };
       }
     } else if (user?.branchId && user.group !== 'Admin') {
       where.branchId = BigInt(user.branchId);
@@ -651,7 +655,7 @@ export class RadiologyService {
     });
   }
 
-  async getOrderById(id: number) {
+  async getOrderById(id: number, user?: AuthUser) {
     const order = await this.prisma.radiologyOrder.findUnique({
       where: { id: BigInt(id) },
       include: {
@@ -671,6 +675,10 @@ export class RadiologyService {
 
     if (!order) {
       throw new NotFoundException(`Radiology order #${id} not found`);
+    }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, order.branchId, 'radiology order');
     }
 
     // Fetch previous imaging history for the same patient (excluding current order)
