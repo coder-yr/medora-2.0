@@ -26,12 +26,23 @@ export function getApiBaseUrl(): string {
         !/^(\d{1,3}\.){3}\d{1,3}$/.test(hostname));
 
     if (isCloudDeploy) {
-      // If an explicit valid public HTTPS backend URL is set, use it
+      // 1. If an explicit valid public HTTPS backend URL is set, use it
       if (envUrl && envUrl.startsWith('https://')) {
         return envUrl.trim().replace(/\/+$/, '');
       }
-      // Otherwise, use same-origin relative root so requests hit the deployment's API routes
-      return origin;
+
+      // 2. Production Vercel deployment resolution
+      if (hostname.includes('medora-20-frontend.vercel.app')) {
+        return 'https://medora-20-backend.vercel.app';
+      }
+
+      // 3. Dynamic match if following *-frontend.vercel.app pattern
+      if (hostname.endsWith('-frontend.vercel.app')) {
+        return `https://${hostname.replace(/-frontend\.vercel\.app$/, '-backend.vercel.app')}`;
+      }
+
+      // 4. Default fallback for cloud environments
+      return 'https://medora-20-backend.vercel.app';
     }
 
     // If on LAN (IPv4 address that is not localhost)

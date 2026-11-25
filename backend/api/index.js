@@ -72,8 +72,21 @@ async function bootstrap() {
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'x-correlation-id', 'x-request-id'],
-    exposedHeaders: ['x-correlation-id'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-correlation-id',
+      'x-request-id',
+      'x-branch-id',
+      'x-organization-id',
+      'X-Branch-Id',
+      'X-Organization-Id',
+      'Accept',
+      'Origin',
+      'X-Requested-With',
+      'Range',
+    ],
+    exposedHeaders: ['x-correlation-id', 'x-request-id'],
   });
 
   // OpenAPI Swagger Documentation
