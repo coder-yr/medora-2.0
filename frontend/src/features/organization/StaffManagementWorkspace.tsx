@@ -577,19 +577,40 @@ export const StaffManagementWorkspace: React.FC = () => {
                       </td>
                       <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                         {inv.status === 'PENDING' && (
-                          <button
-                            onClick={() => void handleRevokeInvitation(inv.id, inv.email)}
-                            className="btn btn-secondary"
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: 12,
-                              color: '#b91c1c',
-                              borderColor: '#fecdd3',
-                              background: '#fff1f2',
-                            }}
-                          >
-                            Revoke
-                          </button>
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button
+                              onClick={() => {
+                                setInviteEmail(inv.email);
+                                setInviteName(inv.name);
+                                setInviteRole(inv.role);
+                                setGeneratedInviteLink(null);
+                                setShowInviteModal(true);
+                              }}
+                              className="btn btn-secondary"
+                              style={{
+                                padding: '4px 10px',
+                                fontSize: 12,
+                                color: '#0284c7',
+                                borderColor: '#bae6fd',
+                                background: '#f0f9ff',
+                              }}
+                            >
+                              Re-issue Link
+                            </button>
+                            <button
+                              onClick={() => void handleRevokeInvitation(inv.id, inv.email)}
+                              className="btn btn-secondary"
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: 12,
+                                color: '#b91c1c',
+                                borderColor: '#fecdd3',
+                                background: '#fff1f2',
+                              }}
+                            >
+                              Revoke
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -649,22 +670,27 @@ export const StaffManagementWorkspace: React.FC = () => {
                   </p>
                 </div>
 
-                <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
                   <input
                     type="text"
                     readOnly
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
                     className="form-control"
                     value={generatedInviteLink}
-                    style={{ fontSize: 12, background: '#f8fafc', fontFamily: 'monospace' }}
+                    style={{ fontSize: 12, background: '#f8fafc', fontFamily: 'monospace', flex: 1, minWidth: 0, padding: '9px 12px' }}
                   />
                   <button
+                    type="button"
                     onClick={copyToClipboard}
-                    className="btn btn-secondary"
-                    style={{ display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap' }}
+                    className="btn btn-primary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', padding: '9px 16px', fontWeight: 700, background: '#0284c7', borderColor: '#0369a1' }}
                   >
-                    {copied ? <Check size={14} color="#16a34a" /> : <Copy size={14} />}
-                    {copied ? 'Copied' : 'Copy'}
+                    {copied ? <Check size={15} color="#ffffff" /> : <Copy size={15} />}
+                    {copied ? 'Copied!' : 'Copy Link'}
                   </button>
+                </div>
+                <div style={{ fontSize: 11.5, color: '#64748b', marginBottom: 20 }}>
+                  Click inside the field to select all or use the Copy Link button to copy the activation URL directly to your clipboard.
                 </div>
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end' }}>

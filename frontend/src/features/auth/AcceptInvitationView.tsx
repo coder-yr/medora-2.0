@@ -31,8 +31,8 @@ export const AcceptInvitationView: React.FC = () => {
 
   useEffect(() => {
     const curToken = token || activeToken;
-    if (!curToken) {
-      setError('No invitation token provided. Please paste your token or use the activation link sent to you.');
+    if (!curToken || curToken === 'undefined' || curToken === 'null' || !curToken.trim()) {
+      setError('No invitation token provided. Please paste your 64-character token or use the activation link sent to you.');
       setLoading(false);
       return;
     }
@@ -41,24 +41,35 @@ export const AcceptInvitationView: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/auth/invitations/${curToken.trim()}`);
-        const json = await res.json();
-        if (!res.ok) {
-          throw new Error(json.error?.message || json.message || 'Invitation token is invalid or has expired.');
+        const res = await fetch(`${apiBaseUrl}/api/v1/auth/invitations/${encodeURIComponent(curToken.trim())}`);
+        let json: any = null;
+        try {
+          json = await res.json();
+        } catch {
+          throw new Error(`Authentication service returned invalid response (status ${res.status}).`);
         }
-        const payload = json.data?.data || json.data || json;
+
+        if (!res.ok) {
+          throw new Error(json?.error?.message || json?.message || 'Invitation token is invalid or has expired.');
+        }
+
+        const payload = json?.data?.data || json?.data || json;
+        if (!payload || !payload.email || typeof payload !== 'object') {
+          throw new Error('Unable to retrieve valid invitation details. Please check your activation link or contact your hospital administrator.');
+        }
+
         const normalizedInvitation = {
           id: payload.id || '',
           email: payload.email || '',
           name: payload.name || '',
           role: payload.role || '',
-          organizationName: payload.organizationName || payload.organization?.name || '',
+          organizationName: payload.organizationName || payload.organization?.name || 'Healthcare Facility',
           organizationCode: payload.organizationCode || payload.organization?.code || '',
         };
         setInvitation(normalizedInvitation);
         if (normalizedInvitation.name) setName(normalizedInvitation.name);
       } catch (err: any) {
-        setError(err.message);
+        setError(err.message || 'Failed to validate invitation.');
       } finally {
         setLoading(false);
       }
@@ -257,10 +268,23 @@ export const AcceptInvitationView: React.FC = () => {
           </div>
         ) : (
           <div>
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 18, fontSize: 13 }}>
-              <div>Organization: <strong>{invitation.organizationName}</strong> ({invitation.organizationCode})</div>
-              <div>Assigned Role: <span className="badge badge-primary" style={{ fontSize: 11.5 }}>{invitation.role}</span></div>
-              <div>Invited Email: <code>{invitation.email}</code></div>
+            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, marginBottom: 18, fontSize: 13 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ color: '#64748b', fontSize: 12 }}>Healthcare Facility:</span>
+                <strong style={{ color: '#0f172a' }}>{invitation.organizationName} {invitation.organizationCode ? `(${invitation.organizationCode})` : ''}</strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ color: '#64748b', fontSize: 12 }}>Assigned Role:</span>
+                <span className="badge badge-primary" style={{ fontSize: 11.5, background: '#0284c7', color: '#fff', padding: '3px 8px', borderRadius: 6, fontWeight: 700 }}>
+                  {invitation.role}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: '#64748b', fontSize: 12 }}>Invited Email:</span>
+                <code style={{ fontSize: 12, color: '#0369a1', fontWeight: 600, background: '#e0f2fe', padding: '2px 6px', borderRadius: 4 }}>
+                  {invitation.email}
+                </code>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit}>

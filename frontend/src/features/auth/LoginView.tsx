@@ -93,9 +93,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password }),
       });
-      const data = await res.json();
+      let data: any = null;
+      try {
+        data = await res.json();
+      } catch {
+        throw new Error(`Authentication server returned invalid response format (HTTP ${res.status}).`);
+      }
 
-      if (res.ok && data.success) {
+      if (res.ok && data?.success) {
         if (data.data?.mfaRequired) {
           setMfaRequired(true);
           setMfaTicket(data.data.mfaTicket);
@@ -107,13 +112,13 @@ export const LoginView: React.FC<LoginViewProps> = ({ apiBaseUrl, onLoginSuccess
           return;
         }
       }
-      const msg = data.error?.message || data.message || 'Invalid email or password.';
+      const msg = data?.error?.message || data?.message || 'Invalid email or password.';
       if (typeof msg === 'string' && msg.toLowerCase().includes('locked')) {
         setIsLocked(true);
       }
       setError(Array.isArray(msg) ? msg.join(', ') : msg);
-    } catch {
-      setError('Unable to connect to the hospital authentication service.');
+    } catch (err: any) {
+      setError(err?.message || 'Unable to connect to the hospital authentication service.');
     } finally {
       setLoading(false);
     }
