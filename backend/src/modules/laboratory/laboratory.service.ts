@@ -22,6 +22,7 @@ import { QueryLabCatalogueDto, QueryLabOrdersDto } from './dto/query-lab.dto';
 import { Prisma } from '@prisma/client';
 import { Optional } from '@nestjs/common';
 import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
+import { NotificationService } from '../notification/notification.service';
 import { AuthUser } from '../../common/types/auth-user.interface';
 
 @Injectable()
@@ -29,6 +30,7 @@ export class LaboratoryService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly branchAuth?: BranchAuthorizationService,
+    @Optional() private readonly notificationService?: NotificationService,
   ) { }
 
   // ===========================================================================
@@ -1228,6 +1230,19 @@ export class LaboratoryService {
       },
     });
 
+    // Phase 10.5.8: Detect critical findings and escalate to responsible clinician
+    if (this.notificationService && updated.tests) {
+      const criticalParams = updated.tests.flatMap((t: any) => t.resultParameters || [])
+        .filter((p: any) => ['CRITICAL_HIGH', 'CRITICAL_LOW', 'CRITICAL', 'ALERT'].includes(p.abnormalFlag));
+
+      if (criticalParams.length > 0) {
+        const findings = criticalParams
+          .map((p: any) => `Value: ${p.value} (${p.abnormalFlag})`)
+          .join('; ');
+        void this.notificationService.triggerCriticalResultEscalation(BigInt(orderId), findings);
+      }
+    }
+
     return this.serializeBigInt(updated);
   }
 
@@ -1265,6 +1280,11 @@ export class LaboratoryService {
         samples: true,
       },
     });
+
+    // Phase 10.5.8: Notify patient of finalized laboratory report
+    if (this.notificationService) {
+      void this.notificationService.triggerLabReportNotification(BigInt(orderId), false);
+    }
 
     return this.serializeBigInt(updated);
   }

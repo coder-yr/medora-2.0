@@ -38,6 +38,7 @@ import { StaffWorkspace } from './components/StaffWorkspace';
 import { AccountingWorkspace } from './components/AccountingWorkspace';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
 import { NotificationAdminWorkspace } from './features/notifications/NotificationAdminWorkspace';
+import { FollowUpWorkspace } from './features/follow-up/FollowUpWorkspace';
 
 // Types
 import type { Patient } from './types/patient';
@@ -131,6 +132,11 @@ const ConsultationRoute: React.FC = () => {
       }}
     />
   );
+};
+
+const FollowUpRoute: React.FC = () => {
+  const { token, apiBaseUrl, activeBranchId } = useAuth();
+  return <FollowUpWorkspace token={token} apiBaseUrl={apiBaseUrl} activeBranchId={activeBranchId} />;
 };
 
 const PrescriptionRoute: React.FC = () => {
@@ -377,6 +383,14 @@ export function App() {
               element={
                 <RequirePermission permission="consultation_view">
                   <ConsultationRoute />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/follow-ups"
+              element={
+                <RequirePermission permission="consultation_view">
+                  <FollowUpRoute />
                 </RequirePermission>
               }
             />

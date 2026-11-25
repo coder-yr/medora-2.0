@@ -107,4 +107,54 @@ export class NotificationController {
   async markAllAsRead(@CurrentUser() user: AuthUser) {
     return this.service.markAllAsRead(BigInt(user.id));
   }
+
+  // ===========================================================================
+  // CLINICAL CRITICAL ALERTS & PATIENT PREFERENCES (PHASE 10.5.8)
+  // ===========================================================================
+
+  @Get('critical-alerts')
+  @ApiOperation({ summary: 'List unacknowledged critical laboratory result alerts' })
+  @ApiResponse({ status: 200, description: 'List of unacknowledged critical alerts' })
+  @RequirePermissions(HospitalPermission.NOTIFICATION_VIEW)
+  async getCriticalAlerts(
+    @CurrentUser() user: AuthUser,
+    @Query('doctorId') doctorId?: string,
+  ) {
+    const branchId = user.branchId ? BigInt(user.branchId) : undefined;
+    const docId = doctorId ? BigInt(doctorId) : undefined;
+    return this.service.getPendingCriticalEscalations(branchId, docId);
+  }
+
+  @Post('critical-alerts/:id/acknowledge')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Acknowledge receipt of a critical laboratory result' })
+  @ApiResponse({ status: 200, description: 'Critical alert acknowledged' })
+  @RequirePermissions(HospitalPermission.NOTIFICATION_MARK_READ)
+  async acknowledgeCriticalAlert(
+    @Param('id') id: string,
+    @Body() body: { notes?: string },
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.service.acknowledgeCriticalEscalation(BigInt(id), BigInt(user.id), body.notes);
+  }
+
+  @Get('patients/:patientId/preferences')
+  @ApiOperation({ summary: "Get patient's communication preferences and consent" })
+  @ApiResponse({ status: 200, description: 'Patient preferences retrieved' })
+  @RequirePermissions(HospitalPermission.NOTIFICATION_VIEW)
+  async getPatientPreferences(@Param('patientId') patientId: string) {
+    return this.service.getPatientPreferences(BigInt(patientId));
+  }
+
+  @Put('patients/:patientId/preferences')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: "Update patient's communication preferences and consent" })
+  @ApiResponse({ status: 200, description: 'Patient preferences updated' })
+  @RequirePermissions(HospitalPermission.NOTIFICATION_PREFERENCES_UPDATE)
+  async updatePatientPreferences(
+    @Param('patientId') patientId: string,
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    return this.service.updatePatientPreferences(BigInt(patientId), dto);
+  }
 }

@@ -9,6 +9,7 @@ import * as crypto from 'crypto';
 import { DoctorService } from '../doctor/doctor.service';
 import { PatientService } from '../patient/patient.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationService } from '../notification/notification.service';
 import { BranchAuthorizationService } from '../../common/services/branch-authorization.service';
 import { AuthUser } from '../../common/types/auth-user.interface';
 import { AppointmentQueryDto } from './dto/appointment-query.dto';
@@ -59,6 +60,7 @@ export class AppointmentService {
     private readonly patientService: PatientService,
     private readonly doctorService: DoctorService,
     @Optional() private readonly branchAuth?: BranchAuthorizationService,
+    @Optional() private readonly notificationService?: NotificationService,
   ) { }
 
   /**
@@ -186,6 +188,10 @@ export class AppointmentService {
         },
       });
 
+      if (this.notificationService) {
+        void this.notificationService.scheduleAppointmentReminders(created.id);
+      }
+
       return this.formatAppointment(created);
     });
   }
@@ -288,6 +294,10 @@ export class AppointmentService {
         },
       });
 
+      if (this.notificationService) {
+        void this.notificationService.scheduleAppointmentReminders(created.id);
+      }
+
       return this.formatAppointment(created);
     });
   }
@@ -371,6 +381,10 @@ export class AppointmentService {
       },
     });
 
+    if (this.notificationService) {
+      void this.notificationService.cancelAppointmentReminders(BigInt(idStr));
+    }
+
     return this.formatAppointment(updated);
   }
 
@@ -401,6 +415,10 @@ export class AppointmentService {
         doctor: true,
       },
     });
+
+    if (this.notificationService) {
+      void this.notificationService.cancelAppointmentReminders(BigInt(idStr));
+    }
 
     return this.formatAppointment(updated);
   }
@@ -435,6 +453,10 @@ export class AppointmentService {
       },
     });
 
+    if (this.notificationService) {
+      void this.notificationService.cancelAppointmentReminders(BigInt(idStr));
+    }
+
     return this.formatAppointment(updated);
   }
 
@@ -468,6 +490,10 @@ export class AppointmentService {
         doctor: true,
       },
     });
+
+    if (this.notificationService) {
+      void this.notificationService.cancelAppointmentReminders(BigInt(idStr));
+    }
 
     return this.formatAppointment(updated);
   }
@@ -562,6 +588,10 @@ export class AppointmentService {
           doctor: true,
         },
       });
+
+      if (this.notificationService) {
+        void this.notificationService.rescheduleAppointmentReminders(newAppointment.id);
+      }
 
       return this.formatAppointment(newAppointment);
     });

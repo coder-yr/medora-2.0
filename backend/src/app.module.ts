@@ -35,6 +35,7 @@ import { PlatformModule } from './modules/platform/platform.module';
 import { OrganizationStaffModule } from './modules/organization-staff/organization-staff.module';
 import { OrganizationRegistrationModule } from './modules/organization-registration/organization-registration.module';
 import { NotificationModule } from './modules/notification/notification.module';
+import { FollowUpModule } from './modules/follow-up/follow-up.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { AppController } from './app.controller';
@@ -77,6 +78,7 @@ import { AppController } from './app.controller';
     OrganizationStaffModule,
     OrganizationRegistrationModule,
     NotificationModule,
+    FollowUpModule,
     DashboardModule,
   ],
   controllers: [AppController],

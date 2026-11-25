@@ -108,10 +108,20 @@ export class NotificationOutboxService {
 
       // 3. Dispatch to all recipients
       for (const recipient of recipients) {
-        // Evaluate recipient preferences if recipient is a registered staff user
+        // Evaluate recipient preferences if recipient is a registered staff user or patient
         if (recipient.userId) {
           const pref = await this.prisma.notificationPreference.findUnique({
             where: { userId: recipient.userId },
+          });
+
+          if (pref) {
+            if (channel === 'IN_APP' && !pref.inAppEnabled) continue;
+            if (channel === 'EMAIL' && !pref.emailEnabled) continue;
+            if (channel === 'SMS' && !pref.smsEnabled) continue;
+          }
+        } else if (recipient.patientId) {
+          const pref = await this.prisma.notificationPreference.findUnique({
+            where: { patientId: recipient.patientId },
           });
 
           if (pref) {

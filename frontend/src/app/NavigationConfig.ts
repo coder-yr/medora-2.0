@@ -2,6 +2,7 @@ import {
   LayoutDashboard,
   Users,
   Calendar,
+  CalendarCheck,
   Stethoscope,
   Pill,
   CreditCard,
@@ -82,6 +83,15 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     category: 'Clinical Operations',
     requiredPermissions: ['consultation_view'],
     order: 4,
+  },
+  {
+    id: 'follow-ups',
+    label: 'Follow-ups & Alerts',
+    path: '/follow-ups',
+    icon: CalendarCheck,
+    category: 'Clinical Operations',
+    requiredPermissions: ['consultation_view'],
+    order: 4.5,
   },
   {
     id: 'prescriptions',

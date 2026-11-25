@@ -562,6 +562,35 @@ export class ConsultationService {
         });
       }
 
+      // Phase 10.5.8: Automatically sync clinical follow-up entity
+      if (dto.follow_up_date) {
+        try {
+          const orgId = user?.organizationId ? BigInt(user.organizationId) : BigInt(1);
+          const branchId = visit.branchId ? BigInt(visit.branchId) : BigInt(1);
+          const dueDateObj = new Date(dto.follow_up_date);
+          const prefix = `FOL-${new Date().toISOString().split('T')[0].replace(/-/g, '')}-`;
+          const count = await tx.followUp.count({ where: { followUpNumber: { startsWith: prefix } } });
+          const folNumber = `${prefix}${(count + 1).toString().padStart(4, '0')}`;
+
+          await tx.followUp.create({
+            data: {
+              followUpNumber: folNumber,
+              organizationId: orgId,
+              branchId,
+              patientId: BigInt(patient.id),
+              doctorId: doctor ? BigInt(doctor.id) : BigInt(1),
+              consultationId: c.id,
+              dueDate: dueDateObj,
+              reason: dto.follow_up_notes?.trim() || 'Post-consultation follow-up',
+              priority: 'ROUTINE',
+              status: 'SCHEDULED',
+            },
+          });
+        } catch (fErr) {
+          this.logger.warn(`Failed to auto-create follow-up record for consult #${c.id}: ${fErr}`);
+        }
+      }
+
       return this.formatConsultation(c);
     });
   }

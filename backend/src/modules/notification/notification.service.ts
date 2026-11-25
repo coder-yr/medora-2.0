@@ -159,6 +159,11 @@ export class NotificationService {
           inAppEnabled: true,
           emailEnabled: true,
           smsEnabled: true,
+          appointmentConsent: true,
+          labConsent: true,
+          followUpConsent: true,
+          billingConsent: true,
+          preferredChannel: 'IN_APP',
         },
       });
     }
@@ -171,6 +176,15 @@ export class NotificationService {
     if (dto.inAppEnabled !== undefined) updateData.inAppEnabled = dto.inAppEnabled;
     if (dto.emailEnabled !== undefined) updateData.emailEnabled = dto.emailEnabled;
     if (dto.smsEnabled !== undefined) updateData.smsEnabled = dto.smsEnabled;
+    if (dto.appointmentConsent !== undefined) updateData.appointmentConsent = dto.appointmentConsent;
+    if (dto.labConsent !== undefined) updateData.labConsent = dto.labConsent;
+    if (dto.followUpConsent !== undefined) updateData.followUpConsent = dto.followUpConsent;
+    if (dto.billingConsent !== undefined) updateData.billingConsent = dto.billingConsent;
+    if (dto.preferredChannel !== undefined) updateData.preferredChannel = dto.preferredChannel;
+    if (dto.consentSource !== undefined) {
+      updateData.consentSource = dto.consentSource;
+      updateData.consentGivenAt = new Date();
+    }
     if (dto.channelOverrides !== undefined) updateData.channelOverrides = dto.channelOverrides;
     if (dto.quietHoursStart !== undefined) updateData.quietHoursStart = dto.quietHoursStart;
     if (dto.quietHoursEnd !== undefined) updateData.quietHoursEnd = dto.quietHoursEnd;
@@ -180,6 +194,60 @@ export class NotificationService {
       update: updateData,
       create: {
         userId,
+        ...updateData,
+      },
+    });
+
+    return this.serializeBigInt(pref);
+  }
+
+  async getPatientPreferences(patientId: bigint) {
+    let pref = await this.prisma.notificationPreference.findUnique({
+      where: { patientId },
+    });
+
+    if (!pref) {
+      pref = await this.prisma.notificationPreference.create({
+        data: {
+          patientId,
+          inAppEnabled: true,
+          emailEnabled: true,
+          smsEnabled: true,
+          appointmentConsent: true,
+          labConsent: true,
+          followUpConsent: true,
+          billingConsent: true,
+          preferredChannel: 'IN_APP',
+        },
+      });
+    }
+
+    return this.serializeBigInt(pref);
+  }
+
+  async updatePatientPreferences(patientId: bigint, dto: UpdatePreferencesDto) {
+    const updateData: any = {};
+    if (dto.inAppEnabled !== undefined) updateData.inAppEnabled = dto.inAppEnabled;
+    if (dto.emailEnabled !== undefined) updateData.emailEnabled = dto.emailEnabled;
+    if (dto.smsEnabled !== undefined) updateData.smsEnabled = dto.smsEnabled;
+    if (dto.appointmentConsent !== undefined) updateData.appointmentConsent = dto.appointmentConsent;
+    if (dto.labConsent !== undefined) updateData.labConsent = dto.labConsent;
+    if (dto.followUpConsent !== undefined) updateData.followUpConsent = dto.followUpConsent;
+    if (dto.billingConsent !== undefined) updateData.billingConsent = dto.billingConsent;
+    if (dto.preferredChannel !== undefined) updateData.preferredChannel = dto.preferredChannel;
+    if (dto.consentSource !== undefined) {
+      updateData.consentSource = dto.consentSource;
+      updateData.consentGivenAt = new Date();
+    }
+    if (dto.channelOverrides !== undefined) updateData.channelOverrides = dto.channelOverrides;
+    if (dto.quietHoursStart !== undefined) updateData.quietHoursStart = dto.quietHoursStart;
+    if (dto.quietHoursEnd !== undefined) updateData.quietHoursEnd = dto.quietHoursEnd;
+
+    const pref = await this.prisma.notificationPreference.upsert({
+      where: { patientId },
+      update: updateData,
+      create: {
+        patientId,
         ...updateData,
       },
     });
@@ -230,6 +298,8 @@ export class NotificationService {
     branchId: bigint | null,
     scheduledAt: Date,
   ) {
+    const orgId = dto.organizationId ? BigInt(dto.organizationId) : null;
+
     // 1. Create Notification Header
     const notification = await tx.notification.create({
       data: {
@@ -240,6 +310,7 @@ export class NotificationService {
         metadata: dto.metadata || null,
         priority: dto.priority || 'NORMAL',
         status: dto.channel === 'IN_APP' ? 'DELIVERED' : 'PENDING',
+        organizationId: orgId,
         branchId,
         scheduledAt,
         sentAt: dto.channel === 'IN_APP' ? new Date() : null,
@@ -524,6 +595,330 @@ export class NotificationService {
     });
 
     return this.serializeBigInt(updated);
+  }
+
+  // ===========================================================================
+  // 5. APPOINTMENT REMINDER ENGINE & CLINICAL ESCALATIONS (PHASE 10.5.8)
+  // ===========================================================================
+
+  /**
+   * Schedules automated 24h and 2h reminders for an appointment
+   */
+  async scheduleAppointmentReminders(appointmentId: bigint) {
+    const apt = await this.prisma.appointment.findUnique({
+      where: { id: appointmentId },
+      include: {
+        patient: {
+          include: { notificationPreferences: true },
+        },
+        doctor: true,
+      },
+    });
+
+    if (!apt) {
+      this.logger.warn(`Appointment #${appointmentId} not found for reminder scheduling.`);
+      return;
+    }
+
+    // Suppress reminder if appointment is already completed or cancelled
+    if (['completed', 'cancelled', 'no show', 'rescheduled'].includes(apt.status.toLowerCase())) {
+      this.logger.debug(`Skipping reminders for appointment #${appointmentId} with status ${apt.status}`);
+      return;
+    }
+
+    const patient = apt.patient;
+    const doctor = apt.doctor;
+    if (!patient) return;
+
+    // Check patient consent
+    const consent = patient.notificationPreferences?.appointmentConsent ?? true;
+    if (!consent) {
+      this.logger.debug(`Patient #${patient.id} has opted out of appointment reminders.`);
+      return;
+    }
+
+    // Parse appointment start datetime
+    let startTime: Date;
+    try {
+      if (apt.sTime && apt.sTime.includes(':')) {
+        startTime = new Date(apt.sTime);
+      } else {
+        startTime = new Date(apt.date);
+      }
+    } catch {
+      startTime = new Date(apt.date);
+    }
+
+    if (isNaN(startTime.getTime())) {
+      this.logger.warn(`Invalid appointment date/time for appointment #${appointmentId}`);
+      return;
+    }
+
+    const now = new Date();
+    const branchIdStr = apt.branchId ? apt.branchId.toString() : apt.doctor?.branchId ? apt.doctor.branchId.toString() : undefined;
+    const channel = (patient.notificationPreferences?.preferredChannel as any) || 'IN_APP';
+    const destination = (channel === 'EMAIL' ? patient.email : patient.phone) || undefined;
+
+    // 1. 24-Hour Reminder
+    const reminder24h = new Date(startTime.getTime() - 24 * 60 * 60 * 1000);
+    if (reminder24h > now) {
+      await this.queueNotification({
+        eventType: 'APPOINTMENT_REMINDER',
+        channel,
+        title: 'Upcoming Appointment Tomorrow',
+        message: `Reminder: You have an appointment scheduled for tomorrow with ${doctor?.name || 'your physician'}.`,
+        branchId: branchIdStr,
+        priority: 'NORMAL',
+        scheduledAt: reminder24h.toISOString(),
+        deduplicationKey: `APT-REM-${apt.id}-24H`,
+        recipients: [
+          {
+            patientId: patient.id.toString(),
+            destination,
+            recipientName: patient.name,
+          },
+        ],
+        metadata: {
+          appointmentId: apt.id.toString(),
+          doctorId: doctor?.id ? doctor.id.toString() : null,
+          interval: '24H',
+          date: apt.date,
+        },
+      });
+    }
+
+    // 2. 2-Hour Reminder
+    const reminder2h = new Date(startTime.getTime() - 2 * 60 * 60 * 1000);
+    if (reminder2h > now) {
+      await this.queueNotification({
+        eventType: 'APPOINTMENT_REMINDER',
+        channel,
+        title: 'Appointment in 2 Hours',
+        message: `Reminder: Your appointment with ${doctor?.name || 'your physician'} is scheduled in 2 hours.`,
+        branchId: branchIdStr,
+        priority: 'HIGH',
+        scheduledAt: reminder2h.toISOString(),
+        deduplicationKey: `APT-REM-${apt.id}-2H`,
+        recipients: [
+          {
+            patientId: patient.id.toString(),
+            destination,
+            recipientName: patient.name,
+          },
+        ],
+        metadata: {
+          appointmentId: apt.id.toString(),
+          doctorId: doctor?.id ? doctor.id.toString() : null,
+          interval: '2H',
+          date: apt.date,
+        },
+      });
+    }
+  }
+
+  /**
+   * Cancels pending reminders when appointment is cancelled or completed
+   */
+  async cancelAppointmentReminders(appointmentId: bigint) {
+    const keys = [`APT-REM-${appointmentId}-24H`, `APT-REM-${appointmentId}-2H`];
+
+    const updated = await this.prisma.notificationOutbox.updateMany({
+      where: {
+        deduplicationKey: { in: keys },
+        status: { in: ['PENDING', 'RETRYABLE'] },
+      },
+      data: {
+        status: 'CANCELLED',
+        lastError: 'Appointment status transitioned to completed or cancelled; reminder suppressed.',
+      },
+    });
+
+    this.logger.log(`Cancelled ${updated.count} pending reminder(s) for appointment #${appointmentId}`);
+  }
+
+  /**
+   * Reschedules appointment reminders
+   */
+  async rescheduleAppointmentReminders(appointmentId: bigint) {
+    await this.cancelAppointmentReminders(appointmentId);
+    await this.scheduleAppointmentReminders(appointmentId);
+  }
+
+  /**
+   * Notifies patient that verified lab report is available (respects privacy & consent)
+   */
+  async triggerLabReportNotification(orderId: bigint, isCorrected = false) {
+    const order = await this.prisma.lab.findUnique({
+      where: { id: orderId },
+      include: {
+        patient: { include: { notificationPreferences: true } },
+      },
+    });
+
+    if (!order || !order.patient) return;
+
+    const consent = order.patient.notificationPreferences?.labConsent ?? true;
+    if (!consent) {
+      this.logger.debug(`Patient #${order.patient.id} opted out of laboratory notifications.`);
+      return;
+    }
+
+    const channel = (order.patient.notificationPreferences?.preferredChannel as any) || 'IN_APP';
+    const destination = (channel === 'EMAIL' ? order.patient.email : order.patient.phone) || undefined;
+    const branchIdStr = order.branchId ? order.branchId.toString() : undefined;
+    const orgIdStr = order.organizationId ? order.organizationId.toString() : undefined;
+
+    await this.queueNotification({
+      eventType: isCorrected ? 'LAB_REPORT_CORRECTED' : 'LAB_RESULT_AVAILABLE',
+      channel,
+      title: isCorrected ? 'Corrected Lab Report Available' : 'Lab Test Results Available',
+      // Strict clinical privacy: never include test analyte names, values, or abnormal results in preview
+      message: `Your laboratory investigation report (Order #${order.orderNumber || order.id}) is now finalized and available in your patient portal.`,
+      branchId: branchIdStr,
+      organizationId: orgIdStr,
+      priority: 'NORMAL',
+      deduplicationKey: `LAB-REL-${order.id}-${isCorrected ? 'CORR' : 'INIT'}`,
+      recipients: [
+        {
+          patientId: order.patient.id.toString(),
+          destination,
+          recipientName: order.patient.name,
+        },
+      ],
+      metadata: {
+        orderId: order.id.toString(),
+        orderNumber: order.orderNumber,
+        isCorrected,
+      },
+    });
+  }
+
+  /**
+   * Triggers critical laboratory alert with responsible clinician escalation
+   */
+  async triggerCriticalResultEscalation(orderId: bigint, criticalFindings: string) {
+    const order = await this.prisma.lab.findUnique({
+      where: { id: orderId },
+      include: {
+        patient: true,
+        doctor: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Lab order #${orderId} not found.`);
+    }
+
+    // 1. Create CriticalLabEscalation entity
+    const escalation = await this.prisma.criticalLabEscalation.create({
+      data: {
+        labOrderId: order.id,
+        patientId: order.patientId,
+        responsibleClinicianId: order.doctorId,
+        criticalFindings: criticalFindings.trim(),
+        isAcknowledged: false,
+      },
+    });
+
+    // 2. Alert responsible doctor via urgent IN_APP notification
+    let targetUserId: bigint | null = null;
+    if (order.doctor?.email) {
+      const user = await this.prisma.user.findFirst({
+        where: { email: { equals: order.doctor.email, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (user) targetUserId = user.id;
+    }
+
+    const branchIdStr = order.branchId ? order.branchId.toString() : undefined;
+    const orgIdStr = order.organizationId ? order.organizationId.toString() : undefined;
+
+    await this.queueNotification({
+      eventType: 'CRITICAL_LAB_RESULT_ESCALATION',
+      channel: 'IN_APP',
+      title: 'CRITICAL LAB ALERT: Immediate Evaluation Required',
+      message: `Critical value detected for Patient ${order.patientName || order.patient?.name} (Order #${order.orderNumber || order.id}). Findings: ${criticalFindings.slice(0, 150)}. Electronic alert does not replace verbal handoff.`,
+      branchId: branchIdStr,
+      organizationId: orgIdStr,
+      priority: 'URGENT',
+      deduplicationKey: `CRIT-ESC-${escalation.id}`,
+      recipients: targetUserId
+        ? [
+            {
+              userId: targetUserId.toString(),
+              recipientName: order.doctor?.name || undefined,
+            },
+          ]
+        : [],
+      metadata: {
+        escalationId: escalation.id.toString(),
+        labOrderId: order.id.toString(),
+        patientId: order.patientId.toString(),
+        patientName: order.patientName || order.patient?.name,
+        criticalFindings,
+      },
+    });
+
+    return this.serializeBigInt(escalation);
+  }
+
+  /**
+   * Clinician acknowledges critical laboratory alert
+   */
+  async acknowledgeCriticalEscalation(escalationId: bigint, userId: bigint, notes?: string) {
+    const escalation = await this.prisma.criticalLabEscalation.findUnique({
+      where: { id: escalationId },
+    });
+
+    if (!escalation) {
+      throw new NotFoundException(`Critical alert escalation #${escalationId} not found.`);
+    }
+
+    const updated = await this.prisma.criticalLabEscalation.update({
+      where: { id: escalationId },
+      data: {
+        isAcknowledged: true,
+        acknowledgedAt: new Date(),
+        acknowledgedById: userId,
+        acknowledgementNotes: notes?.trim() || null,
+      },
+      include: {
+        patient: { select: { id: true, name: true } },
+        responsibleClinician: { select: { id: true, name: true } },
+        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    return this.serializeBigInt(updated);
+  }
+
+  /**
+   * Retrieves pending unacknowledged critical alerts for clinician dashboard
+   */
+  async getPendingCriticalEscalations(branchId?: bigint, doctorId?: bigint) {
+    const where: any = {
+      isAcknowledged: false,
+    };
+
+    if (doctorId) {
+      where.responsibleClinicianId = doctorId;
+    }
+
+    if (branchId) {
+      where.labOrder = { branchId };
+    }
+
+    const items = await this.prisma.criticalLabEscalation.findMany({
+      where,
+      orderBy: { escalatedAt: 'desc' },
+      include: {
+        patient: { select: { id: true, name: true, phone: true } },
+        responsibleClinician: { select: { id: true, name: true } },
+        labOrder: { select: { id: true, orderNumber: true, status: true } },
+      },
+    });
+
+    return items.map((i) => this.serializeBigInt(i));
   }
 
   // ===========================================================================

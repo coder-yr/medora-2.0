@@ -67,6 +67,9 @@ export class CreateNotificationDto {
   branchId?: string | number;
 
   @IsOptional()
+  organizationId?: string | number;
+
+  @IsOptional()
   scheduledAt?: string;
 
   @IsString()
@@ -87,6 +90,32 @@ export class UpdatePreferencesDto {
   @IsBoolean()
   @IsOptional()
   smsEnabled?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  appointmentConsent?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  labConsent?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  followUpConsent?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  billingConsent?: boolean;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['IN_APP', 'EMAIL', 'SMS'])
+  preferredChannel?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(50)
+  consentSource?: string;
 
   @IsObject()
   @IsOptional()
@@ -207,4 +236,11 @@ export class AdminQueryNotificationsDto {
 
   @IsOptional()
   offset?: string | number;
+}
+
+export class AcknowledgeEscalationDto {
+  @IsString()
+  @IsOptional()
+  @MaxLength(1000)
+  notes?: string;
 }
