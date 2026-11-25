@@ -30,7 +30,7 @@ import {
   UpdateLabTestCatalogueDto,
 } from './dto/catalogue.dto';
 import { CancelLabOrderDto, CreateLabOrderDto } from './dto/lab-order.dto';
-import { CollectSampleDto, ReceiveSampleDto, RejectSampleDto } from './dto/sample.dto';
+import { CollectSampleDto, ReceiveSampleDto, RecollectSampleDto, RejectSampleDto } from './dto/sample.dto';
 import {
   ApproveReportDto,
   EnterResultsDto,
@@ -154,6 +154,14 @@ export class LaboratoryController {
     return this.labService.getOrderById(id, req.user);
   }
 
+  @Get('orders/:id/print')
+  @RequirePermissions(HospitalPermission.LAB_VIEW)
+  @ApiOperation({ summary: 'Get printable laboratory report payload with facility branding and verified readings' })
+  @ApiResponse({ status: 200, description: 'Printable laboratory report data' })
+  async getPrintout(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+    return this.labService.getPrintout(id, req.user);
+  }
+
   @Post('orders/:id/cancel')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions(HospitalPermission.LAB_ORDER)
@@ -228,6 +236,20 @@ export class LaboratoryController {
   ) {
     const userId = req.user?.id ? Number(req.user.id) : 1;
     return this.labService.rejectSample(sampleId, dto, userId);
+  }
+
+  @Post('samples/:sampleId/recollect')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(HospitalPermission.LAB_SAMPLE_COLLECT)
+  @ApiOperation({ summary: 'Record specimen recollection after sample rejection' })
+  @ApiResponse({ status: 200, description: 'New recollected sample created and linked' })
+  async recollectSample(
+    @Param('sampleId', ParseIntPipe) sampleId: number,
+    @Body() dto: RecollectSampleDto,
+    @Req() req: any,
+  ) {
+    const userId = req.user?.id ? Number(req.user.id) : 1;
+    return this.labService.recollectSample(sampleId, dto, userId);
   }
 
   // ===========================================================================

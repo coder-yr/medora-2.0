@@ -112,6 +112,12 @@ export class CreateSupplierDto {
   @IsString()
   address?: string;
 
+  @ApiPropertyOptional({ example: '27AAAAA0000A1Z5', description: 'GSTIN tax identification number' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  gstin?: string;
+
   @ApiPropertyOptional({ example: true, description: 'Active status' })
   @IsOptional()
   @IsBoolean()

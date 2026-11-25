@@ -61,8 +61,17 @@ export class InvoicePaymentResponseDto {
   @ApiProperty({ example: '1' })
   paymentId!: string;
 
+  @ApiPropertyOptional({ example: 'RCP-20261028-0001' })
+  receiptNumber?: string | null;
+
   @ApiProperty({ example: '300.00' })
   amount!: string;
+
+  @ApiPropertyOptional({ example: '0.00' })
+  refundedAmount?: string | null;
+
+  @ApiPropertyOptional({ example: 'COMPLETED' })
+  status?: string;
 
   @ApiPropertyOptional({ example: 'Cash' })
   method?: string | null;
@@ -80,9 +89,50 @@ export class InvoicePaymentResponseDto {
   createdAt?: string | null;
 }
 
+export class InvoiceRefundResponseDto {
+  @ApiProperty({ example: '1' })
+  id!: string;
+
+  @ApiProperty({ example: 'RFD-20261028-0001' })
+  refundNumber!: string;
+
+  @ApiProperty({ example: '1' })
+  paymentId!: string;
+
+  @ApiPropertyOptional({ example: '1' })
+  invoicePaymentId?: string | null;
+
+  @ApiProperty({ example: '100.00' })
+  amount!: string;
+
+  @ApiProperty({ example: 'Patient cancellation' })
+  reason!: string;
+
+  @ApiProperty({ example: 'Cash' })
+  method!: string;
+
+  @ApiPropertyOptional({ example: '1' })
+  approvedById?: string | null;
+
+  @ApiProperty({ example: '1' })
+  processedById!: string;
+
+  @ApiProperty({ example: '2026-10-28T11:00:00.000Z' })
+  refundedAt!: string;
+}
+
 export class InvoiceResponseDto {
   @ApiProperty({ example: '1' })
   id!: string;
+
+  @ApiPropertyOptional({ example: 'INV-20261028-0001' })
+  invoiceNumber?: string | null;
+
+  @ApiPropertyOptional({ example: '1' })
+  organizationId?: string | null;
+
+  @ApiPropertyOptional({ example: '1' })
+  branchId?: string | null;
 
   @ApiProperty({ example: '1' })
   patientId!: string;
@@ -93,8 +143,20 @@ export class InvoiceResponseDto {
   @ApiPropertyOptional({ example: '2' })
   referringDoctorId?: string | null;
 
+  @ApiPropertyOptional({ example: '1' })
+  consultationId?: string | null;
+
   @ApiProperty({ example: '2026-10-28' })
   date!: string;
+
+  @ApiPropertyOptional({ example: '2026-11-05' })
+  dueDate?: string | null;
+
+  @ApiPropertyOptional()
+  cancelledAt?: string | null;
+
+  @ApiPropertyOptional()
+  cancellationReason?: string | null;
 
   @ApiProperty({ example: '500.00', description: 'Subtotal before discount and tax' })
   subtotal!: string;
@@ -134,6 +196,9 @@ export class InvoiceResponseDto {
 
   @ApiProperty({ type: [InvoicePaymentResponseDto] })
   payments!: InvoicePaymentResponseDto[];
+
+  @ApiPropertyOptional({ type: [InvoiceRefundResponseDto] })
+  refunds?: InvoiceRefundResponseDto[];
 
   @ApiPropertyOptional()
   createdAt?: string | null;

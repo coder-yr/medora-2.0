@@ -54,6 +54,23 @@ export class DispenseItemDto {
   @IsNumber()
   @Min(0)
   unitPrice?: number;
+
+  @ApiPropertyOptional({ description: 'Whether this medicine is an authorized clinical substitution', example: false })
+  @IsOptional()
+  @IsBoolean()
+  isSubstituted?: boolean;
+
+  @ApiPropertyOptional({ description: 'Originally prescribed Medicine ID if substituted', example: 5 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  originalMedicineId?: number;
+
+  @ApiPropertyOptional({ description: 'Mandatory reason for clinical substitution', example: 'Brand out of stock; bioequivalent generic dispensed with doctor consent' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  substitutionReason?: string;
 }
 
 export class DispensePrescriptionDto {
@@ -127,4 +144,101 @@ export class DispensePrescriptionDto {
   @ValidateNested({ each: true })
   @Type(() => DispenseItemDto)
   items!: DispenseItemDto[];
+}
+
+export class CreateOtcSaleItemDto {
+  @ApiPropertyOptional({ description: 'Catalogue Medicine ID (omit if custom/unlisted)', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  medicineId?: number;
+
+  @ApiPropertyOptional({ description: 'Custom unlisted medicine name if medicineId is omitted' })
+  @IsOptional()
+  @IsString()
+  customName?: string;
+
+  @ApiPropertyOptional({ description: 'Explicit Batch ID. If omitted, FEFO allocates automatically.', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  batchId?: number;
+
+  @ApiProperty({ description: 'Quantity to sell', example: 1 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  quantity!: number;
+
+  @ApiPropertyOptional({ description: 'Custom unit selling price in INR' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  unitPrice?: number;
+}
+
+export class CreateOtcSaleDto {
+  @ApiPropertyOptional({ description: 'Optional registered Patient ID', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  patientId?: number;
+
+  @ApiPropertyOptional({ description: 'Customer / Patient full name for walk-in counter sales', example: 'Pooja Verma' })
+  @IsOptional()
+  @IsString()
+  patientName?: string;
+
+  @ApiPropertyOptional({ description: 'Customer contact phone number', example: '+91 98765 43210' })
+  @IsOptional()
+  @IsString()
+  customerPhone?: string;
+
+  @ApiProperty({ description: 'Sale date (YYYY-MM-DD)', example: '2026-11-24' })
+  @IsString()
+  @IsNotEmpty()
+  saleDate!: string;
+
+  @ApiPropertyOptional({ description: 'Discount in INR', example: 0.0, default: 0.0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  discount?: number;
+
+  @ApiPropertyOptional({ description: 'Sales Tax / VAT in INR', example: 0.0, default: 0.0 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  tax?: number;
+
+  @ApiPropertyOptional({ description: 'Payment method: cash, card, upi, bank_transfer', example: 'cash' })
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @ApiPropertyOptional({ description: 'Pharmacist sale notes' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @ApiPropertyOptional({ description: 'Whether to generate Phase 10.5.6 invoice', default: true })
+  @IsOptional()
+  @IsBoolean()
+  generateInvoice?: boolean;
+
+  @ApiPropertyOptional({ description: 'Hospital branch ID' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  branchId?: number;
+
+  @ApiProperty({ description: 'OTC line items', type: [CreateOtcSaleItemDto] })
+  @IsArray()
+  @ArrayMinSize(1, { message: 'Must include at least one medicine item for OTC sale.' })
+  @ValidateNested({ each: true })
+  @Type(() => CreateOtcSaleItemDto)
+  items!: CreateOtcSaleItemDto[];
 }

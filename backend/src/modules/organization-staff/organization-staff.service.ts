@@ -383,6 +383,31 @@ export class OrganizationStaffService {
         where: { id: membership.userId },
         data: { branchId: branchIds[0] },
       });
+
+      // Synchronize UserBranchMembership records for each assigned branch
+      for (const b of validBranches) {
+        await this.prisma.userBranchMembership.upsert({
+          where: {
+            userId_branchId: {
+              userId: membership.userId,
+              branchId: b.id,
+            },
+          },
+          create: {
+            userId: membership.userId,
+            branchId: b.id,
+            accessRole: membership.accessRole,
+            isActive: true,
+            isDefault: b.id === branchIds[0],
+          },
+          update: {
+            isActive: true,
+            accessRole: membership.accessRole,
+            isDefault: b.id === branchIds[0],
+            revokedAt: null,
+          },
+        });
+      }
     }
 
     return {

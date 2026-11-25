@@ -16,14 +16,33 @@ import {
 
 export const APPOINTMENT_STATUSES = [
   'scheduled',
+  'confirmed',
+  'checked_in',
   'arrived',
+  'waiting',
+  'called',
+  'in_consultation',
   'in consultation',
   'completed',
   'cancelled',
+  'no_show',
   'no show',
+  'rescheduled',
+  'SCHEDULED',
+  'CONFIRMED',
+  'CHECKED_IN',
+  'WAITING',
+  'IN_CONSULTATION',
+  'COMPLETED',
+  'CANCELLED',
+  'NO_SHOW',
+  'RESCHEDULED',
 ] as const;
 
 export type AppointmentStatus = (typeof APPOINTMENT_STATUSES)[number];
+
+export const APPOINTMENT_PRIORITIES = ['NORMAL', 'URGENT', 'VIP', 'EMERGENCY'] as const;
+export type AppointmentPriority = (typeof APPOINTMENT_PRIORITIES)[number];
 
 export class CreateAppointmentDto {
   @ApiProperty({
@@ -79,6 +98,31 @@ export class CreateAppointmentDto {
     message: `Status must be one of: ${APPOINTMENT_STATUSES.join(', ')}`,
   })
   status?: AppointmentStatus;
+
+  @ApiPropertyOptional({
+    description: 'Priority level for queue handling',
+    enum: APPOINTMENT_PRIORITIES,
+    default: 'NORMAL',
+  })
+  @IsOptional()
+  @IsIn([...APPOINTMENT_PRIORITIES])
+  priority?: AppointmentPriority;
+
+  @ApiPropertyOptional({
+    description: 'Medical department name',
+    example: 'Cardiology',
+  })
+  @IsOptional()
+  @IsString()
+  department?: string;
+
+  @ApiPropertyOptional({
+    description: 'Reason for visit',
+    example: 'Chest discomfort and shortness of breath',
+  })
+  @IsOptional()
+  @IsString()
+  reason?: string;
 
   @ApiPropertyOptional({
     description: 'Remarks or clinical notes',

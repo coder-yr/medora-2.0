@@ -25,6 +25,8 @@ import { RequirePermissions } from '../../common/decorators/permissions.decorato
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { AuthUser } from '../../common/types/auth-user.interface';
 import { MedicineService } from './medicine.service';
 import { CreateMedicineDto } from './dto/create-medicine.dto';
 import { UpdateMedicineDto } from './dto/update-medicine.dto';
@@ -176,15 +178,15 @@ export class MedicineController {
   @Get('meta/suppliers')
   @RequirePermissions(HospitalPermission.MEDICINE_VIEW)
   @ApiOperation({ summary: 'List pharmaceutical suppliers' })
-  findAllSuppliers() {
-    return this.medicineService.findAllSuppliers();
+  findAllSuppliers(@CurrentUser() user?: AuthUser) {
+    return this.medicineService.findAllSuppliers(user?.organizationId ? BigInt(user.organizationId) : undefined);
   }
 
   @Post('meta/suppliers')
   @RequirePermissions(HospitalPermission.MEDICINE_ADD)
   @ApiOperation({ summary: 'Create supplier' })
-  createSupplier(@Body() dto: CreateSupplierDto) {
-    return this.medicineService.createSupplier(dto);
+  createSupplier(@Body() dto: CreateSupplierDto, @CurrentUser() user?: AuthUser) {
+    return this.medicineService.createSupplier(dto, user?.organizationId ? BigInt(user.organizationId) : undefined);
   }
 
   @Put('meta/suppliers/:id')

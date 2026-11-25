@@ -109,6 +109,15 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
           return record;
         }),
       },
+      patient: {
+        update: jest.fn().mockImplementation(async ({ where, data }: any) => {
+          const p = patientsMap.get(where.id.toString());
+          if (!p) throw new Error('Not found');
+          const updated = { ...p, ...data, updatedAt: new Date() };
+          patientsMap.set(where.id.toString(), updated);
+          return updated;
+        }),
+      },
       consultTemplate: {
         create: jest.fn().mockImplementation(async ({ data }: any) => {
           autoTemplateId++;
@@ -116,6 +125,11 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
           const record = { id, ...data, createdAt: new Date(), updatedAt: new Date() };
           templatesMap.set(id.toString(), record);
           return record;
+        }),
+      },
+      consultationAmendment: {
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          return { id: 1n, ...data, createdAt: new Date() };
         }),
       },
       doctorSlot: {
@@ -276,6 +290,23 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
       user: {
         findUnique: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockResolvedValue({ id: 999n }),
+      },
+      consultationAmendment: {
+        create: jest.fn().mockImplementation(async ({ data }: any) => {
+          return { id: 1n, ...data, createdAt: new Date() };
+        }),
+      },
+      prescription: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      lab: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      radiologyOrder: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      patientDocument: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
     };
   };
@@ -543,6 +574,140 @@ describe('ConsultationService (Legacy Parity & Clinical Rules)', () => {
       expect(printSummary.doctor?.name).toBe('Dr Gregory House');
       expect(printSummary.diagnosis).toBe('Musculoskeletal strain');
       expect(printSummary.visit?.bp).toBe('130/85');
+    });
+  });
+
+  describe('Phase 10.5.3: SOAP Documentation, Live BMI & Clinical Sign-off', () => {
+    it('saves comprehensive SOAP notes and calculates BMI automatically', async () => {
+      const saved = await service.saveVisitConsultation(
+        appointment1.id,
+        {
+          soap_subjective: 'Patient reports progressive dry cough for 3 days',
+          soap_objective: 'Vitals stable. Throat clear.',
+          soap_assessment: 'Viral upper respiratory tract infection',
+          soap_plan: 'Oral fluids and rest. Symptomatic relief.',
+          vitals: {
+            height: 175,
+            weight: 70,
+            bp: '120/80',
+            pulse: '72',
+          },
+          diagnoses: [
+            { type: 'PRIMARY', description: 'Viral bronchitis', code: 'J20.9' },
+          ],
+          action: 'draft',
+        },
+        doctor1.id,
+      );
+
+      expect(saved.soapSubjective).toBe('Patient reports progressive dry cough for 3 days');
+      expect(saved.soapObjective).toBe('Vitals stable. Throat clear.');
+      expect(saved.soapAssessment).toBe('Viral upper respiratory tract infection');
+      expect(saved.soapPlan).toBe('Oral fluids and rest. Symptomatic relief.');
+      expect(saved.vitals).toBeDefined();
+      expect(saved.vitals.bmi).toBe('22.9');
+      expect(saved.status).toBe('draft');
+    });
+
+    it('signs consultation note, sets digital signature and enforces immutability', async () => {
+      const signed = await service.saveVisitConsultation(
+        appointment1.id,
+        {
+          presenting_complaint: 'Cough',
+          diagnosis: 'Acute Bronchitis',
+          action: 'sign',
+        },
+        doctor1.id,
+      );
+
+      expect(signed.status).toBe('signed');
+      expect(signed.signedAt).toBeDefined();
+      expect(signed.signedById).toBe(doctor1.id);
+
+      // Attempt to modify signed note directly should be rejected
+      await expect(
+        service.saveVisitConsultation(
+          appointment1.id,
+          {
+            presenting_complaint: 'Overwriting signed note',
+            action: 'save',
+          },
+          doctor1.id,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('records auditable amendment on signed consultation', async () => {
+      const signed = await service.saveVisitConsultation(
+        appointment1.id,
+        {
+          presenting_complaint: 'Persistent fever',
+          diagnosis: 'Typhoid fever',
+          action: 'sign',
+        },
+        doctor1.id,
+      );
+
+      const amended = await service.amendConsultation(
+        signed.id,
+        {
+          reason: 'Blood culture report received showing Salmonella typhi',
+          amendedSection: 'ASSESSMENT',
+          newNotes: 'Confirmed enteric fever via culture. Ceftriaxone IV started.',
+        },
+        doctor1.id,
+      );
+
+      expect(amended.id).toBe(signed.id);
+      expect(amended.status).toBe('signed');
+    });
+
+    it('rejects amendment on draft consultation', async () => {
+      const draft = await service.saveVisitConsultation(
+        appointment1.id,
+        {
+          presenting_complaint: 'Headache',
+          action: 'draft',
+        },
+        doctor1.id,
+      );
+
+      await expect(
+        service.amendConsultation(
+          draft.id,
+          {
+            reason: 'Testing rejection',
+            amendedSection: 'PLAN',
+            newNotes: 'Should not amend draft',
+          },
+          doctor1.id,
+        ),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('retrieves patient clinical chart consolidating allergy and encounter data', async () => {
+      const chart = await service.getPatientClinicalChart(patient1.id);
+
+      expect(chart.patient).toBeDefined();
+      expect(chart.patient.name).toBe('Jane Doe');
+      expect(chart.allergyStatus).toBeDefined();
+      expect(Array.isArray(chart.diagnoses)).toBe(true);
+      expect(Array.isArray(chart.consultations)).toBe(true);
+      expect(Array.isArray(chart.prescriptions)).toBe(true);
+      expect(Array.isArray(chart.labResults)).toBe(true);
+      expect(Array.isArray(chart.radiologyReports)).toBe(true);
+    });
+
+    it('retrieves doctor clinical dashboard with live queue and counts', async () => {
+      const dashboard = await service.getDoctorDashboard(doctor1.id);
+
+      expect(typeof dashboard.todayAppointments).toBe('number');
+      expect(typeof dashboard.waitingPatients).toBe('number');
+      expect(typeof dashboard.activeConsultations).toBe('number');
+      expect(typeof dashboard.completedConsultations).toBe('number');
+      expect(typeof dashboard.pendingDrafts).toBe('number');
+      expect(Array.isArray(dashboard.queue)).toBe(true);
+      expect(Array.isArray(dashboard.drafts)).toBe(true);
     });
   });
 });

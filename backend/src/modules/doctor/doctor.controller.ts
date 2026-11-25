@@ -8,10 +8,11 @@ import {
   Param,
   Patch,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { HospitalPermission } from '../../common/constants/permissions.enum';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -21,6 +22,11 @@ import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { DoctorQueryDto } from './dto/doctor-query.dto';
 import { DoctorResponseDto, PaginatedDoctorsDto } from './dto/doctor-response.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
+import {
+  DoctorLeaveDto,
+  DoctorScheduleUpdateDto,
+  DoctorSlotDto,
+} from './dto/doctor-schedule.dto';
 
 @ApiTags('Doctors')
 @ApiBearerAuth('JWT')
@@ -61,6 +67,59 @@ export class DoctorController {
   @ApiResponse({ status: 404, description: 'Doctor not found' })
   async findOne(@Param('id') id: string): Promise<DoctorResponseDto> {
     return this.doctorService.findById(id);
+  }
+
+  @Get(':id/schedules')
+  @RequirePermissions(HospitalPermission.DOCTOR_VIEW)
+  @ApiOperation({ summary: 'Get doctor weekly working clinic schedules' })
+  @ApiQuery({ name: 'branchId', required: false, description: 'Optional branch ID filter' })
+  @ApiResponse({ status: 200, type: [DoctorSlotDto] })
+  async getSchedules(
+    @Param('id') id: string,
+    @Query('branchId') branchId?: string,
+  ): Promise<DoctorSlotDto[]> {
+    return this.doctorService.getDoctorSchedules(id, branchId);
+  }
+
+  @Put(':id/schedules')
+  @RequirePermissions(HospitalPermission.DOCTOR_UPDATE)
+  @ApiOperation({ summary: 'Update doctor weekly working clinic schedules' })
+  @ApiResponse({ status: 200, type: [DoctorSlotDto] })
+  async updateSchedules(
+    @Param('id') id: string,
+    @Body() dto: DoctorScheduleUpdateDto,
+  ): Promise<DoctorSlotDto[]> {
+    return this.doctorService.updateDoctorSchedules(id, dto);
+  }
+
+  @Get(':id/leaves')
+  @RequirePermissions(HospitalPermission.DOCTOR_VIEW)
+  @ApiOperation({ summary: 'Get doctor upcoming leave and blocked windows' })
+  @ApiResponse({ status: 200, type: [DoctorLeaveDto] })
+  async getLeaves(@Param('id') id: string): Promise<DoctorLeaveDto[]> {
+    return this.doctorService.getDoctorLeaves(id);
+  }
+
+  @Post(':id/leaves')
+  @RequirePermissions(HospitalPermission.DOCTOR_UPDATE)
+  @ApiOperation({ summary: 'Add a leave or blocked time window for a doctor' })
+  @ApiResponse({ status: 201, type: DoctorLeaveDto })
+  async addLeave(
+    @Param('id') id: string,
+    @Body() dto: DoctorLeaveDto,
+  ): Promise<DoctorLeaveDto> {
+    return this.doctorService.addDoctorLeave(id, dto);
+  }
+
+  @Delete(':id/leaves/:blockId')
+  @RequirePermissions(HospitalPermission.DOCTOR_UPDATE)
+  @ApiOperation({ summary: 'Remove a leave or blocked window for a doctor' })
+  @ApiResponse({ status: 200, description: 'Leave removed' })
+  async removeLeave(
+    @Param('id') id: string,
+    @Param('blockId') blockId: string,
+  ): Promise<{ message: string }> {
+    return this.doctorService.deleteDoctorLeave(id, blockId);
   }
 
   @Post()

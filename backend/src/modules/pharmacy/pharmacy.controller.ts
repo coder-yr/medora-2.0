@@ -30,12 +30,15 @@ import { AuthUser } from '../../common/types/auth-user.interface';
 import { PharmacyService } from './pharmacy.service';
 import { CreateBatchDto, UpdateBatchStatusDto } from './dto/batch.dto';
 import {
+  ApprovePurchaseOrderDto,
+  CancelPurchaseOrderDto,
   CreateGoodsReceiptDto,
   CreatePurchaseOrderDto,
 } from './dto/purchase.dto';
-import { DispensePrescriptionDto } from './dto/dispensation.dto';
+import { CreateOtcSaleDto, DispensePrescriptionDto } from './dto/dispensation.dto';
 import { CreateStockAdjustmentDto } from './dto/adjustment.dto';
 import { CreatePharmacyReturnDto } from './dto/return.dto';
+import { CreateStockTransferDto, QueryStockTransferDto } from './dto/transfer.dto';
 import {
   QueryBatchDto,
   QueryDispensationDto,
@@ -163,6 +166,40 @@ export class PharmacyController {
     return this.pharmacyService.getPurchaseOrderById(id, user);
   }
 
+  @Post('purchases/orders/:id/approve')
+  @RequirePermissions(HospitalPermission.PO_APPROVE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Approve purchase order for supplier fulfillment' })
+  @ApiParam({ name: 'id', description: 'Purchase order ID' })
+  async approvePurchaseOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ApprovePurchaseOrderDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.approvePurchaseOrder(
+      id,
+      dto.notes,
+      user,
+    );
+  }
+
+  @Post('purchases/orders/:id/cancel')
+  @RequirePermissions(HospitalPermission.PHARMACY_PURCHASE)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Cancel purchase order' })
+  @ApiParam({ name: 'id', description: 'Purchase order ID' })
+  async cancelPurchaseOrder(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: CancelPurchaseOrderDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.cancelPurchaseOrder(
+      id,
+      dto.reason,
+      user,
+    );
+  }
+
   @Get('purchases/receipts')
   @RequirePermissions(HospitalPermission.PHARMACY_RECEIVE)
   @ApiOperation({ summary: 'List goods receipts (GRNs)' })
@@ -259,6 +296,24 @@ export class PharmacyController {
     return this.pharmacyService.getDispensationById(id, user);
   }
 
+  @Post('sales/otc')
+  @RequirePermissions(HospitalPermission.PHARMACY_OTC_SALE)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Direct Over-the-Counter retail sale with FEFO batch allocation and prescription checks',
+  })
+  @ApiResponse({ status: 201, description: 'OTC sale completed and invoice generated' })
+  async createOtcSale(
+    @Body() dto: CreateOtcSaleDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.sellOtc(
+      dto,
+      user?.id ? Number(user.id) : undefined,
+      user,
+    );
+  }
+
   // ===========================================================================
   // 5. STOCK ADJUSTMENTS
   // ===========================================================================
@@ -333,7 +388,47 @@ export class PharmacyController {
   }
 
   // ===========================================================================
-  // 7. STOCK MOVEMENTS & AUDIT LEDGER
+  // 7. INTER-BRANCH STOCK TRANSFERS
+  // ===========================================================================
+
+  @Get('transfers')
+  @RequirePermissions(HospitalPermission.PHARMACY_VIEW)
+  @ApiOperation({ summary: 'List inter-branch stock transfers' })
+  async findAllTransfers(
+    @Query() query: QueryStockTransferDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getTransfers(query, user);
+  }
+
+  @Post('transfers')
+  @RequirePermissions(HospitalPermission.PHARMACY_TRANSFER)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create and execute inter-branch stock transfer' })
+  async createTransfer(
+    @Body() dto: CreateStockTransferDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.transferStock(
+      dto,
+      user?.id ? Number(user.id) : undefined,
+      user,
+    );
+  }
+
+  @Get('transfers/:id')
+  @RequirePermissions(HospitalPermission.PHARMACY_VIEW)
+  @ApiOperation({ summary: 'Get inter-branch stock transfer details' })
+  @ApiParam({ name: 'id', description: 'Transfer ID' })
+  async findOneTransfer(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.pharmacyService.getTransferById(id, user);
+  }
+
+  // ===========================================================================
+  // 8. STOCK MOVEMENTS & AUDIT LEDGER
   // ===========================================================================
 
   @Get('movements')

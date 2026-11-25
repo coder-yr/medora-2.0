@@ -11,7 +11,7 @@ import {
   UpdateLabTestCatalogueDto,
 } from './dto/catalogue.dto';
 import { CancelLabOrderDto, CreateLabOrderDto } from './dto/lab-order.dto';
-import { CollectSampleDto, ReceiveSampleDto, RejectSampleDto } from './dto/sample.dto';
+import { CollectSampleDto, ReceiveSampleDto, RecollectSampleDto, RejectSampleDto } from './dto/sample.dto';
 import {
   ApproveReportDto,
   EnterResultsDto,
@@ -29,7 +29,7 @@ export class LaboratoryService {
   constructor(
     private readonly prisma: PrismaService,
     @Optional() private readonly branchAuth?: BranchAuthorizationService,
-  ) {}
+  ) { }
 
   // ===========================================================================
   // 1. SERIALIZATION HELPERS
@@ -137,33 +137,38 @@ export class LaboratoryService {
     const created = await this.prisma.labCategory.create({
       data: {
         category: name,
+        code: dto.code?.trim() || null,
+        department: dto.department?.trim() || null,
         description: dto.description?.trim() || null,
         referenceValue: dto.referenceValue?.trim() || null,
         price: dto.price !== undefined ? new Prisma.Decimal(dto.price) : null,
         sampleType: dto.sampleType?.trim() || null,
         turnaroundHours: dto.turnaroundHours ?? 24,
         instructions: dto.instructions?.trim() || null,
+        collectionNotes: dto.collectionNotes?.trim() || null,
+        criticalLow: dto.criticalLow !== undefined ? new Prisma.Decimal(dto.criticalLow) : null,
+        criticalHigh: dto.criticalHigh !== undefined ? new Prisma.Decimal(dto.criticalHigh) : null,
         isActive: true,
         parameters: dto.parameters?.length
           ? {
-              create: dto.parameters.map((p, idx) => {
-                const range =
-                  p.referenceRange?.trim() ||
-                  (p.referenceMin && p.referenceMax
-                    ? `${p.referenceMin} - ${p.referenceMax} ${p.unit || ''}`.trim()
-                    : null);
-                return {
-                  name: p.name.trim(),
-                  unit: p.unit?.trim() || null,
-                  referenceRange: range,
-                  gender: p.gender?.trim() || 'ALL',
-                  ageMin: p.ageMin,
-                  ageMax: p.ageMax,
-                  displayOrder: p.displayOrder ?? idx + 1,
-                  isActive: true,
-                };
-              }),
-            }
+            create: dto.parameters.map((p, idx) => {
+              const range =
+                p.referenceRange?.trim() ||
+                (p.referenceMin && p.referenceMax
+                  ? `${p.referenceMin} - ${p.referenceMax} ${p.unit || ''}`.trim()
+                  : null);
+              return {
+                name: p.name.trim(),
+                unit: p.unit?.trim() || null,
+                referenceRange: range,
+                gender: p.gender?.trim() || 'ALL',
+                ageMin: p.ageMin,
+                ageMax: p.ageMax,
+                displayOrder: p.displayOrder ?? idx + 1,
+                isActive: true,
+              };
+            }),
+          }
           : undefined,
       },
       include: {
@@ -230,6 +235,8 @@ export class LaboratoryService {
       where: { id: BigInt(id) },
       data: {
         category: testName || undefined,
+        code: dto.code !== undefined ? dto.code?.trim() || null : undefined,
+        department: dto.department !== undefined ? dto.department?.trim() || null : undefined,
         description: dto.description !== undefined ? dto.description?.trim() || null : undefined,
         referenceValue:
           dto.referenceValue !== undefined ? dto.referenceValue?.trim() || null : undefined,
@@ -238,6 +245,10 @@ export class LaboratoryService {
         turnaroundHours: dto.turnaroundHours !== undefined ? dto.turnaroundHours : undefined,
         instructions:
           dto.instructions !== undefined ? dto.instructions?.trim() || null : undefined,
+        collectionNotes:
+          dto.collectionNotes !== undefined ? dto.collectionNotes?.trim() || null : undefined,
+        criticalLow: dto.criticalLow !== undefined ? new Prisma.Decimal(dto.criticalLow) : undefined,
+        criticalHigh: dto.criticalHigh !== undefined ? new Prisma.Decimal(dto.criticalHigh) : undefined,
         isActive: dto.isActive !== undefined ? dto.isActive : undefined,
       },
       include: {
@@ -414,11 +425,22 @@ export class LaboratoryService {
         0,
       );
 
+      // Resolve tenant and branch context
+      const organizationId = user?.organizationId
+        ? BigInt(user.organizationId)
+        : ((patient as any).branch?.organizationId ? BigInt((patient as any).branch.organizationId) : null);
+      const branchId = user?.branchId
+        ? BigInt(user.branchId)
+        : (patient.branchId || null);
+
       // 1. Optional Invoice Integration (only for outpatient when not admitted)
       let invoiceId: bigint | null = null;
       if (!admissionId && dto.generateInvoice) {
         const payment = await tx.payment.create({
           data: {
+            invoiceNumber: `INV-LAB-${orderNumber}`,
+            organizationId,
+            branchId,
             patientId: BigInt(dto.patientId),
             doctor: doctor ? doctor.name : null,
             date: orderDate,
@@ -444,8 +466,11 @@ export class LaboratoryService {
       }
 
       // 2. Create parent Lab Order
+
       const lab = await tx.lab.create({
         data: {
+          organizationId,
+          branchId,
           orderNumber,
           patientId: BigInt(dto.patientId),
           doctorId: dto.doctorId ? BigInt(dto.doctorId) : null,
@@ -796,6 +821,8 @@ export class LaboratoryService {
         where: { id: BigInt(sampleId) },
         data: {
           status: 'COLLECTED',
+          collectorLocation: dto.collectorLocation?.trim() || null,
+          condition: dto.condition?.trim() || 'GOOD',
           collectedAt: now,
           collectedBy: BigInt(userId),
           notes: dto.notes?.trim() || sample.notes,
@@ -812,6 +839,55 @@ export class LaboratoryService {
     });
 
     return this.serializeBigInt(updatedSample);
+  }
+
+  async recollectSample(sampleId: number, dto: RecollectSampleDto, userId: number) {
+    const originalSample = await this.prisma.labSample.findUnique({
+      where: { id: BigInt(sampleId) },
+      include: { lab: true, tests: true },
+    });
+
+    if (!originalSample) {
+      throw new NotFoundException(`Sample #${sampleId} not found.`);
+    }
+
+    const now = new Date();
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+    const newSampleNumber = `SMP-${dateStr}-${originalSample.labId}-R${Math.floor(100 + Math.random() * 900)}`;
+
+    const newSample = await this.prisma.$transaction(async (tx: any) => {
+      const created = await tx.labSample.create({
+        data: {
+          labId: originalSample.labId,
+          sampleNumber: newSampleNumber,
+          sampleType: originalSample.sampleType,
+          collectorLocation: dto.collectorLocation?.trim() || null,
+          condition: dto.condition?.trim() || 'FRESH',
+          isRecollection: true,
+          recollectedFromId: originalSample.id,
+          status: 'COLLECTED',
+          collectedAt: now,
+          collectedBy: BigInt(userId),
+          notes: dto.notes?.trim() || `Recollected after #${originalSample.sampleNumber} rejection`,
+        },
+      });
+
+      // Re-link test line items to the newly recollected sample
+      await tx.labTest.updateMany({
+        where: { sampleId: originalSample.id },
+        data: { sampleId: created.id },
+      });
+
+      // Update lab order status back to SAMPLE_COLLECTED
+      await tx.lab.update({
+        where: { id: originalSample.labId },
+        data: { status: 'SAMPLE_COLLECTED' },
+      });
+
+      return created;
+    });
+
+    return this.serializeBigInt(newSample);
   }
 
   async receiveSample(sampleId: number, dto: ReceiveSampleDto, userId: number) {
@@ -891,12 +967,85 @@ export class LaboratoryService {
   // 5. RESULT ENTRY, VERIFICATION & AMENDMENTS
   // ===========================================================================
 
-  async enterResults(orderId: number, dto: EnterResultsDto, _userId: number) {
+  private evaluateAbnormalFlag(
+    valueStr: string,
+    referenceRange?: string | null,
+    criticalLow?: number | null,
+    criticalHigh?: number | null,
+  ): string {
+    if (!valueStr) return 'NORMAL';
+    const trimmed = valueStr.trim();
+    const upper = trimmed.toUpperCase();
+
+    // Check qualitative values first
+    if (['POSITIVE', 'REACTIVE', 'DETECTED', 'PRESENT'].includes(upper)) {
+      return 'REACTIVE';
+    }
+    if (['NEGATIVE', 'NON-REACTIVE', 'NOT DETECTED', 'ABSENT'].includes(upper)) {
+      return 'NORMAL';
+    }
+
+    const num = parseFloat(trimmed);
+    if (isNaN(num)) {
+      return 'NORMAL';
+    }
+
+    // Parse reference range bounds
+    let rangeMin: number | null = null;
+    let rangeMax: number | null = null;
+
+    if (referenceRange) {
+      // 1. "13.5 - 17.5", "13.5-17.5"
+      const dashMatch = referenceRange.match(/^([0-9.]+)\s*-\s*([0-9.]+)/);
+      if (dashMatch) {
+        rangeMin = parseFloat(dashMatch[1]);
+        rangeMax = parseFloat(dashMatch[2]);
+      } else {
+        // 2. "< 200", "<= 200"
+        const ltMatch = referenceRange.match(/^(?:<=?|<)\s*([0-9.]+)/);
+        if (ltMatch) {
+          rangeMax = parseFloat(ltMatch[1]);
+        } else {
+          // 3. "> 60", ">= 60"
+          const gtMatch = referenceRange.match(/^(?:>=?|>)\s*([0-9.]+)/);
+          if (gtMatch) {
+            rangeMin = parseFloat(gtMatch[1]);
+          }
+        }
+      }
+    }
+
+    // Critical limits check: only evaluate when clinically consistent with this parameter's scale
+    const isCriticalLowValid =
+      criticalLow !== null &&
+      criticalLow !== undefined &&
+      (rangeMin === null || criticalLow < rangeMin);
+
+    const isCriticalHighValid =
+      criticalHigh !== null &&
+      criticalHigh !== undefined &&
+      (rangeMax === null || criticalHigh > rangeMax);
+
+    if (isCriticalLowValid && num < (criticalLow as number)) {
+      return 'CRITICAL_LOW';
+    }
+    if (isCriticalHighValid && num > (criticalHigh as number)) {
+      return 'CRITICAL_HIGH';
+    }
+
+    if (rangeMin !== null && num < rangeMin) return 'LOW';
+    if (rangeMax !== null && num > rangeMax) return 'HIGH';
+
+    return 'NORMAL';
+  }
+
+  async enterResults(orderId: number, dto: EnterResultsDto, userId: number) {
     const order = await this.prisma.lab.findUnique({
       where: { id: BigInt(orderId) },
       include: {
         tests: {
           include: {
+            labCategory: true,
             resultParameters: true,
           },
         },
@@ -944,14 +1093,24 @@ export class LaboratoryService {
           continue;
         }
 
+        const referenceRange = existingParam?.referenceRangeSnapshot || param.referenceRangeSnapshot;
+        const criticalLow = test.labCategory?.criticalLow ? Number(test.labCategory.criticalLow) : null;
+        const criticalHigh = test.labCategory?.criticalHigh ? Number(test.labCategory.criticalHigh) : null;
+        const calculatedFlag = this.evaluateAbnormalFlag(value, referenceRange, criticalLow, criticalHigh);
+        const finalFlag = (param.abnormalFlag && param.abnormalFlag !== 'NORMAL')
+          ? param.abnormalFlag
+          : calculatedFlag;
+
         // Upsert result parameter reading
         if (existingParam) {
           await tx.labResultParameter.update({
             where: { id: existingParam.id },
             data: {
               value: value !== '' ? value : existingParam.value,
-              abnormalFlag: param.abnormalFlag || existingParam.abnormalFlag,
+              abnormalFlag: finalFlag,
               clinicalComments: param.clinicalComments?.trim() || existingParam.clinicalComments,
+              enteredById: BigInt(userId),
+              enteredAt: now,
             },
           });
         } else {
@@ -963,8 +1122,10 @@ export class LaboratoryService {
               value,
               unitSnapshot: param.unitSnapshot?.trim() || null,
               referenceRangeSnapshot: param.referenceRangeSnapshot?.trim() || null,
-              abnormalFlag: param.abnormalFlag || 'NORMAL',
+              abnormalFlag: finalFlag,
               clinicalComments: param.clinicalComments?.trim() || null,
+              enteredById: BigInt(userId),
+              enteredAt: now,
             },
           });
         }
@@ -997,8 +1158,8 @@ export class LaboratoryService {
         reportedCount === 0
           ? 'PROCESSING'
           : reportedCount === totalCount
-          ? 'RESULT_ENTERED'
-          : 'PARTIAL';
+            ? 'RESULT_ENTERED'
+            : 'PARTIAL';
 
       const legacyCategoryName = updatedTests.map((t: any) => t.name).join(', ').slice(0, 1000);
       const legacyReport = updatedTests
@@ -1296,5 +1457,152 @@ export class LaboratoryService {
     });
 
     return this.serializeBigInt(orders);
+  }
+
+  // ===========================================================================
+  // 7. PRINTABLE LABORATORY REPORT
+  // ===========================================================================
+
+  async getPrintout(id: number, user?: AuthUser) {
+    const order = await this.prisma.lab.findUnique({
+      where: { id: BigInt(id) },
+      include: {
+        patient: true,
+        doctor: true,
+        branch: {
+          include: {
+            settings: true,
+            organization: {
+              include: {
+                settings: true,
+              },
+            },
+          },
+        },
+        organization: {
+          include: {
+            settings: true,
+          },
+        },
+        samples: {
+          orderBy: { id: 'asc' },
+        },
+        tests: {
+          include: {
+            labCategory: true,
+            sample: true,
+            resultParameters: {
+              include: {
+                enteredBy: true,
+              },
+              orderBy: { id: 'asc' },
+            },
+          },
+        },
+        amendments: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Lab order #${id} not found.`);
+    }
+
+    if (this.branchAuth && user && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertResourceAccess(user, order.patient?.branchId, 'laboratory order');
+    }
+
+    const hospitalSettings = await this.prisma.hospitalSettings.findFirst({
+      orderBy: { id: 'desc' },
+    });
+
+    let verifierName: string | null = null;
+    if (order.verifiedBy) {
+      const vUser = await this.prisma.user.findUnique({ where: { id: order.verifiedBy } });
+      if (vUser) verifierName = `${vUser.firstName} ${vUser.lastName}`.trim();
+    }
+    let approverName: string | null = null;
+    if (order.approvedBy) {
+      const aUser = await this.prisma.user.findUnique({ where: { id: order.approvedBy } });
+      if (aUser) approverName = `${aUser.firstName} ${aUser.lastName}`.trim();
+    }
+
+    const orgSettings = order.organization?.settings || order.branch?.organization?.settings;
+    const branchSettings = order.branch?.settings;
+
+    const printoutPayload = {
+      orderNumber: order.orderNumber,
+      orderDate: order.date,
+      priority: order.priority,
+      status: order.status,
+      clinicalNotes: order.clinicalNotes,
+      hospital: {
+        name: orgSettings?.legalName || hospitalSettings?.hospitalName || 'Medora Healthcare',
+        address: orgSettings?.address || hospitalSettings?.address || '',
+        phone: orgSettings?.phone || hospitalSettings?.phone || '',
+        email: orgSettings?.email || hospitalSettings?.email || '',
+        taxNumber: orgSettings?.taxNumber || hospitalSettings?.taxNumber || '',
+        logoUrl: branchSettings?.logoUrlOverride || orgSettings?.logoUrl || hospitalSettings?.logoUrl || null,
+        branchName: order.branch?.name || null,
+        branchAddress: order.branch?.address || null,
+      },
+      patient: {
+        id: Number(order.patient.id),
+        mrn: order.patient.patientId || order.patient.oldMrn || `PAT-${order.patient.id}`,
+        name: order.patient.name,
+        age: order.patient.age,
+        gender: order.patient.sex,
+        phone: order.patient.phone,
+        address: order.patient.address,
+      },
+      doctor: {
+        id: order.doctor ? Number(order.doctor.id) : null,
+        name: order.doctor ? order.doctor.name : (order.doctorName || 'Attending Physician'),
+        department: order.doctor?.department || null,
+      },
+      samples: order.samples.map((s: any) => ({
+        sampleNumber: s.sampleNumber,
+        sampleType: s.sampleType,
+        status: s.status,
+        collectorLocation: s.collectorLocation,
+        condition: s.condition,
+        isRecollection: s.isRecollection,
+        collectedAt: s.collectedAt ? s.collectedAt.toISOString() : null,
+        receivedAt: s.receivedAt ? s.receivedAt.toISOString() : null,
+      })),
+      tests: order.tests.map((t: any) => ({
+        id: Number(t.id),
+        name: t.name,
+        department: t.labCategory?.department || 'General',
+        sampleType: t.sampleType,
+        resultSummary: t.result,
+        status: t.status,
+        parameters: t.resultParameters.map((p: any) => ({
+          parameterName: p.parameterName,
+          value: p.value,
+          unit: p.unitSnapshot,
+          referenceRange: p.referenceRangeSnapshot,
+          abnormalFlag: p.abnormalFlag,
+          clinicalComments: p.clinicalComments,
+          enteredBy: p.enteredBy ? `${p.enteredBy.firstName} ${p.enteredBy.lastName}`.trim() : null,
+          enteredAt: p.enteredAt ? p.enteredAt.toISOString() : null,
+        })),
+      })),
+      verification: {
+        verifiedByName: verifierName,
+        verifiedAt: order.verifiedAt ? order.verifiedAt.toISOString() : null,
+        approvedByName: approverName,
+        approvedAt: order.approvedAt ? order.approvedAt.toISOString() : null,
+      },
+      amendments: order.amendments.map((a: any) => ({
+        id: Number(a.id),
+        reason: a.reason,
+        createdAt: a.createdAt.toISOString(),
+      })),
+      printedAt: new Date().toISOString(),
+    };
+
+    return this.serializeBigInt(printoutPayload);
   }
 }

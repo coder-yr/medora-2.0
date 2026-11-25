@@ -19,7 +19,16 @@ export type LabOrderStatus =
 
 export type SampleStatus = 'PENDING' | 'COLLECTED' | 'RECEIVED' | 'REJECTED';
 
-export type AbnormalFlag = 'NORMAL' | 'HIGH' | 'LOW' | 'CRITICAL' | 'ABNORMAL';
+export type AbnormalFlag =
+  | 'NORMAL'
+  | 'HIGH'
+  | 'LOW'
+  | 'CRITICAL'
+  | 'CRITICAL_LOW'
+  | 'CRITICAL_HIGH'
+  | 'ABNORMAL'
+  | 'REACTIVE'
+  | 'NON_REACTIVE';
 
 export interface LabTestParameter {
   id: string | number;
@@ -39,6 +48,7 @@ export interface LabCategory {
   id: string | number;
   category: string; // Test Name
   name?: string;
+  code?: string | null;
   department?: string;
   referenceValue: string | null;
   description: string | null;
@@ -46,6 +56,9 @@ export interface LabCategory {
   sampleType: string | null;
   turnaroundHours: number;
   instructions: string | null;
+  collectionNotes?: string | null;
+  criticalLow?: number | null;
+  criticalHigh?: number | null;
   isActive: boolean;
   status?: string;
   parameters?: LabTestParameter[];
@@ -58,6 +71,10 @@ export interface LabSample {
   sampleNumber: string;
   sampleType: string;
   status: SampleStatus;
+  collectorLocation?: string | null;
+  condition?: string | null;
+  isRecollection?: boolean;
+  recollectedFromId?: string | number | null;
   collectedAt: string | null;
   collectedBy: string | number | null;
   receivedAt: string | null;

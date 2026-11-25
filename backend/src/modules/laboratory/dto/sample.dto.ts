@@ -2,7 +2,39 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class CollectSampleDto {
+  @ApiPropertyOptional({ description: 'Phlebotomy / collection site location', example: 'OPD Phlebotomy Room 1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  collectorLocation?: string;
+
+  @ApiPropertyOptional({ description: 'Condition of collected specimen', example: 'GOOD' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  condition?: string;
+
   @ApiPropertyOptional({ description: 'Optional phlebotomy collection notes', example: 'Right antecubital fossa' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
+}
+
+export class RecollectSampleDto {
+  @ApiPropertyOptional({ description: 'Phlebotomy / collection site location', example: 'OPD Phlebotomy Room 1' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  collectorLocation?: string;
+
+  @ApiPropertyOptional({ description: 'Condition of recollected specimen', example: 'FRESH' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  condition?: string;
+
+  @ApiPropertyOptional({ description: 'Recollection remarks or notes' })
   @IsOptional()
   @IsString()
   @MaxLength(500)

@@ -365,6 +365,34 @@ export function LaboratoryWorkspace({ token, userRole }: Props) {
     }
   };
 
+  // Action: Recollect Sample
+  const handleRecollectSample = async (sampleId: number | string) => {
+    try {
+      setLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/v1/lab/samples/${sampleId}/recollect`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          collectorLocation: 'OPD Phlebotomy',
+          condition: 'FRESH',
+          notes: 'Recollected following rejection',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showNotice(`Recollected sample #${data.sampleNumber || sampleId} created and registered`);
+        loadSampleQueue();
+        loadOrders();
+      } else {
+        showNotice(data.message || 'Failed to recollect sample', 'error');
+      }
+    } catch (err: any) {
+      showNotice(err.message || 'Error recollecting sample', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Action: Reject Sample
   const handleRejectSample = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1306,6 +1334,15 @@ export function LaboratoryWorkspace({ token, userRole }: Props) {
                                 className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm transition-all"
                               >
                                 Accept & Accession
+                              </button>
+                            )}
+
+                            {sample.status === 'REJECTED' && (
+                              <button
+                                onClick={() => handleRecollectSample(sample.id)}
+                                className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium text-xs shadow-sm transition-all flex items-center gap-1"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5" /> Recollect Specimen
                               </button>
                             )}
 

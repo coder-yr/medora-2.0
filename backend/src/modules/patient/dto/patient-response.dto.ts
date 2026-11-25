@@ -82,6 +82,30 @@ export class PatientResponseDto {
   @ApiPropertyOptional({ example: '1' })
   branchId?: string | null;
 
+  @ApiPropertyOptional({ example: 'Zainab Bibi' })
+  emergencyContactName?: string | null;
+
+  @ApiPropertyOptional({ example: '03009876543' })
+  emergencyContactPhone?: string | null;
+
+  @ApiPropertyOptional({ example: 'Spouse' })
+  emergencyContactRelation?: string | null;
+
+  @ApiPropertyOptional({ example: 'Penicillin, NSAIDs' })
+  allergies?: string | null;
+
+  @ApiPropertyOptional({ example: 'Type 2 Diabetes' })
+  medicalHistory?: string | null;
+
+  @ApiPropertyOptional({ example: 'Appendectomy' })
+  surgicalHistory?: string | null;
+
+  @ApiPropertyOptional({ example: 'Hypertension' })
+  familyHistory?: string | null;
+
+  @ApiPropertyOptional({ example: 'Metformin 500mg' })
+  currentMedications?: string | null;
+
   @ApiPropertyOptional()
   createdAt?: string | null;
 

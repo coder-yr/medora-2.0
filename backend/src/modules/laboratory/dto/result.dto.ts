@@ -49,12 +49,12 @@ export class ResultParameterValueDto {
 
   @ApiPropertyOptional({
     description: 'Abnormal evaluation flag',
-    enum: ['NORMAL', 'HIGH', 'LOW', 'CRITICAL', 'ABNORMAL'],
+    enum: ['NORMAL', 'HIGH', 'LOW', 'CRITICAL', 'CRITICAL_LOW', 'CRITICAL_HIGH', 'ABNORMAL', 'REACTIVE', 'NON_REACTIVE'],
     default: 'NORMAL',
     example: 'NORMAL',
   })
   @IsOptional()
-  @IsIn(['NORMAL', 'HIGH', 'LOW', 'CRITICAL', 'ABNORMAL'])
+  @IsIn(['NORMAL', 'HIGH', 'LOW', 'CRITICAL', 'CRITICAL_LOW', 'CRITICAL_HIGH', 'ABNORMAL', 'REACTIVE', 'NON_REACTIVE'])
   abnormalFlag?: string;
 
   @ApiPropertyOptional({ description: 'Technologist comments or observations' })

@@ -83,6 +83,15 @@ describe('AppointmentService (Legacy Parity & Concurrency)', () => {
           }
           return null;
         }),
+        aggregate: jest.fn().mockImplementation(async ({ where }: any) => {
+          let maxToken = 0;
+          for (const a of appointmentsMap.values()) {
+            if (where.doctorId && a.doctorId !== where.doctorId) continue;
+            if (where.date && a.date !== where.date) continue;
+            if (a.tokenNo && a.tokenNo > maxToken) maxToken = a.tokenNo;
+          }
+          return { _max: { tokenNo: maxToken } };
+        }),
         create: jest.fn().mockImplementation(async ({ data }: any) => {
           autoApptId++;
           const id = autoApptId;
@@ -159,6 +168,9 @@ describe('AppointmentService (Legacy Parity & Concurrency)', () => {
           if (where?.status?.notIn) {
             list = list.filter((a) => !where.status.notIn.includes(a.status));
           }
+          if (where?.status?.in) {
+            list = list.filter((a) => where.status.in.includes(a.status));
+          }
           list.sort((a, b) => a.sTime.localeCompare(b.sTime));
           return list.slice(skip, skip + take).map((a) => ({
             ...a,
@@ -171,7 +183,23 @@ describe('AppointmentService (Legacy Parity & Concurrency)', () => {
           if (where?.date) list = list.filter((a) => a.date === where.date);
           if (where?.doctorId) list = list.filter((a) => a.doctorId === where.doctorId);
           if (where?.patientId) list = list.filter((a) => a.patientId === where.patientId);
+          if (where?.status) list = list.filter((a) => a.status === where.status);
           return list.length;
+        }),
+        update: jest.fn().mockImplementation(async ({ where, data }: any) => {
+          const a = appointmentsMap.get(where.id.toString());
+          if (!a) throw new Error('Not found');
+          const patient = patientsMap.get(a.patientId.toString());
+          const doctor = doctorsMap.get(a.doctorId.toString());
+          const updated = {
+            ...a,
+            ...data,
+            patient,
+            doctor,
+            updatedAt: new Date(),
+          };
+          appointmentsMap.set(where.id.toString(), updated);
+          return updated;
         }),
         delete: jest.fn().mockImplementation(async ({ where }: any) => {
           appointmentsMap.delete(where.id.toString());
@@ -204,6 +232,15 @@ describe('AppointmentService (Legacy Parity & Concurrency)', () => {
         }),
       },
       doctor: {
+        aggregate: jest.fn().mockImplementation(async ({ where }: any) => {
+          let maxToken = 0;
+          for (const a of appointmentsMap.values()) {
+            if (where.doctorId && a.doctorId !== where.doctorId) continue;
+            if (where.date && a.date !== where.date) continue;
+            if (a.tokenNo && a.tokenNo > maxToken) maxToken = a.tokenNo;
+          }
+          return { _max: { tokenNo: maxToken } };
+        }),
         create: jest.fn().mockImplementation(async ({ data }: any) => {
           autoDoctorId++;
           const id = autoDoctorId;
@@ -554,5 +591,157 @@ describe('AppointmentService (Legacy Parity & Concurrency)', () => {
       { start: '09:30', minutes: 15 },
       { start: '09:45', minutes: 15 },
     ]);
+  });
+
+  it('Rule 13: doctor break hours exclude slots and reject bookings during break', async () => {
+    // Weekday 4 (Thursday) with a break between 13:00 and 14:00
+    addTestSlot({
+      doctorId: doctor2.id,
+      weekday: 4,
+      startTime: '12:00',
+      endTime: '15:00',
+      slotMinutes: 30,
+      active: true,
+      breakStartTime: '13:00',
+      breakEndTime: '14:00',
+    } as any);
+
+    const slots = await service.getFreeSlots(doctor2.id, '2026-10-01');
+    const slotStarts = slots.map((s) => s.start);
+    // 12:00, 12:30, 14:00, 14:30 (13:00 and 13:30 should be excluded by the break)
+    expect(slotStarts).toContain('12:00');
+    expect(slotStarts).toContain('12:30');
+    expect(slotStarts).not.toContain('13:00');
+    expect(slotStarts).not.toContain('13:30');
+    expect(slotStarts).toContain('14:00');
+    expect(slotStarts).toContain('14:30');
+
+    // Attempting to book during break time must throw BadRequestException
+    await expect(
+      service.create({
+        patient: patient1.id,
+        doctor: doctor2.id,
+        date: '2026-10-01',
+        start: '13:00',
+        minutes: 30,
+      }),
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('Rule 14: walk-in creation generates sequential token numbers and checks in immediately', async () => {
+    const walkIn1 = await service.createWalkIn({
+      patient: patient1.id,
+      doctor: doctor1.id,
+      priority: 'URGENT',
+      reason: 'Sudden chest discomfort',
+    });
+
+    expect(walkIn1.status).toBe('waiting');
+    expect(walkIn1.tokenNumber).toBe('W-01');
+    expect(walkIn1.priority).toBe('URGENT');
+    expect(walkIn1.checkedInAt).toBeTruthy();
+
+    const walkIn2 = await service.createWalkIn({
+      patient: patient2.id,
+      doctor: doctor1.id,
+      priority: 'NORMAL',
+      reason: 'Routine check-up',
+    });
+
+    expect(walkIn2.tokenNumber).toBe('W-02');
+    expect(walkIn2.status).toBe('waiting');
+  });
+
+  it('Rule 15: patient check-in generates queue token if absent and sets status to waiting', async () => {
+    const app = await service.create({
+      patient: patient1.id,
+      doctor: doctor1.id,
+      date: '2026-10-01',
+      start: '16:00',
+      minutes: 15,
+      status: 'scheduled',
+    });
+
+    expect(app.status).toBe('scheduled');
+    expect(app.tokenNumber).toBeNull();
+
+    const checkedIn = await service.checkIn(app.id);
+    expect(checkedIn.status).toBe('waiting');
+    expect(checkedIn.tokenNumber).toMatch(/^Q-\d{2}$/);
+    expect(checkedIn.checkedInAt).toBeTruthy();
+  });
+
+  it('Rule 16: OPD queue orders by priority then arrival time and calculates metrics', async () => {
+    const today = new Date().toISOString().split('T')[0];
+
+    // Create a NORMAL priority walk-in
+    await service.createWalkIn({
+      patient: patient1.id,
+      doctor: doctor1.id,
+      priority: 'NORMAL',
+      reason: 'Cold',
+    });
+
+    // Create an EMERGENCY priority walk-in
+    await service.createWalkIn({
+      patient: patient2.id,
+      doctor: doctor1.id,
+      priority: 'EMERGENCY',
+      reason: 'Severe allergic reaction',
+    });
+
+    const queue = await service.getOpdQueue(undefined, doctor1.id, today);
+    expect(queue.items.length).toBeGreaterThanOrEqual(2);
+
+    // EMERGENCY should be first in queue even though checked in after NORMAL
+    expect(queue.items[0].priority).toBe('EMERGENCY');
+    expect(queue.items[0].queuePosition).toBe(1);
+    expect(queue.summary.totalWaiting).toBeGreaterThanOrEqual(2);
+  });
+
+  it('Rule 17: appointment cancellation records reason and prevents completing', async () => {
+    const app = await service.create({
+      patient: patient1.id,
+      doctor: doctor1.id,
+      date: '2026-10-01',
+      start: '16:30',
+      minutes: 15,
+    });
+
+    const cancelled = await service.cancel(app.id, {
+      reason: 'Patient requested cancellation due to personal reasons',
+    });
+
+    expect(cancelled.status).toBe('cancelled');
+    expect(cancelled.cancellationReason).toBe('Patient requested cancellation due to personal reasons');
+    expect(cancelled.cancelledAt).toBeTruthy();
+
+    await expect(service.completeConsultation(app.id)).rejects.toThrow(BadRequestException);
+  });
+
+  it('Rule 18: appointment rescheduling preserves historical record and creates linked new appointment', async () => {
+    const original = await service.create({
+      patient: patient1.id,
+      doctor: doctor1.id,
+      date: '2026-10-01',
+      start: '16:45',
+      minutes: 15,
+    });
+
+    const rescheduled = await service.reschedule(original.id, {
+      date: '2026-10-01',
+      start: '17:00',
+      minutes: 15,
+      reason: 'Doctor surgery running late',
+    });
+
+    expect(rescheduled.id).not.toBe(original.id);
+    expect(rescheduled.rescheduledFromId).toBe(original.id);
+    expect(rescheduled.rescheduleReason).toBe('Doctor surgery running late');
+    expect(rescheduled.timeSlot).toBe('17:00 - 17:15');
+
+    // Verify original appointment is now marked 'rescheduled'
+    const fetchedOriginal = await service.findOne(original.id);
+    expect(fetchedOriginal.status).toBe('rescheduled');
   });
 });

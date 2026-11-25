@@ -30,11 +30,13 @@ describe('PrescriptionService', () => {
 
   const mockPrescription = {
     id: BigInt(100),
+    prescriptionNumber: 'RX-20261124-0001',
     patientId: BigInt(1),
     doctorId: BigInt(2),
     date: '2026-10-30',
     symptom: 'Cough',
     advice: 'Drink warm water',
+    status: 'DRAFT',
     state: 'issued',
     dd: 'Bronchitis',
     medicine: 'Amoxil 1+0+1 for 5 days',
@@ -51,6 +53,13 @@ describe('PrescriptionService', () => {
         dosage: '1+0+1',
         duration: '5 days',
         instructions: 'After meals',
+        quantityPrescribed: 10,
+        unit: 'tablets',
+        route: 'Oral',
+        frequency: 'BD',
+        timing: 'After food',
+        refills: 0,
+        dispensedQuantity: 0,
       },
     ],
     createdAt: new Date(),
@@ -72,7 +81,7 @@ describe('PrescriptionService', () => {
       prescription: {
         findMany: jest.fn(),
         findUnique: jest.fn(),
-        count: jest.fn(),
+        count: jest.fn().mockResolvedValue(0),
         create: jest.fn(),
         update: jest.fn(),
         delete: jest.fn(),
@@ -80,6 +89,10 @@ describe('PrescriptionService', () => {
       prescriptionMedicine: {
         deleteMany: jest.fn(),
         createMany: jest.fn(),
+      },
+      prescriptionAmendment: {
+        deleteMany: jest.fn(),
+        create: jest.fn(),
       },
       $transaction: jest.fn((callback) => callback(prisma)),
     };
@@ -396,6 +409,80 @@ describe('PrescriptionService', () => {
       prisma.prescription.findUnique.mockResolvedValue(null);
 
       await expect(service.remove(999)).rejects.toThrow(NotFoundException);
+    });
+
+    it('rejects deletion of a signed prescription', async () => {
+      prisma.prescription.findUnique.mockResolvedValue({
+        ...mockPrescription,
+        status: 'SIGNED',
+      });
+
+      await expect(service.remove(100)).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('digital sign, cancel, and amend workflows', () => {
+    const mockUser = { id: 1, role: 'doctor', group: 'doctor' } as any;
+
+    it('signs draft prescription and stamps timestamp and user ID', async () => {
+      prisma.prescription.findUnique.mockResolvedValue({ ...mockPrescription, status: 'DRAFT' });
+      prisma.prescription.update.mockResolvedValue({
+        ...mockPrescription,
+        status: 'SIGNED',
+        signedAt: new Date(),
+        signedById: BigInt(1),
+      });
+
+      const res = await service.sign(100, { signatureNotes: 'Clinical check verified' }, mockUser);
+      expect(res.status).toBe('SIGNED');
+      expect(prisma.prescription.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: BigInt(100) },
+          data: expect.objectContaining({
+            status: 'SIGNED',
+            signedById: BigInt(1),
+          }),
+        }),
+      );
+    });
+
+    it('cancels an active prescription with mandatory reason', async () => {
+      prisma.prescription.findUnique.mockResolvedValue({ ...mockPrescription, status: 'SIGNED' });
+      prisma.prescription.update.mockResolvedValue({
+        ...mockPrescription,
+        status: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancelledById: BigInt(1),
+        cancellationReason: 'Adverse rash reported',
+      });
+
+      const res = await service.cancel(100, { reason: 'Adverse rash reported' }, mockUser);
+      expect(res.status).toBe('CANCELLED');
+    });
+
+    it('creates an auditable clinical amendment for signed prescription', async () => {
+      prisma.prescription.findUnique.mockResolvedValue({ ...mockPrescription, status: 'SIGNED' });
+      prisma.prescriptionAmendment.create.mockResolvedValue({ id: BigInt(1) });
+      prisma.prescription.update.mockResolvedValue({ ...mockPrescription, note: 'Amended' });
+
+      await service.amend(
+        100,
+        {
+          reason: 'Titration',
+          amendedSection: 'MEDICATION_DOSAGE',
+          newNotes: 'Reduced to 250mg TDS',
+        },
+        mockUser,
+      );
+
+      expect(prisma.prescriptionAmendment.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          prescriptionId: BigInt(100),
+          amendedBy: BigInt(1),
+          reason: 'Titration',
+          newNotes: 'Reduced to 250mg TDS',
+        }),
+      });
     });
   });
 });

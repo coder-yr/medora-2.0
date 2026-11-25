@@ -83,6 +83,33 @@ export class AppointmentResponseDto {
   @ApiPropertyOptional({ example: 'first_visit' })
   visitType?: string | null;
 
+  @ApiPropertyOptional({ example: 'NORMAL' })
+  priority?: string | null;
+
+  @ApiPropertyOptional({ example: 1 })
+  tokenNo?: number | null;
+
+  @ApiPropertyOptional({ example: 1 })
+  queueNumber?: number | null;
+
+  @ApiPropertyOptional({ example: 'Q-01' })
+  tokenNumber?: string | null;
+
+  @ApiPropertyOptional({ example: 'Cardiology' })
+  department?: string | null;
+
+  @ApiPropertyOptional({ example: 'Patient requested cancellation' })
+  cancellationReason?: string | null;
+
+  @ApiPropertyOptional()
+  cancelledAt?: string | null;
+
+  @ApiPropertyOptional({ example: '1' })
+  rescheduledFromId?: string | null;
+
+  @ApiPropertyOptional({ example: 'Doctor delayed in surgery' })
+  rescheduleReason?: string | null;
+
   @ApiProperty({ type: () => PatientSummaryDto })
   patient?: PatientSummaryDto;
 

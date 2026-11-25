@@ -122,6 +122,22 @@ export function PharmacyWorkspace({
   >([]);
   const [generateInvoice, setGenerateInvoice] = useState(true);
   const [dispensationReceipt, setDispensationReceipt] = useState<PharmacyDispensation | null>(null);
+  const [rxQueue, setRxQueue] = useState<any[]>([]);
+  const [loadingRxQueue, setLoadingRxQueue] = useState(false);
+
+  const loadRxQueue = useCallback(async () => {
+    setLoadingRxQueue(true);
+    try {
+      const res = await apiFetch('/api/v1/prescriptions/pharmacy/queue');
+      if (res && res.success && Array.isArray(res.data)) {
+        setRxQueue(res.data);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingRxQueue(false);
+    }
+  }, [apiFetch]);
 
   // 5. Adjustments & Returns State
   const [adjSubTab, setAdjSubTab] = useState<'adjustments' | 'returns'>('adjustments');
@@ -295,6 +311,7 @@ export function PharmacyWorkspace({
     else if (activeTab === 'purchases') loadPurchases();
     else if (activeTab === 'adjustments') loadAdjustmentsAndReturns();
     else if (activeTab === 'reports') loadReports();
+    else if (activeTab === 'dispense') loadRxQueue();
   }, [
     token,
     activeTab,
@@ -304,6 +321,7 @@ export function PharmacyWorkspace({
     loadAdjustmentsAndReturns,
     loadReports,
     loadSupportingData,
+    loadRxQueue,
   ]);
 
   // ===========================================================================
@@ -354,6 +372,46 @@ export function PharmacyWorkspace({
     }
   };
 
+  const handleLoadFromQueue = async (rxId: string | number) => {
+    setPrescriptionLookupId(String(rxId));
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/api/v1/pharmacy/dispensations/context/${rxId}`);
+      if (res.success && res.data) {
+        setDispenseContext(res.data);
+        const initialDispense: any[] = [];
+        res.data.lines.forEach((line: any) => {
+          if (line.fefoPlan && line.fefoPlan.allocations.length > 0) {
+            line.fefoPlan.allocations.forEach((alloc: any) => {
+              initialDispense.push({
+                prescriptionMedicineId: line.prescriptionMedicineId,
+                medicineId: line.medicineId,
+                batchId: alloc.batchId,
+                quantity: alloc.allocatedQty,
+                unitPrice: line.unitPrice || alloc.batch.sellingPrice || 10,
+                medicineName: line.matchedMedicineName || line.prescribedName,
+              });
+            });
+          } else if (line.quantityRemaining > 0) {
+            initialDispense.push({
+              prescriptionMedicineId: line.prescriptionMedicineId,
+              medicineId: line.medicineId,
+              quantity: line.quantityRemaining,
+              unitPrice: line.unitPrice || 10,
+              medicineName: line.matchedMedicineName || line.prescribedName,
+            });
+          }
+        });
+        setDispenseItems(initialDispense);
+        onNotification('success', `Prescription #${rxId} loaded with FEFO batch allocations.`);
+      }
+    } catch (err: any) {
+      onNotification('error', err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleExecuteDispense = async () => {
     if (!dispenseContext) return;
     if (dispenseItems.length === 0) {
@@ -389,6 +447,7 @@ export function PharmacyWorkspace({
         setDispenseContext(null);
         setDispenseItems([]);
         setPrescriptionLookupId('');
+        loadRxQueue();
       }
     } catch (err: any) {
       onNotification('error', err.message);
@@ -918,6 +977,52 @@ export function PharmacyWorkspace({
                 {loading ? 'Searching...' : 'Load Regimen'}
               </button>
             </form>
+
+            {/* Prescriptions Queue Ready for Dispensing */}
+            {rxQueue.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-slate-800 text-sm flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-emerald-600" />
+                    Pending Prescriptions Ready for Dispensing ({rxQueue.length})
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={loadRxQueue}
+                    className="text-xs text-emerald-600 hover:underline font-medium"
+                  >
+                    Refresh Queue
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {rxQueue.map((rx: any) => (
+                    <div
+                      key={rx.id}
+                      className="p-3 bg-slate-50 border border-slate-200/70 rounded-xl hover:border-emerald-300 transition flex justify-between items-center"
+                    >
+                      <div>
+                        <div className="font-bold text-slate-900 text-xs">
+                          {rx.prescriptionNumber || `RX-${rx.id}`}
+                        </div>
+                        <div className="text-slate-600 text-xs font-medium">
+                          {rx.patient?.name || `Patient #${rx.patientId}`}
+                        </div>
+                        <div className="text-slate-400 text-[10px]">
+                          {rx.date} • {rx.items?.length || 0} items prescribed
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleLoadFromQueue(rx.id)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-medium transition"
+                      >
+                        Dispense
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Active Dispensing Encounter Context */}

@@ -21,7 +21,7 @@ import {
 
 @Injectable()
 export class MedicineService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   // ===========================================================================
   // 1. MEDICINE CATALOGUE CRUD & SEARCH
@@ -140,6 +140,14 @@ export class MedicineService {
     const created = await this.prisma.medicine.create({
       data: {
         name: trimmedName,
+        brandName: dto.brandName ? dto.brandName.trim() : null,
+        code: dto.code ? dto.code.trim() : null,
+        composition: dto.composition ? dto.composition.trim() : null,
+        barcode: dto.barcode ? dto.barcode.trim() : null,
+        prescriptionRequired: dto.prescriptionRequired !== undefined ? dto.prescriptionRequired : true,
+        reorderLevel: dto.reorderLevel !== undefined ? dto.reorderLevel : 10,
+        minStockLevel: dto.minStockLevel !== undefined ? dto.minStockLevel : 5,
+        maxStockLevel: dto.maxStockLevel !== undefined ? dto.maxStockLevel : 1000,
         generic: dto.generic ? dto.generic.trim() : null,
         company: dto.company ? dto.company.trim() : null,
         categoryId: dto.categoryId ? BigInt(dto.categoryId) : null,
@@ -190,6 +198,14 @@ export class MedicineService {
       where: { id: existing.id },
       data: {
         ...(dto.name !== undefined && { name: nextName }),
+        ...(dto.brandName !== undefined && { brandName: dto.brandName ? dto.brandName.trim() : null }),
+        ...(dto.code !== undefined && { code: dto.code ? dto.code.trim() : null }),
+        ...(dto.composition !== undefined && { composition: dto.composition ? dto.composition.trim() : null }),
+        ...(dto.barcode !== undefined && { barcode: dto.barcode ? dto.barcode.trim() : null }),
+        ...(dto.prescriptionRequired !== undefined && { prescriptionRequired: dto.prescriptionRequired }),
+        ...(dto.reorderLevel !== undefined && { reorderLevel: dto.reorderLevel }),
+        ...(dto.minStockLevel !== undefined && { minStockLevel: dto.minStockLevel }),
+        ...(dto.maxStockLevel !== undefined && { maxStockLevel: dto.maxStockLevel }),
         ...(dto.generic !== undefined && { generic: dto.generic ? dto.generic.trim() : null }),
         ...(dto.company !== undefined && { company: dto.company ? dto.company.trim() : null }),
         ...(dto.categoryId !== undefined && {
@@ -662,8 +678,17 @@ export class MedicineService {
   }
 
   // Suppliers
-  async findAllSuppliers() {
+  async findAllSuppliers(organizationId?: bigint | number | string) {
+    const where: any = {};
+    if (organizationId) {
+      where.OR = [
+        { organizationId: BigInt(organizationId) },
+        { organizationId: null },
+      ];
+    }
+
     const suppliers = await this.prisma.supplier.findMany({
+      where,
       orderBy: { name: 'asc' },
       include: { _count: { select: { medicines: true } } },
     });
@@ -674,6 +699,8 @@ export class MedicineService {
       email: s.email,
       phone: s.phone,
       address: s.address,
+      gstin: s.gstin,
+      organizationId: s.organizationId ? s.organizationId.toString() : null,
       isActive: s.isActive,
       medicineCount: s._count.medicines,
       createdAt: s.createdAt,
@@ -681,7 +708,7 @@ export class MedicineService {
     }));
   }
 
-  async createSupplier(dto: CreateSupplierDto) {
+  async createSupplier(dto: CreateSupplierDto, organizationId?: bigint | number | string) {
     const created = await this.prisma.supplier.create({
       data: {
         name: dto.name.trim(),
@@ -689,6 +716,8 @@ export class MedicineService {
         email: dto.email ? dto.email.trim() : null,
         phone: dto.phone ? dto.phone.trim() : null,
         address: dto.address ? dto.address.trim() : null,
+        gstin: dto.gstin ? dto.gstin.trim() : null,
+        organizationId: organizationId ? BigInt(organizationId) : null,
         isActive: dto.isActive !== undefined ? dto.isActive : true,
       },
     });
@@ -707,6 +736,7 @@ export class MedicineService {
         ...(dto.email !== undefined && { email: dto.email ? dto.email.trim() : null }),
         ...(dto.phone !== undefined && { phone: dto.phone ? dto.phone.trim() : null }),
         ...(dto.address !== undefined && { address: dto.address ? dto.address.trim() : null }),
+        ...(dto.gstin !== undefined && { gstin: dto.gstin ? dto.gstin.trim() : null }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
       },
     });
@@ -788,49 +818,57 @@ export class MedicineService {
     return {
       id: m.id.toString(),
       name: m.name,
+      brandName: m.brandName,
+      code: m.code,
+      composition: m.composition,
+      barcode: m.barcode,
+      prescriptionRequired: m.prescriptionRequired !== undefined ? m.prescriptionRequired : true,
+      reorderLevel: m.reorderLevel !== undefined ? m.reorderLevel : 10,
+      minStockLevel: m.minStockLevel !== undefined ? m.minStockLevel : 5,
+      maxStockLevel: m.maxStockLevel !== undefined ? m.maxStockLevel : 1000,
       generic: m.generic,
       company: m.company,
       categoryId: m.categoryId ? m.categoryId.toString() : null,
       category: m.category
         ? {
-            id: m.category.id.toString(),
-            category: m.category.category,
-            description: m.category.description,
-          }
+          id: m.category.id.toString(),
+          category: m.category.category,
+          description: m.category.description,
+        }
         : null,
       manufacturerId: m.manufacturerId ? m.manufacturerId.toString() : null,
       manufacturer: m.manufacturer
         ? {
-            id: m.manufacturer.id.toString(),
-            name: m.manufacturer.name,
-            country: m.manufacturer.country,
-          }
+          id: m.manufacturer.id.toString(),
+          name: m.manufacturer.name,
+          country: m.manufacturer.country,
+        }
         : null,
       dosageFormId: m.dosageFormId ? m.dosageFormId.toString() : null,
       dosageForm: m.dosageForm
         ? {
-            id: m.dosageForm.id.toString(),
-            name: m.dosageForm.name,
-            description: m.dosageForm.description,
-          }
+          id: m.dosageForm.id.toString(),
+          name: m.dosageForm.name,
+          description: m.dosageForm.description,
+        }
         : null,
       strength: m.strength,
       unitId: m.unitId ? m.unitId.toString() : null,
       measurementUnit: m.measurementUnit
         ? {
-            id: m.measurementUnit.id.toString(),
-            name: m.measurementUnit.name,
-            symbol: m.measurementUnit.symbol,
-          }
+          id: m.measurementUnit.id.toString(),
+          name: m.measurementUnit.name,
+          symbol: m.measurementUnit.symbol,
+        }
         : null,
       supplierId: m.supplierId ? m.supplierId.toString() : null,
       supplier: m.supplier
         ? {
-            id: m.supplier.id.toString(),
-            name: m.supplier.name,
-            contactPerson: m.supplier.contactPerson,
-            phone: m.supplier.phone,
-          }
+          id: m.supplier.id.toString(),
+          name: m.supplier.name,
+          contactPerson: m.supplier.contactPerson,
+          phone: m.supplier.phone,
+        }
         : null,
       box: m.box,
       price: m.price ? Number(m.price) : 0,

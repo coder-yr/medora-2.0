@@ -155,3 +155,17 @@ export class CreateGoodsReceiptDto {
   @Type(() => GoodsReceiptItemDto)
   items!: GoodsReceiptItemDto[];
 }
+
+export class ApprovePurchaseOrderDto {
+  @ApiPropertyOptional({ description: 'Approval notes or commentary', example: 'Approved for urgent formulary restock' })
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class CancelPurchaseOrderDto {
+  @ApiProperty({ description: 'Mandatory reason for cancellation', example: 'Supplier out of production; PO replaced by PO-202611-004' })
+  @IsString()
+  @IsNotEmpty({ message: 'Cancellation reason is mandatory.' })
+  reason!: string;
+}

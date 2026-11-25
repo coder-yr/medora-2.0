@@ -13,6 +13,17 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { PatientQueryDto } from './dto/patient-query.dto';
 import { PaginatedPatientsDto, PatientResponseDto } from './dto/patient-response.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { CheckDuplicateQueryDto } from './dto/check-duplicate-query.dto';
+import { DuplicateCheckResponseDto, DuplicateMatchItemDto } from './dto/duplicate-check-response.dto';
+import {
+  EncounterAppointmentDto,
+  EncounterConsultationDto,
+  EncounterInvoiceDto,
+  EncounterLabDto,
+  EncounterPrescriptionDto,
+  PatientEncounterResponseDto,
+} from './dto/patient-encounter-response.dto';
+import { CreatePatientDocumentDto, PatientDocumentResponseDto } from './dto/patient-document.dto';
 
 @Injectable()
 export class PatientService {
@@ -256,6 +267,14 @@ export class PatientService {
         registrationTime,
         ionUserId: '',
         howAdded,
+        emergencyContactName: dto.emergencyContactName?.trim() || null,
+        emergencyContactPhone: dto.emergencyContactPhone?.trim() || null,
+        emergencyContactRelation: dto.emergencyContactRelation?.trim() || null,
+        allergies: dto.allergies?.trim() || null,
+        medicalHistory: dto.medicalHistory?.trim() || null,
+        surgicalHistory: dto.surgicalHistory?.trim() || null,
+        familyHistory: dto.familyHistory?.trim() || null,
+        currentMedications: dto.currentMedications?.trim() || null,
       },
     });
 
@@ -312,6 +331,23 @@ export class PatientService {
       updateData.age = this.deriveAge(updateData.birthdate as string);
     }
 
+    if (dto.emergencyContactName !== undefined)
+      updateData.emergencyContactName = dto.emergencyContactName?.trim() || null;
+    if (dto.emergencyContactPhone !== undefined)
+      updateData.emergencyContactPhone = dto.emergencyContactPhone?.trim() || null;
+    if (dto.emergencyContactRelation !== undefined)
+      updateData.emergencyContactRelation = dto.emergencyContactRelation?.trim() || null;
+    if (dto.allergies !== undefined)
+      updateData.allergies = dto.allergies?.trim() || null;
+    if (dto.medicalHistory !== undefined)
+      updateData.medicalHistory = dto.medicalHistory?.trim() || null;
+    if (dto.surgicalHistory !== undefined)
+      updateData.surgicalHistory = dto.surgicalHistory?.trim() || null;
+    if (dto.familyHistory !== undefined)
+      updateData.familyHistory = dto.familyHistory?.trim() || null;
+    if (dto.currentMedications !== undefined)
+      updateData.currentMedications = dto.currentMedications?.trim() || null;
+
     const updated = await this.prisma.patient.update({
       where: { id: BigInt(existing.id) },
       data: updateData,
@@ -350,6 +386,311 @@ export class PatientService {
   }
 
   /**
+   * Check for potential duplicate patients within the authorized branch/tenant.
+   */
+  async checkDuplicates(
+    query: CheckDuplicateQueryDto,
+    user?: AuthUser,
+  ): Promise<DuplicateCheckResponseDto> {
+    const phone = query.phone?.trim();
+    const cnic = this.formatCnic(query.cnic);
+    const name = query.name?.trim();
+    const birthdate = query.birthdate?.trim();
+
+    if (!phone && !cnic && !(name && birthdate)) {
+      return { hasMatch: false, matchCount: 0, matches: [] };
+    }
+
+    let branchFilter: Record<string, unknown> = {};
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
+      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+
+      if (query.branchId) {
+        const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+        branchFilter = isOrg1
+          ? { OR: [{ branchId: authorizedBranchId }, { branchId: null }] }
+          : { branchId: authorizedBranchId };
+      } else {
+        const branchIds = accessibleBranches || [];
+        branchFilter = isOrg1
+          ? { OR: [{ branchId: { in: branchIds } }, { branchId: null }] }
+          : { branchId: { in: branchIds } };
+      }
+    } else if (query.branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
+      branchFilter = { branchId: authorizedBranchId };
+    }
+
+    const orConditions: Array<Record<string, unknown>> = [];
+
+    if (phone) {
+      orConditions.push({ phone });
+      orConditions.push({ altPhone: phone });
+    }
+    if (cnic) {
+      orConditions.push({ cnic });
+    }
+    if (name && birthdate) {
+      orConditions.push({
+        AND: [
+          { name: { equals: name, mode: 'insensitive' as const } },
+          { birthdate },
+        ],
+      });
+    }
+
+    const matchedPatients = await this.prisma.patient.findMany({
+      where: {
+        ...branchFilter,
+        OR: orConditions,
+      },
+      take: 10,
+    });
+
+    const matches: DuplicateMatchItemDto[] = matchedPatients.map((p) => {
+      const matchedOn: string[] = [];
+      if (phone && (p.phone === phone || p.altPhone === phone)) {
+        matchedOn.push('phone');
+      }
+      if (cnic && p.cnic === cnic) {
+        matchedOn.push('cnic');
+      }
+      if (
+        name &&
+        birthdate &&
+        p.name.toLowerCase() === name.toLowerCase() &&
+        p.birthdate === birthdate
+      ) {
+        matchedOn.push('name_birthdate');
+      }
+      return {
+        patient: this.mapToDto(p),
+        matchedOn,
+      };
+    });
+
+    return {
+      hasMatch: matches.length > 0,
+      matchCount: matches.length,
+      matches,
+    };
+  }
+
+  /**
+   * Retrieves aggregated clinical encounter history across outpatient modules.
+   */
+  async getEncounterHistory(
+    idOrPatientId: string | number,
+    user?: AuthUser,
+  ): Promise<PatientEncounterResponseDto> {
+    const patientDto = await this.findById(idOrPatientId, user);
+    const patientBigInt = BigInt(patientDto.id);
+
+    const [appointments, consultations, prescriptions, labs, invoices] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where: { patientId: patientBigInt },
+        include: { doctor: true },
+        orderBy: { id: 'desc' },
+        take: 50,
+      }),
+      this.prisma.consultation.findMany({
+        where: { patientId: patientBigInt },
+        include: { doctor: true },
+        orderBy: { id: 'desc' },
+        take: 50,
+      }),
+      this.prisma.prescription.findMany({
+        where: { patientId: patientBigInt },
+        include: { doctor: true, medicines: true },
+        orderBy: { id: 'desc' },
+        take: 50,
+      }),
+      this.prisma.lab.findMany({
+        where: { patientId: patientBigInt },
+        orderBy: { id: 'desc' },
+        take: 50,
+      }),
+      this.prisma.payment.findMany({
+        where: { patientId: patientBigInt },
+        orderBy: { id: 'desc' },
+        take: 50,
+      }),
+    ]);
+
+    const mappedAppointments: EncounterAppointmentDto[] = appointments.map((a) => ({
+      id: a.id.toString(),
+      date: a.addDate || a.date || '',
+      time: a.timeSlot || null,
+      doctorName: a.doctor?.name || null,
+      status: a.status || 'scheduled',
+      type: a.visitType || 'first_visit',
+    }));
+
+    const mappedConsultations: EncounterConsultationDto[] = consultations.map((c) => ({
+      id: c.id.toString(),
+      date: c.createdAt ? c.createdAt.toISOString() : c.date.toISOString(),
+      doctorName: c.doctor?.name || null,
+      diagnosis: c.diagnosis || c.provisionalDiagnosis || null,
+      symptoms: c.presentingComplaint || null,
+      notes: c.plan || null,
+      status: c.status || 'draft',
+    }));
+
+    const mappedPrescriptions: EncounterPrescriptionDto[] = prescriptions.map((pr) => {
+      const medNames = (pr.medicines || []).map((m) => m.name).filter(Boolean);
+      return {
+        id: pr.id.toString(),
+        date: pr.date || '',
+        doctorName: pr.doctor?.name || null,
+        itemCount: medNames.length,
+        medicines: medNames,
+      };
+    });
+
+    const mappedLabs: EncounterLabDto[] = labs.map((l) => ({
+      id: l.id.toString(),
+      date: l.date || '',
+      testName: l.category || 'Laboratory Test',
+      status: l.status || 'ORDERED',
+    }));
+
+    let totalInvoiced = 0;
+    let totalPaid = 0;
+    const mappedInvoices: EncounterInvoiceDto[] = invoices.map((inv) => {
+      const gross = Number(inv.grossTotal || 0);
+      const paid = Number(inv.amountReceived || 0);
+      totalInvoiced += gross;
+      totalPaid += paid;
+      return {
+        id: inv.id.toString(),
+        date: inv.date || '',
+        amount: gross,
+        paidAmount: paid,
+        status: inv.status || 'unpaid',
+      };
+    });
+
+    return {
+      patientId: patientDto.id,
+      summary: {
+        totalAppointments: mappedAppointments.length,
+        totalConsultations: mappedConsultations.length,
+        totalPrescriptions: mappedPrescriptions.length,
+        totalLabs: mappedLabs.length,
+        totalInvoiced,
+        outstandingBalance: Math.max(0, totalInvoiced - totalPaid),
+      },
+      appointments: mappedAppointments,
+      consultations: mappedConsultations,
+      prescriptions: mappedPrescriptions,
+      labs: mappedLabs,
+      invoices: mappedInvoices,
+    };
+  }
+
+  /**
+   * Retrieves uploaded clinical documents and reports for a patient.
+   */
+  async getDocuments(
+    idOrPatientId: string | number,
+    user?: AuthUser,
+  ): Promise<PatientDocumentResponseDto[]> {
+    const patientDto = await this.findById(idOrPatientId, user);
+    const docs = await this.prisma.patientDocument.findMany({
+      where: { patientId: BigInt(patientDto.id) },
+      include: { uploadedBy: true },
+      orderBy: { id: 'desc' },
+    });
+
+    return docs.map((d) => ({
+      id: d.id.toString(),
+      patientId: d.patientId.toString(),
+      branchId: d.branchId ? d.branchId.toString() : null,
+      title: d.title,
+      documentType: d.documentType,
+      fileUrl: d.fileUrl,
+      fileSize: d.fileSize || null,
+      mimeType: d.mimeType || null,
+      notes: d.notes || null,
+      uploadedByName: d.uploadedBy ? `${d.uploadedBy.firstName} ${d.uploadedBy.lastName}`.trim() : null,
+      createdAt: d.createdAt ? d.createdAt.toISOString() : null,
+    }));
+  }
+
+  /**
+   * Attaches a document or external medical report to a patient.
+   */
+  async addDocument(
+    idOrPatientId: string | number,
+    dto: CreatePatientDocumentDto,
+    user?: AuthUser,
+  ): Promise<PatientDocumentResponseDto> {
+    const patientDto = await this.findById(idOrPatientId, user);
+    let targetBranchId: bigint | null = patientDto.branchId ? BigInt(patientDto.branchId) : null;
+
+    if (dto.branchId && user && this.branchAuth) {
+      targetBranchId = await this.branchAuth.assertBranchAccess(user, dto.branchId);
+    }
+
+    const doc = await this.prisma.patientDocument.create({
+      data: {
+        patientId: BigInt(patientDto.id),
+        branchId: targetBranchId,
+        title: dto.title.trim(),
+        documentType: dto.documentType?.trim() || 'GENERAL',
+        fileUrl: dto.fileUrl.trim(),
+        fileSize: dto.fileSize || null,
+        mimeType: dto.mimeType?.trim() || null,
+        notes: dto.notes?.trim() || null,
+        uploadedById: user ? BigInt(user.id) : null,
+      },
+      include: { uploadedBy: true },
+    });
+
+    return {
+      id: doc.id.toString(),
+      patientId: doc.patientId.toString(),
+      branchId: doc.branchId ? doc.branchId.toString() : null,
+      title: doc.title,
+      documentType: doc.documentType,
+      fileUrl: doc.fileUrl,
+      fileSize: doc.fileSize || null,
+      mimeType: doc.mimeType || null,
+      notes: doc.notes || null,
+      uploadedByName: doc.uploadedBy ? `${doc.uploadedBy.firstName} ${doc.uploadedBy.lastName}`.trim() : null,
+      createdAt: doc.createdAt ? doc.createdAt.toISOString() : null,
+    };
+  }
+
+  /**
+   * Removes a patient document.
+   */
+  async removeDocument(
+    idOrPatientId: string | number,
+    docId: string | number,
+    user?: AuthUser,
+  ): Promise<{ message: string }> {
+    const patientDto = await this.findById(idOrPatientId, user);
+    const doc = await this.prisma.patientDocument.findFirst({
+      where: {
+        id: BigInt(docId),
+        patientId: BigInt(patientDto.id),
+      },
+    });
+
+    if (!doc) {
+      throw new NotFoundException(`Document #${docId} not found for patient #${patientDto.patientId}`);
+    }
+
+    await this.prisma.patientDocument.delete({
+      where: { id: doc.id },
+    });
+
+    return { message: `Document #${docId} successfully removed.` };
+  }
+
+  /**
    * Converts a Prisma record to a typed PatientResponseDto.
    */
   private mapToDto(p: Patient): PatientResponseDto {
@@ -380,6 +721,14 @@ export class PatientService {
       howAdded: p.howAdded || null,
       patientTypeId: p.patientTypeId ? p.patientTypeId.toString() : null,
       branchId: p.branchId ? p.branchId.toString() : null,
+      emergencyContactName: p.emergencyContactName || null,
+      emergencyContactPhone: p.emergencyContactPhone || null,
+      emergencyContactRelation: p.emergencyContactRelation || null,
+      allergies: p.allergies || null,
+      medicalHistory: p.medicalHistory || null,
+      surgicalHistory: p.surgicalHistory || null,
+      familyHistory: p.familyHistory || null,
+      currentMedications: p.currentMedications || null,
       createdAt: p.createdAt ? p.createdAt.toISOString() : null,
       updatedAt: p.updatedAt ? p.updatedAt.toISOString() : null,
     };

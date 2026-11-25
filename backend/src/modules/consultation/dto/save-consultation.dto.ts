@@ -222,13 +222,131 @@ export class SaveConsultationDto {
   radiology_urgent?: boolean;
 
   @ApiPropertyOptional({
-    description: 'Encounter action: "save" keeps draft, "complete" finalises consultation and checks out visit',
-    enum: ['save', 'complete'],
+    description: 'Encounter action: "save"/"draft" keeps draft, "sign"/"complete" finalises consultation and locks record',
+    enum: ['save', 'draft', 'sign', 'complete'],
     default: 'save',
   })
   @IsOptional()
-  @IsIn(['save', 'complete'], { message: 'Action must be "save" or "complete".' })
-  action?: 'save' | 'complete';
+  @IsIn(['save', 'draft', 'sign', 'complete'], { message: 'Action must be "save", "draft", "sign", or "complete".' })
+  action?: 'save' | 'draft' | 'sign' | 'complete';
+
+  // SOAP Documentation standard fields
+  @ApiPropertyOptional({
+    description: 'SOAP Subjective notes (patient description of problems, history, symptoms)',
+    example: 'Patient reports progressive dry cough and intermittent low-grade fever for 4 days.',
+  })
+  @IsOptional()
+  @IsString()
+  soap_subjective?: string;
+
+  @ApiPropertyOptional({
+    description: 'SOAP Objective notes (clinical physical examination, vitals, observations)',
+    example: 'Chest clear on auscultation. Throat mild erythema. Vitals stable.',
+  })
+  @IsOptional()
+  @IsString()
+  soap_objective?: string;
+
+  @ApiPropertyOptional({
+    description: 'SOAP Assessment notes (diagnostic synthesis, clinical reasoning, differential diagnosis)',
+    example: 'Likely viral upper respiratory tract infection. Differential: mild acute bronchitis.',
+  })
+  @IsOptional()
+  @IsString()
+  soap_assessment?: string;
+
+  @ApiPropertyOptional({
+    description: 'SOAP Plan notes (management, prescriptions, patient education, follow-up instructions)',
+    example: 'Symptomatic therapy. Warm fluids, rest. Review in 5 days if fever persists.',
+  })
+  @IsOptional()
+  @IsString()
+  soap_plan?: string;
+
+  // Structured Chief Complaint & HPI
+  @ApiPropertyOptional({
+    description: 'Structured chief complaint details (primary, onset, duration, severity)',
+    example: { primary: 'Dry cough', onset: '4 days ago', duration: 'Continuous', severity: 'Moderate' },
+  })
+  @IsOptional()
+  @IsObject()
+  chief_complaint_details?: Record<string, any>;
+
+  @ApiPropertyOptional({
+    description: 'Structured history of present illness details (progression, aggravating/relieving factors)',
+    example: { progression: 'Worsening at night', relievingFactors: 'Warm drinks' },
+  })
+  @IsOptional()
+  @IsObject()
+  hpi_details?: Record<string, any>;
+
+  // Comprehensive Vitals Intake
+  @ApiPropertyOptional({
+    description: 'Comprehensive vital signs object (BP, HR, RR, Temp, SpO2, Height, Weight, BMI)',
+    example: {
+      bp: '120/80',
+      pulse: '72',
+      respiratoryRate: '16',
+      temperature: '98.6',
+      oxygenSaturation: '98',
+      height: '175',
+      weight: '70',
+      bmi: '22.9',
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  vitals?: {
+    bp?: string;
+    pulse?: string | number;
+    respiratoryRate?: string | number;
+    temperature?: string | number;
+    oxygenSaturation?: string | number;
+    height?: string | number;
+    weight?: string | number;
+    bmi?: string | number;
+  };
+
+  // Structured Diagnoses List
+  @ApiPropertyOptional({
+    description: 'Array of structured diagnoses (primary, secondary, differential)',
+    example: [
+      { type: 'PRIMARY', description: 'Acute upper respiratory tract infection', code: 'J06.9' },
+      { type: 'SECONDARY', description: 'Essential hypertension', code: 'I10' },
+    ],
+  })
+  @IsOptional()
+  @IsArray()
+  diagnoses?: Array<{
+    type: 'PRIMARY' | 'SECONDARY' | 'DIFFERENTIAL';
+    description: string;
+    code?: string;
+    status?: string;
+  }>;
+
+  // Structured Treatment Plan
+  @ApiPropertyOptional({
+    description: 'Comprehensive treatment recommendations and patient education',
+    example: {
+      recommendations: 'Increased oral fluid intake and vocal rest',
+      medications: 'Paracetamol 500mg TDS PRN',
+      followUp: 'Review SOS if fever > 101 F or dyspnea',
+      patientEducation: 'Explained red flag symptoms requiring immediate ER evaluation',
+    },
+  })
+  @IsOptional()
+  @IsObject()
+  treatment_plan?: Record<string, any>;
+
+  // Allergy Status
+  @ApiPropertyOptional({
+    description: 'Confirmed allergy status: NKDA (No Known Drug Allergies), ALLERGIES_RECORDED, or UNKNOWN',
+    example: 'NKDA',
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(['NKDA', 'ALLERGIES_RECORDED', 'UNKNOWN'])
+  allergy_status?: 'NKDA' | 'ALLERGIES_RECORDED' | 'UNKNOWN';
 
   @ApiPropertyOptional({
     description: 'Optional template name to save this consultation note as a reusable template',

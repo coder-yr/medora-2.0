@@ -23,6 +23,10 @@ import { CreatePatientDto } from './dto/create-patient.dto';
 import { PaginatedPatientsDto, PatientResponseDto } from './dto/patient-response.dto';
 import { PatientQueryDto } from './dto/patient-query.dto';
 import { UpdatePatientDto } from './dto/update-patient.dto';
+import { CheckDuplicateQueryDto } from './dto/check-duplicate-query.dto';
+import { DuplicateCheckResponseDto } from './dto/duplicate-check-response.dto';
+import { PatientEncounterResponseDto } from './dto/patient-encounter-response.dto';
+import { CreatePatientDocumentDto, PatientDocumentResponseDto } from './dto/patient-document.dto';
 import { PatientService } from './patient.service';
 
 @ApiTags('Patient Registry & Demographics')
@@ -50,6 +54,21 @@ export class PatientController {
     return this.patientService.findAll(query, user);
   }
 
+  @Get('check-duplicates')
+  @RequirePermissions(HospitalPermission.PATIENT_VIEW)
+  @ApiOperation({ summary: 'Check for duplicate patient registrations by phone, CNIC, or name and birthdate' })
+  @ApiResponse({
+    status: 200,
+    type: DuplicateCheckResponseDto,
+    description: 'Duplicate detection check result',
+  })
+  async checkDuplicates(
+    @Query() query: CheckDuplicateQueryDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<DuplicateCheckResponseDto> {
+    return this.patientService.checkDuplicates(query, user);
+  }
+
   @Get(':id')
   @RequirePermissions(HospitalPermission.PATIENT_VIEW)
   @ApiOperation({ summary: 'Retrieve patient demographics by ID or 6-digit patient_id' })
@@ -60,6 +79,64 @@ export class PatientController {
     @CurrentUser() user: AuthUser,
   ): Promise<PatientResponseDto> {
     return this.patientService.findById(id, user);
+  }
+
+  @Get(':id/encounters')
+  @RequirePermissions(HospitalPermission.PATIENT_VIEW)
+  @ApiOperation({ summary: 'Retrieve full outpatient clinical encounter history for a patient' })
+  @ApiResponse({
+    status: 200,
+    type: PatientEncounterResponseDto,
+    description: 'Aggregated clinical encounter history',
+  })
+  async getEncounters(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PatientEncounterResponseDto> {
+    return this.patientService.getEncounterHistory(id, user);
+  }
+
+  @Get(':id/documents')
+  @RequirePermissions(HospitalPermission.PATIENT_VIEW)
+  @ApiOperation({ summary: 'Retrieve documents and external medical reports for a patient' })
+  @ApiResponse({
+    status: 200,
+    type: [PatientDocumentResponseDto],
+    description: 'Patient medical documents',
+  })
+  async getDocuments(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PatientDocumentResponseDto[]> {
+    return this.patientService.getDocuments(id, user);
+  }
+
+  @Post(':id/documents')
+  @RequirePermissions(HospitalPermission.PATIENT_UPDATE)
+  @ApiOperation({ summary: 'Upload / attach a new document to a patient record' })
+  @ApiResponse({
+    status: 201,
+    type: PatientDocumentResponseDto,
+    description: 'Document attached successfully',
+  })
+  async addDocument(
+    @Param('id') id: string,
+    @Body() dto: CreatePatientDocumentDto,
+    @CurrentUser() user: AuthUser,
+  ): Promise<PatientDocumentResponseDto> {
+    return this.patientService.addDocument(id, dto, user);
+  }
+
+  @Delete(':id/documents/:docId')
+  @RequirePermissions(HospitalPermission.PATIENT_DELETE)
+  @ApiOperation({ summary: 'Remove an attached medical document' })
+  @ApiResponse({ status: 200, description: 'Document removed' })
+  async removeDocument(
+    @Param('id') id: string,
+    @Param('docId') docId: string,
+    @CurrentUser() user: AuthUser,
+  ): Promise<{ message: string }> {
+    return this.patientService.removeDocument(id, docId, user);
   }
 
   @Post()

@@ -58,6 +58,21 @@ export class OrganizationStaffController {
     return this.service.listInvitations(orgId);
   }
 
+  @Get('activity')
+  @ApiOperation({ summary: 'List organization staff audit activity' })
+  @ApiResponse({ status: 200, description: 'Staff activity logs' })
+  async getStaffActivity(
+    @Param('orgId') orgId: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    return this.service.getOrganizationActivity(
+      orgId,
+      limit ? parseInt(limit, 10) : 50,
+      offset ? parseInt(offset, 10) : 0,
+    );
+  }
+
   @Post('invitations/:invitationId/revoke')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Revoke a pending staff invitation' })

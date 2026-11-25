@@ -26,22 +26,37 @@ export const AcceptInvitationView: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  const [manualTokenInput, setManualTokenInput] = useState('');
+  const [activeToken, setActiveToken] = useState<string | null>(token);
+
   useEffect(() => {
-    if (!token) {
-      setError('Missing invitation token.');
+    const curToken = token || activeToken;
+    if (!curToken) {
+      setError('No invitation token provided. Please paste your token or use the activation link sent to you.');
       setLoading(false);
       return;
     }
 
     const validateToken = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        const res = await fetch(`${apiBaseUrl}/api/v1/auth/invitations/${token}`);
-        const data = await res.json();
+        const res = await fetch(`${apiBaseUrl}/api/v1/auth/invitations/${curToken.trim()}`);
+        const json = await res.json();
         if (!res.ok) {
-          throw new Error(data.message || 'Invitation token is invalid or has expired.');
+          throw new Error(json.error?.message || json.message || 'Invitation token is invalid or has expired.');
         }
-        setInvitation(data);
-        if (data.name) setName(data.name);
+        const payload = json.data?.data || json.data || json;
+        const normalizedInvitation = {
+          id: payload.id || '',
+          email: payload.email || '',
+          name: payload.name || '',
+          role: payload.role || '',
+          organizationName: payload.organizationName || payload.organization?.name || '',
+          organizationCode: payload.organizationCode || payload.organization?.code || '',
+        };
+        setInvitation(normalizedInvitation);
+        if (normalizedInvitation.name) setName(normalizedInvitation.name);
       } catch (err: any) {
         setError(err.message);
       } finally {
@@ -50,10 +65,24 @@ export const AcceptInvitationView: React.FC = () => {
     };
 
     void validateToken();
-  }, [token, apiBaseUrl]);
+  }, [token, activeToken, apiBaseUrl]);
+
+  const handleManualTokenSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = manualTokenInput.trim();
+    if (clean) {
+      navigate(`/accept-invitation?token=${encodeURIComponent(clean)}`, { replace: true });
+      setActiveToken(clean);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const curToken = token || activeToken;
+    if (!curToken) {
+      alert('Invitation token is required.');
+      return;
+    }
     if (password.length < 8) {
       alert('Password must be at least 8 characters long.');
       return;
@@ -69,20 +98,21 @@ export const AcceptInvitationView: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token,
+          token: curToken.trim(),
           password,
           name: name.trim() || undefined,
         }),
       });
 
-      const data = await res.json();
+      const json = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Failed to activate staff membership.');
+        throw new Error(json.error?.message || json.message || 'Failed to activate staff membership.');
       }
 
       setSuccess(true);
-      if (data.accessToken && data.user) {
-        handleLoginSuccess(data);
+      const payload = json.data || json;
+      if (payload.accessToken && payload.user) {
+        handleLoginSuccess(payload);
         setTimeout(() => {
           navigate('/dashboard', { replace: true });
         }, 1500);
@@ -147,9 +177,56 @@ export const AcceptInvitationView: React.FC = () => {
             Validating single-use invitation token...
           </div>
         ) : error ? (
-          <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: 14, color: '#9f1239', fontSize: 13, textAlign: 'center' }}>
-            <AlertCircle size={18} style={{ display: 'inline', marginRight: 6, verticalAlign: -3 }} />
-            {error}
+          <div>
+            <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: 14, color: '#9f1239', fontSize: 13, textAlign: 'center', marginBottom: 20 }}>
+              <AlertCircle size={18} style={{ display: 'inline', marginRight: 6, verticalAlign: -3 }} />
+              {error}
+            </div>
+
+            {error.toLowerCase().includes('already been accepted') ? (
+              <div style={{ textAlign: 'center', marginBottom: 20 }}>
+                <button
+                  type="button"
+                  onClick={() => navigate('/login')}
+                  className="btn btn-primary"
+                  style={{ width: '100%', padding: '10px 16px', fontSize: 14, fontWeight: 700 }}
+                >
+                  Proceed to Platform Login
+                </button>
+              </div>
+            ) : null}
+
+            <form onSubmit={handleManualTokenSubmit} style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+              <label style={{ fontSize: 13, fontWeight: 600, color: '#334155', display: 'block', marginBottom: 6 }}>
+                Enter Invitation Token Manually
+              </label>
+              <input
+                type="text"
+                required
+                className="form-control"
+                placeholder="Paste your 64-character token here..."
+                value={manualTokenInput}
+                onChange={(e) => setManualTokenInput(e.target.value)}
+                style={{ fontSize: 13, marginBottom: 12 }}
+              />
+              <button
+                type="submit"
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '9px 16px', fontSize: 13.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+              >
+                Validate Token <ArrowRight size={15} />
+              </button>
+            </form>
+
+            <div style={{ textAlign: 'center', marginTop: 16 }}>
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 13, cursor: 'pointer', textDecoration: 'underline' }}
+              >
+                Already have an activated account? Sign In
+              </button>
+            </div>
           </div>
         ) : success ? (
           <div style={{ textAlign: 'center', padding: '16px 0' }}>
@@ -161,12 +238,29 @@ export const AcceptInvitationView: React.FC = () => {
               Redirecting you to your Medora operational workbench...
             </p>
           </div>
+        ) : !invitation ? (
+          <div>
+            <div style={{ background: '#fff1f2', border: '1px solid #fecdd3', borderRadius: 8, padding: 14, color: '#9f1239', fontSize: 13, textAlign: 'center', marginBottom: 20 }}>
+              <AlertCircle size={18} style={{ display: 'inline', marginRight: 6, verticalAlign: -3 }} />
+              No invitation details found. Please check your activation link or sign in.
+            </div>
+            <div style={{ textAlign: 'center', marginBottom: 16 }}>
+              <button
+                type="button"
+                onClick={() => navigate('/login')}
+                className="btn btn-primary"
+                style={{ width: '100%', padding: '10px 16px', fontSize: 14, fontWeight: 700 }}
+              >
+                Go to Platform Login
+              </button>
+            </div>
+          </div>
         ) : (
           <div>
             <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: 12, marginBottom: 18, fontSize: 13 }}>
-              <div>Organization: <strong>{invitation?.organizationName}</strong> ({invitation?.organizationCode})</div>
-              <div>Assigned Role: <span className="badge badge-primary" style={{ fontSize: 11.5 }}>{invitation?.role}</span></div>
-              <div>Invited Email: <code>{invitation?.email}</code></div>
+              <div>Organization: <strong>{invitation.organizationName}</strong> ({invitation.organizationCode})</div>
+              <div>Assigned Role: <span className="badge badge-primary" style={{ fontSize: 11.5 }}>{invitation.role}</span></div>
+              <div>Invited Email: <code>{invitation.email}</code></div>
             </div>
 
             <form onSubmit={handleSubmit}>

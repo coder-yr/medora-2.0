@@ -19,10 +19,19 @@ import {
 } from './dto/appointment-response.dto';
 import {
   APPOINTMENT_STATUSES,
+  AppointmentPriority,
   AppointmentStatus,
   CreateAppointmentDto,
 } from './dto/create-appointment.dto';
 import { UpdateAppointmentDto } from './dto/update-appointment.dto';
+import { WalkInAppointmentDto } from './dto/walk-in-appointment.dto';
+import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto';
+import { CancelAppointmentDto } from './dto/cancel-appointment.dto';
+import {
+  OpdQueueResponseDto,
+  QueueItemDto,
+  QueueSummaryDto,
+} from './dto/queue-response.dto';
 
 const WEEKDAYS = [
   'Sunday',
@@ -34,6 +43,13 @@ const WEEKDAYS = [
   'Saturday',
 ];
 
+const PRIORITY_WEIGHT: Record<string, number> = {
+  EMERGENCY: 4,
+  URGENT: 3,
+  VIP: 2,
+  NORMAL: 1,
+};
+
 @Injectable()
 export class AppointmentService {
   private readonly logger = new Logger(AppointmentService.name);
@@ -43,7 +59,7 @@ export class AppointmentService {
     private readonly patientService: PatientService,
     private readonly doctorService: DoctorService,
     @Optional() private readonly branchAuth?: BranchAuthorizationService,
-  ) {}
+  ) { }
 
   /**
    * Book a new appointment with transaction-level double booking and doctor availability guards.
@@ -93,9 +109,25 @@ export class AppointmentService {
     const isVideo = Boolean(dto.video);
     const videoRoom = isVideo ? this.generateVideoRoom() : null;
 
+    let tokenNo: number | null = null;
+    let tokenNumber: string | null = null;
+    let checkedInAt: Date | null = null;
+    if (['checked_in', 'waiting', 'arrived'].includes(status)) {
+      checkedInAt = new Date();
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       // Lock doctor row to serialize concurrent bookings for the same doctor
       await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(doctor.id)} FOR UPDATE`;
+
+      if (checkedInAt) {
+        const maxToken = await tx.appointment.aggregate({
+          where: { doctorId: BigInt(doctor.id), date: dto.date },
+          _max: { tokenNo: true },
+        });
+        tokenNo = (maxToken._max.tokenNo || 0) + 1;
+        tokenNumber = `Q-${tokenNo.toString().padStart(2, '0')}`;
+      }
 
       // Check doctor schedule availability
       if (!['cancelled', 'no show', 'completed'].includes(status)) {
@@ -128,9 +160,15 @@ export class AppointmentService {
           eTime: endStr,
           sTimeKey,
           status,
-          remarks: dto.remarks ?? '',
+          priority: dto.priority || 'NORMAL',
+          department: dto.department || (doctor as any).department || null,
+          remarks: dto.reason ? `${dto.reason}${dto.remarks ? ' - ' + dto.remarks : ''}` : (dto.remarks ?? ''),
           addDate: new Date().toISOString().split('T')[0],
           registrationTime: new Date().toISOString(),
+          checkedInAt,
+          tokenNo,
+          queueNumber: tokenNo,
+          tokenNumber,
           user: userId,
           request: '',
           bp: dto.b_p ?? null,
@@ -150,6 +188,526 @@ export class AppointmentService {
 
       return this.formatAppointment(created);
     });
+  }
+
+  /**
+   * Register a walk-in patient directly into the OPD waiting queue with sequential token.
+   */
+  async createWalkIn(
+    dto: WalkInAppointmentDto,
+    userId = '',
+    user?: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    let targetBranchId: bigint | null = null;
+    if (dto.branchId) {
+      targetBranchId =
+        user && this.branchAuth
+          ? await this.branchAuth.assertBranchAccess(user, dto.branchId)
+          : BigInt(dto.branchId);
+    } else if (user?.branchId) {
+      targetBranchId = BigInt(user.branchId);
+    }
+
+    let patientRecord: { id: string; name: string };
+    if (dto.newPatient) {
+      // Register patient inline with validation and duplicate guards
+      patientRecord = await this.patientService.create(dto.newPatient, userId, user);
+    } else if (dto.patient) {
+      try {
+        patientRecord = await this.patientService.findById(dto.patient);
+      } catch {
+        throw new BadRequestException('Patient does not exist.');
+      }
+    } else {
+      throw new BadRequestException(
+        'Either an existing patient ID or newPatient details must be provided.',
+      );
+    }
+
+    let doctorRecord: { id: string; name: string; department?: string | null };
+    try {
+      doctorRecord = await this.doctorService.findById(dto.doctor);
+    } catch {
+      throw new BadRequestException('Doctor does not exist.');
+    }
+
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const currentHours = now.getHours().toString().padStart(2, '0');
+    const currentMinutes = now.getMinutes().toString().padStart(2, '0');
+    const startTime = `${currentHours}:${currentMinutes}`;
+    const { startStr, endStr, timeSlot, sTimeKey } = this.calculateTimeBounds(
+      today,
+      startTime,
+      15,
+    );
+
+    const checkedInAt = new Date();
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Lock doctor row to safely increment sequential token number
+      await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(doctorRecord.id)} FOR UPDATE`;
+
+      const maxToken = await tx.appointment.aggregate({
+        where: { doctorId: BigInt(doctorRecord.id), date: today },
+        _max: { tokenNo: true },
+      });
+      const tokenNo = (maxToken._max.tokenNo || 0) + 1;
+      const tokenNumber = `W-${tokenNo.toString().padStart(2, '0')}`;
+
+      const created = await tx.appointment.create({
+        data: {
+          patientId: BigInt(patientRecord.id),
+          doctorId: BigInt(doctorRecord.id),
+          date: today,
+          timeSlot,
+          sTime: startStr,
+          eTime: endStr,
+          sTimeKey,
+          status: 'waiting',
+          priority: dto.priority || 'NORMAL',
+          department: dto.department || doctorRecord.department || null,
+          remarks: dto.reason
+            ? `${dto.reason}${dto.remarks ? ' - ' + dto.remarks : ''}`
+            : (dto.remarks ?? ''),
+          addDate: today,
+          registrationTime: now.toISOString(),
+          checkedInAt,
+          tokenNo,
+          queueNumber: tokenNo,
+          tokenNumber,
+          user: userId,
+          request: '',
+          mode: 'in_person',
+          branchId: targetBranchId,
+          visitType: 'walk_in',
+        },
+        include: {
+          patient: true,
+          doctor: true,
+        },
+      });
+
+      return this.formatAppointment(created);
+    });
+  }
+
+  /**
+   * Check in an appointment, generating queue token if not already assigned and setting status to 'waiting'.
+   */
+  async checkIn(
+    idOrKey: string | number,
+    user?: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    const idStr = String(idOrKey);
+    const existing = await this.findOne(idStr, user);
+
+    if (['cancelled', 'completed', 'no show'].includes(existing.status)) {
+      throw new BadRequestException(
+        `Cannot check in an appointment that is already ${existing.status}.`,
+      );
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      let tokenNo = existing.tokenNo;
+      let tokenNumber = existing.tokenNumber;
+
+      if (!tokenNo) {
+        await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(existing.doctorId)} FOR UPDATE`;
+        const maxToken = await tx.appointment.aggregate({
+          where: { doctorId: BigInt(existing.doctorId), date: existing.date },
+          _max: { tokenNo: true },
+        });
+        tokenNo = (maxToken._max.tokenNo || 0) + 1;
+        tokenNumber = `Q-${tokenNo.toString().padStart(2, '0')}`;
+      }
+
+      const updated = await tx.appointment.update({
+        where: { id: BigInt(idStr) },
+        data: {
+          status: 'waiting',
+          checkedInAt: existing.checkedInAt
+            ? new Date(existing.checkedInAt)
+            : new Date(),
+          tokenNo,
+          queueNumber: tokenNo,
+          tokenNumber,
+        },
+        include: {
+          patient: true,
+          doctor: true,
+        },
+      });
+
+      return this.formatAppointment(updated);
+    });
+  }
+
+  /**
+   * Call a waiting patient into the doctor's consultation room.
+   */
+  async callPatient(
+    idOrKey: string | number,
+    user?: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    const idStr = String(idOrKey);
+    const existing = await this.findOne(idStr, user);
+
+    if (existing.status === 'cancelled' || existing.status === 'completed') {
+      throw new BadRequestException(
+        `Cannot call an appointment that is ${existing.status}.`,
+      );
+    }
+
+    const updated = await this.prisma.appointment.update({
+      where: { id: BigInt(idStr) },
+      data: {
+        status: 'called',
+        calledInAt: new Date(),
+      },
+      include: {
+        patient: true,
+        doctor: true,
+      },
+    });
+
+    return this.formatAppointment(updated);
+  }
+
+  /**
+   * Mark consultation as started.
+   */
+  async startConsultation(
+    idOrKey: string | number,
+    user?: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    const idStr = String(idOrKey);
+    const existing = await this.findOne(idStr, user);
+
+    if (existing.status === 'cancelled' || existing.status === 'completed') {
+      throw new BadRequestException(
+        `Cannot start consultation for an appointment that is ${existing.status}.`,
+      );
+    }
+
+    const updated = await this.prisma.appointment.update({
+      where: { id: BigInt(idStr) },
+      data: {
+        status: 'in_consultation',
+        consultStartedAt: new Date(),
+      },
+      include: {
+        patient: true,
+        doctor: true,
+      },
+    });
+
+    return this.formatAppointment(updated);
+  }
+
+  /**
+   * Mark consultation complete and check out patient.
+   */
+  async completeConsultation(
+    idOrKey: string | number,
+    user?: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    const idStr = String(idOrKey);
+    const existing = await this.findOne(idStr, user);
+
+    if (existing.status === 'cancelled') {
+      throw new BadRequestException(
+        'Cannot complete a cancelled appointment.',
+      );
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.appointment.update({
+      where: { id: BigInt(idStr) },
+      data: {
+        status: 'completed',
+        completedAt: now,
+        checkedOutAt: now,
+      },
+      include: {
+        patient: true,
+        doctor: true,
+      },
+    });
+
+    return this.formatAppointment(updated);
+  }
+
+  /**
+   * Cancel an appointment with a recorded cancellation reason.
+   */
+  async cancel(
+    idOrKey: string | number,
+    dto: CancelAppointmentDto,
+    userId = '',
+    user?: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    const idStr = String(idOrKey);
+    const existing = await this.findOne(idStr, user);
+
+    if (existing.status === 'completed') {
+      throw new BadRequestException(
+        'Cannot cancel an already completed appointment.',
+      );
+    }
+
+    const updated = await this.prisma.appointment.update({
+      where: { id: BigInt(idStr) },
+      data: {
+        status: 'cancelled',
+        cancellationReason: dto.reason,
+        cancelledAt: new Date(),
+      },
+      include: {
+        patient: true,
+        doctor: true,
+      },
+    });
+
+    return this.formatAppointment(updated);
+  }
+
+  /**
+   * Reschedule an appointment, marking the original as rescheduled and creating a linked new record.
+   */
+  async reschedule(
+    idOrKey: string | number,
+    dto: RescheduleAppointmentDto,
+    userId = '',
+    user?: AuthUser,
+  ): Promise<AppointmentResponseDto> {
+    const idStr = String(idOrKey);
+    const existing = await this.findOne(idStr, user);
+
+    if (['cancelled', 'completed'].includes(existing.status)) {
+      throw new BadRequestException(
+        `Cannot reschedule an appointment that is already ${existing.status}.`,
+      );
+    }
+
+    const minutes = dto.minutes ?? 15;
+    const { startStr, endStr, timeSlot, sTimeKey } = this.calculateTimeBounds(
+      dto.date,
+      dto.start,
+      minutes,
+    );
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Lock doctor row
+      await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(existing.doctorId)} FOR UPDATE`;
+
+      // Verify doctor is bookable on new date/time
+      await this.assertDoctorBookable(
+        tx,
+        existing.doctorId,
+        dto.date,
+        startStr,
+        endStr,
+      );
+
+      // Verify no clash on new slot (ignore original appointment)
+      await this.assertNoClash(
+        tx,
+        existing.doctorId,
+        startStr,
+        endStr,
+        timeSlot,
+        idStr,
+      );
+
+      // 1. Mark existing appointment as rescheduled
+      await tx.appointment.update({
+        where: { id: BigInt(idStr) },
+        data: {
+          status: 'rescheduled',
+          rescheduleReason:
+            dto.reason || `Rescheduled to ${dto.date} ${dto.start}`,
+        },
+      });
+
+      // 2. Create new appointment linked with rescheduledFromId
+      const newAppointment = await tx.appointment.create({
+        data: {
+          patientId: BigInt(existing.patientId),
+          doctorId: BigInt(existing.doctorId),
+          date: dto.date,
+          timeSlot,
+          sTime: startStr,
+          eTime: endStr,
+          sTimeKey,
+          status: 'scheduled',
+          priority: existing.priority || 'NORMAL',
+          department: existing.department || null,
+          remarks: dto.reason
+            ? `Rescheduled: ${dto.reason}`
+            : existing.remarks,
+          addDate: new Date().toISOString().split('T')[0],
+          registrationTime: new Date().toISOString(),
+          user: userId,
+          request: '',
+          mode: existing.mode,
+          videoRoom: existing.mode === 'video' ? this.generateVideoRoom() : null,
+          branchId: existing.branchId ? BigInt(existing.branchId) : null,
+          visitType: existing.visitType || 'first_visit',
+          rescheduledFromId: BigInt(idStr),
+          rescheduleReason: dto.reason || null,
+        },
+        include: {
+          patient: true,
+          doctor: true,
+        },
+      });
+
+      return this.formatAppointment(newAppointment);
+    });
+  }
+
+  /**
+   * Get operational real-time OPD waiting queue with dynamic positions, wait times and metrics.
+   */
+  async getOpdQueue(
+    branchId?: string | number,
+    doctorId?: string | number,
+    date?: string,
+    user?: AuthUser,
+  ): Promise<OpdQueueResponseDto> {
+    const targetDate = date || new Date().toISOString().split('T')[0];
+
+    const where: Record<string, unknown> = {
+      date: targetDate,
+      status: { in: ['checked_in', 'waiting', 'called', 'in_consultation'] },
+    };
+
+    if (doctorId) {
+      where.doctorId = BigInt(doctorId);
+    }
+
+    if (branchId && user && this.branchAuth) {
+      const authorizedBranchId = await this.branchAuth.assertBranchAccess(
+        user,
+        branchId,
+      );
+      where.branchId = authorizedBranchId;
+    } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
+      if (isOrg1) {
+        where.OR = [
+          { branchId: { in: accessible || [] } },
+          { branchId: null },
+        ];
+      } else {
+        where.branchId = { in: accessible || [] };
+      }
+    }
+
+    const [activeAppointments, completedCount] = await Promise.all([
+      this.prisma.appointment.findMany({
+        where,
+        include: {
+          patient: true,
+          doctor: true,
+        },
+      }),
+      this.prisma.appointment.count({
+        where: {
+          date: targetDate,
+          status: 'completed',
+          ...(doctorId ? { doctorId: BigInt(doctorId) } : {}),
+          ...(branchId ? { branchId: BigInt(branchId) } : {}),
+        },
+      }),
+    ]);
+
+    // Sort queue items: Priority (EMERGENCY > URGENT > VIP > NORMAL), then checkedInAt ascending
+    const sorted = [...activeAppointments].sort((a, b) => {
+      const pA = PRIORITY_WEIGHT[a.priority || 'NORMAL'] || 1;
+      const pB = PRIORITY_WEIGHT[b.priority || 'NORMAL'] || 1;
+      if (pA !== pB) {
+        return pB - pA; // Higher priority first
+      }
+      const timeA = a.checkedInAt ? new Date(a.checkedInAt).getTime() : 0;
+      const timeB = b.checkedInAt ? new Date(b.checkedInAt).getTime() : 0;
+      return timeA - timeB;
+    });
+
+    const now = Date.now();
+    let totalWaitTimeAccumulated = 0;
+    let waitingCount = 0;
+    let inConsultationCount = 0;
+
+    const queueItems: QueueItemDto[] = sorted.map((item, index) => {
+      const checkedInTime = item.checkedInAt
+        ? new Date(item.checkedInAt).getTime()
+        : now;
+      const waitingMinutes = Math.max(
+        0,
+        Math.round((now - checkedInTime) / 60000),
+      );
+
+      if (item.status === 'waiting' || item.status === 'checked_in') {
+        waitingCount++;
+        totalWaitTimeAccumulated += waitingMinutes;
+      } else if (item.status === 'in_consultation') {
+        inConsultationCount++;
+      }
+
+      return {
+        appointmentId: item.id.toString(),
+        queuePosition: index + 1,
+        tokenNumber:
+          item.tokenNumber ||
+          `Q-${(item.tokenNo || index + 1).toString().padStart(2, '0')}`,
+        priority: item.priority || 'NORMAL',
+        status: item.status,
+        checkedInAt: item.checkedInAt
+          ? item.checkedInAt.toISOString()
+          : new Date().toISOString(),
+        calledInAt: item.calledInAt ? item.calledInAt.toISOString() : null,
+        consultStartedAt: item.consultStartedAt
+          ? item.consultStartedAt.toISOString()
+          : null,
+        waitingMinutes,
+        patient: {
+          id: item.patient.id.toString(),
+          patientId: item.patient.patientId || '',
+          name: item.patient.name,
+          phone: item.patient.phone || null,
+          allergies: item.patient.allergies || null,
+        },
+        doctor: {
+          id: item.doctor.id.toString(),
+          name: item.doctor.name,
+          department: item.doctor.department || null,
+        },
+        branchId: item.branchId ? item.branchId.toString() : null,
+        visitType: item.visitType || null,
+        timeSlot: item.timeSlot || '',
+        remarks: item.remarks || null,
+      };
+    });
+
+    const averageWaitMinutes =
+      waitingCount > 0
+        ? Math.round(totalWaitTimeAccumulated / waitingCount)
+        : 0;
+
+    const summary: QueueSummaryDto = {
+      totalWaiting: waitingCount,
+      totalInConsultation: inConsultationCount,
+      totalCompletedToday: completedCount,
+      averageWaitMinutes,
+    };
+
+    return {
+      summary,
+      items: queueItems,
+    };
   }
 
   /**
@@ -370,6 +928,7 @@ export class AppointmentService {
   async getFreeSlots(
     doctorId: string | number,
     date: string,
+    branchId?: string | number,
   ): Promise<FreeSlotDto[]> {
     if (!doctorId || !date) {
       return [];
@@ -384,12 +943,20 @@ export class AppointmentService {
     const weekday = day.getDay(); // 0=Sunday .. 6=Saturday
 
     // 1. Get weekly doctor slots
+    const slotWhere: Record<string, unknown> = {
+      doctorId: BigInt(docIdStr),
+      weekday,
+      active: true,
+    };
+    if (branchId) {
+      slotWhere.OR = [
+        { branchId: BigInt(branchId) },
+        { branchId: null },
+      ];
+    }
+
     let dbSlots = await this.prisma.doctorSlot.findMany({
-      where: {
-        doctorId: BigInt(docIdStr),
-        weekday,
-        active: true,
-      },
+      where: slotWhere,
       orderBy: { startTime: 'asc' },
     });
 
@@ -409,6 +976,9 @@ export class AppointmentService {
             endTime: '17:00',
             slotMinutes: 15,
             active: true,
+            branchId: null,
+            breakStartTime: null,
+            breakEndTime: null,
             createdAt: new Date(),
             updatedAt: new Date(),
           },
@@ -445,6 +1015,18 @@ export class AppointmentService {
       while (currentMinutes + slot.slotMinutes <= stopMinutes) {
         const slotStartStr = this.minutesToTime(currentMinutes);
         const slotEndStr = this.minutesToTime(currentMinutes + slot.slotMinutes);
+
+        // Check if inside break period
+        const isDuringBreak =
+          slot.breakStartTime &&
+          slot.breakEndTime &&
+          slotStartStr < slot.breakEndTime &&
+          slotEndStr > slot.breakStartTime;
+
+        if (isDuringBreak) {
+          currentMinutes += slot.slotMinutes;
+          continue;
+        }
 
         const fullStart = `${date} ${slotStartStr}:00`;
         const fullEnd = `${date} ${slotEndStr}:00`;
@@ -535,7 +1117,7 @@ export class AppointmentService {
       }
     }
 
-    // 2. Check weekly clinic hours
+    // 2. Check weekly clinic hours and breaks
     const allSlots = await tx.doctorSlot.findMany({
       where: {
         doctorId: BigInt(doctorId),
@@ -561,17 +1143,33 @@ export class AppointmentService {
     const startTimeOnly = startStr.substring(11, 16);
     const endTimeOnly = endStr.substring(11, 16);
 
-    const fitsInSlot = daySlots.some(
-      (s: { startTime: string; endTime: string }) =>
-        startTimeOnly >= s.startTime && endTimeOnly <= s.endTime,
+    const matchingSlot = daySlots.find(
+      (s: {
+        startTime: string;
+        endTime: string;
+        breakStartTime?: string | null;
+        breakEndTime?: string | null;
+      }) => startTimeOnly >= s.startTime && endTimeOnly <= s.endTime,
     );
 
-    if (!fitsInSlot) {
+    if (!matchingSlot) {
       const hours = daySlots
         .map((s: { startTime: string; endTime: string }) => `${s.startTime}-${s.endTime}`)
         .join(', ');
       throw new BadRequestException(
         `Outside the doctor's clinic hours on ${weekdayName} (${hours}).`,
+      );
+    }
+
+    // Check if slot overlaps with doctor's scheduled break
+    if (
+      matchingSlot.breakStartTime &&
+      matchingSlot.breakEndTime &&
+      startTimeOnly < matchingSlot.breakEndTime &&
+      endTimeOnly > matchingSlot.breakStartTime
+    ) {
+      throw new BadRequestException(
+        `Doctor is on a scheduled break between ${matchingSlot.breakStartTime} and ${matchingSlot.breakEndTime}.`,
       );
     }
   }
@@ -634,6 +1232,17 @@ export class AppointmentService {
       eTime: app.eTime,
       sTimeKey: app.sTimeKey || '',
       status: app.status,
+      priority: app.priority || 'NORMAL',
+      tokenNo: app.tokenNo ?? null,
+      queueNumber: app.tokenNo ?? null,
+      tokenNumber: app.tokenNumber || null,
+      department: app.department || null,
+      cancellationReason: app.cancellationReason || null,
+      cancelledAt: app.cancelledAt ? app.cancelledAt.toISOString() : null,
+      rescheduledFromId: app.rescheduledFromId
+        ? app.rescheduledFromId.toString()
+        : null,
+      rescheduleReason: app.rescheduleReason || null,
       remarks: app.remarks || null,
       mode: app.mode || 'in_person',
       videoRoom: app.videoRoom || null,
@@ -646,21 +1255,23 @@ export class AppointmentService {
       visitType: app.visitType || null,
       patient: app.patient
         ? {
-            id: app.patient.id.toString(),
-            patientId: app.patient.patientId || '',
-            name: app.patient.name,
-            phone: app.patient.phone || null,
-          }
+          id: app.patient.id.toString(),
+          patientId: app.patient.patientId || '',
+          name: app.patient.name,
+          phone: app.patient.phone || null,
+        }
         : undefined,
       doctor: app.doctor
         ? {
-            id: app.doctor.id.toString(),
-            name: app.doctor.name,
-            department: app.doctor.department || null,
-          }
+          id: app.doctor.id.toString(),
+          name: app.doctor.name,
+          department: app.doctor.department || null,
+        }
         : undefined,
       checkedInAt: app.checkedInAt ? app.checkedInAt.toISOString() : null,
-      consultStartedAt: app.consultStartedAt ? app.consultStartedAt.toISOString() : null,
+      consultStartedAt: app.consultStartedAt
+        ? app.consultStartedAt.toISOString()
+        : null,
       calledInAt: app.calledInAt ? app.calledInAt.toISOString() : null,
       checkedOutAt: app.checkedOutAt ? app.checkedOutAt.toISOString() : null,
       completedAt: app.completedAt ? app.completedAt.toISOString() : null,

@@ -109,6 +109,73 @@ describe('PatientService (Legacy Business Rule Parity)', () => {
       },
       appointment: {
         findFirst: jest.fn().mockResolvedValue(null),
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 101n,
+            addDate: '2026-11-23',
+            timeSlot: '10:00 AM',
+            doctor: { name: 'Dr. Tariq Khan' },
+            status: 'scheduled',
+            visitType: 'first_visit',
+          },
+        ]),
+      },
+      consultation: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 201n,
+            createdAt: new Date('2026-11-23T10:30:00.000Z'),
+            date: new Date('2026-11-23'),
+            doctor: { name: 'Dr. Tariq Khan' },
+            diagnosis: 'Acute Pharyngitis',
+            provisionalDiagnosis: null,
+            presentingComplaint: 'Sore throat, fever',
+            plan: 'Rest and hydration',
+            status: 'draft',
+          },
+        ]),
+      },
+      prescription: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 301n,
+            date: '2026-11-23',
+            doctor: { name: 'Dr. Tariq Khan' },
+            medicines: [{ name: 'Amoxicillin 500mg' }, { name: 'Paracetamol 500mg' }],
+          },
+        ]),
+      },
+      lab: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 401n,
+            date: '2026-11-23',
+            category: 'Complete Blood Count (CBC)',
+            status: 'COMPLETED',
+          },
+        ]),
+      },
+      payment: {
+        findMany: jest.fn().mockResolvedValue([
+          {
+            id: 501n,
+            date: '2026-11-23',
+            grossTotal: 1500,
+            amountReceived: 1000,
+            status: 'part_paid',
+          },
+        ]),
+      },
+      patientDocument: {
+        findMany: jest.fn().mockResolvedValue([]),
+        create: jest.fn().mockImplementation(async ({ data }: any) => ({
+          id: 601n,
+          ...data,
+          uploadedBy: { firstName: 'Dr.', lastName: 'Khan' },
+          createdAt: new Date(),
+        })),
+        findFirst: jest.fn().mockResolvedValue({ id: 601n, patientId: 1n }),
+        delete: jest.fn().mockResolvedValue({ id: 601n }),
       },
     };
 
@@ -321,5 +388,89 @@ describe('PatientService (Legacy Business Rule Parity)', () => {
 
   it('Rule 14: remove throws NotFoundException when patient does not exist', async () => {
     await expect(service.remove('999999')).rejects.toThrow(NotFoundException);
+  });
+
+  // Phase 10.5.1 Clinical Operations Tests
+  it('Phase 10.5.1: stores and retrieves emergency contact, allergies, and clinical histories', async () => {
+    const patient = await service.create({
+      name: 'Clinical Patient',
+      emergencyContactName: 'Zainab Bibi',
+      emergencyContactPhone: '03009876543',
+      emergencyContactRelation: 'Spouse',
+      allergies: 'Penicillin, Aspirin',
+      medicalHistory: 'Type 2 Diabetes Mellitus',
+      surgicalHistory: 'Cholecystectomy (2020)',
+      familyHistory: 'Father had CAD',
+      currentMedications: 'Metformin 500mg BID',
+    });
+
+    expect(patient.emergencyContactName).toBe('Zainab Bibi');
+    expect(patient.emergencyContactPhone).toBe('03009876543');
+    expect(patient.emergencyContactRelation).toBe('Spouse');
+    expect(patient.allergies).toBe('Penicillin, Aspirin');
+    expect(patient.medicalHistory).toBe('Type 2 Diabetes Mellitus');
+    expect(patient.surgicalHistory).toBe('Cholecystectomy (2020)');
+    expect(patient.familyHistory).toBe('Father had CAD');
+    expect(patient.currentMedications).toBe('Metformin 500mg BID');
+  });
+
+  it('Phase 10.5.1: detects potential duplicates by phone, CNIC, or name and birthdate', async () => {
+    await service.create({
+      name: 'Fatima Noor',
+      phone: '03005551234',
+      cnic: '3520112345678',
+      birthdate: '1995-04-10',
+    });
+
+    // Mock findMany for checkDuplicates
+    mockPrisma.patient.findMany.mockResolvedValueOnce([
+      {
+        id: 1n,
+        patientId: '000001',
+        name: 'Fatima Noor',
+        phone: '03005551234',
+        cnic: '35201-1234567-8',
+        birthdate: '1995-04-10',
+      },
+    ]);
+
+    const result = await service.checkDuplicates({
+      phone: '03005551234',
+      cnic: '35201-1234567-8',
+    });
+
+    expect(result.hasMatch).toBe(true);
+    expect(result.matchCount).toBe(1);
+    expect(result.matches[0].matchedOn).toContain('phone');
+    expect(result.matches[0].matchedOn).toContain('cnic');
+  });
+
+  it('Phase 10.5.1: aggregates unified encounter timeline across outpatient records', async () => {
+    const p = await service.create({ name: 'Encounter Patient' });
+    const encounters = await service.getEncounterHistory(p.id);
+
+    expect(encounters).toBeDefined();
+    expect(encounters.summary.totalAppointments).toBe(1);
+    expect(encounters.summary.totalConsultations).toBe(1);
+    expect(encounters.summary.totalPrescriptions).toBe(1);
+    expect(encounters.summary.totalLabs).toBe(1);
+    expect(encounters.summary.totalInvoiced).toBe(1500);
+    expect(encounters.summary.outstandingBalance).toBe(500);
+    expect(encounters.appointments[0].doctorName).toBe('Dr. Tariq Khan');
+    expect(encounters.prescriptions[0].medicines).toContain('Amoxicillin 500mg');
+  });
+
+  it('Phase 10.5.1: attaches and retrieves patient clinical documents', async () => {
+    const p = await service.create({ name: 'Document Patient' });
+    const doc = await service.addDocument(p.id, {
+      title: 'Blood Test Report',
+      documentType: 'LAB_REPORT',
+      fileUrl: 'https://storage.medora.health/doc1.pdf',
+      notes: 'Baseline CBC',
+    });
+
+    expect(doc).toBeDefined();
+    expect(doc.title).toBe('Blood Test Report');
+    expect(doc.fileUrl).toBe('https://storage.medora.health/doc1.pdf');
   });
 });

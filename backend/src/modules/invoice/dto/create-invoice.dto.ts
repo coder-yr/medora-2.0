@@ -52,6 +52,26 @@ export class CreateInvoiceItemDto {
   unit_price?: number;
 
   @ApiPropertyOptional({
+    description: 'Line item discount in INR',
+    example: 0,
+    default: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  discount?: number;
+
+  @ApiPropertyOptional({
+    description: 'Line item tax rate percentage (e.g. 5 for 5%)',
+    example: 0,
+    default: 0,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  tax_rate?: number;
+
+  @ApiPropertyOptional({
     description: 'Optional performing doctor ID for this specific line item',
     example: 1,
   })
@@ -88,6 +108,32 @@ export class CreateInvoiceDto {
   @IsNotEmpty({ message: 'Invoice date is required.' })
   @IsString()
   date!: string;
+
+  @ApiPropertyOptional({
+    description: 'Payment due date (YYYY-MM-DD)',
+    example: '2026-11-05',
+  })
+  @IsOptional()
+  @IsString()
+  due_date?: string;
+
+  @ApiPropertyOptional({
+    description: 'Associated Clinical Encounter / Consultation ID',
+  })
+  @IsOptional()
+  consultation_id?: string | number;
+
+  @ApiPropertyOptional({
+    description: 'Associated Laboratory Order ID',
+  })
+  @IsOptional()
+  lab_order_id?: string | number;
+
+  @ApiPropertyOptional({
+    description: 'Associated Appointment ID',
+  })
+  @IsOptional()
+  appointment_id?: string | number;
 
   @ApiPropertyOptional({
     description: 'Total invoice discount amount. Cannot exceed invoice subtotal.',

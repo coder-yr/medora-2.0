@@ -12,6 +12,11 @@ import { CreateDoctorDto } from './dto/create-doctor.dto';
 import { DoctorQueryDto } from './dto/doctor-query.dto';
 import { DoctorResponseDto, PaginatedDoctorsDto } from './dto/doctor-response.dto';
 import { UpdateDoctorDto } from './dto/update-doctor.dto';
+import {
+  DoctorLeaveDto,
+  DoctorScheduleUpdateDto,
+  DoctorSlotDto,
+} from './dto/doctor-schedule.dto';
 
 @Injectable()
 export class DoctorService {
@@ -326,6 +331,190 @@ export class DoctorService {
     });
 
     return { message: `Removed ${existing.name}.` };
+  }
+
+  /**
+   * Retrieves weekly working schedules for a doctor.
+   */
+  async getDoctorSchedules(
+    doctorId: string | number,
+    branchId?: string | number,
+  ): Promise<DoctorSlotDto[]> {
+    const doc = await this.findById(doctorId);
+    const where: Record<string, unknown> = {
+      doctorId: BigInt(doc.id),
+    };
+    if (branchId) {
+      where.branchId = BigInt(branchId);
+    }
+
+    const slots = await this.prisma.doctorSlot.findMany({
+      where,
+      orderBy: [{ weekday: 'asc' }, { startTime: 'asc' }],
+    });
+
+    return slots.map((s) => ({
+      id: s.id.toString(),
+      branchId: s.branchId ? Number(s.branchId) : null,
+      weekday: s.weekday,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      slotMinutes: s.slotMinutes,
+      breakStartTime: s.breakStartTime || null,
+      breakEndTime: s.breakEndTime || null,
+      active: s.active,
+    }));
+  }
+
+  /**
+   * Updates weekly working schedules for a doctor.
+   */
+  async updateDoctorSchedules(
+    doctorId: string | number,
+    dto: DoctorScheduleUpdateDto,
+  ): Promise<DoctorSlotDto[]> {
+    const doc = await this.findById(doctorId);
+    const targetBranchId = dto.branchId ? BigInt(dto.branchId) : null;
+
+    // Validate times
+    for (const slot of dto.slots) {
+      if (slot.startTime >= slot.endTime) {
+        throw new BadRequestException(
+          `Start time (${slot.startTime}) must be earlier than end time (${slot.endTime}).`,
+        );
+      }
+      if (slot.breakStartTime && slot.breakEndTime) {
+        if (slot.breakStartTime >= slot.breakEndTime) {
+          throw new BadRequestException(
+            `Break start time (${slot.breakStartTime}) must be earlier than break end time (${slot.breakEndTime}).`,
+          );
+        }
+        if (slot.breakStartTime < slot.startTime || slot.breakEndTime > slot.endTime) {
+          throw new BadRequestException(
+            `Break period (${slot.breakStartTime}-${slot.breakEndTime}) must be within working hours (${slot.startTime}-${slot.endTime}).`,
+          );
+        }
+      }
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Clear existing slots for this doctor and branch
+      await tx.doctorSlot.deleteMany({
+        where: {
+          doctorId: BigInt(doc.id),
+          ...(targetBranchId ? { branchId: targetBranchId } : {}),
+        },
+      });
+
+      // Insert new slots
+      for (const s of dto.slots) {
+        await tx.doctorSlot.create({
+          data: {
+            doctorId: BigInt(doc.id),
+            branchId: s.branchId ? BigInt(s.branchId) : targetBranchId,
+            weekday: s.weekday,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            slotMinutes: s.slotMinutes || 15,
+            breakStartTime: s.breakStartTime || null,
+            breakEndTime: s.breakEndTime || null,
+            active: s.active ?? true,
+          },
+        });
+      }
+    });
+
+    return this.getDoctorSchedules(doc.id, dto.branchId);
+  }
+
+  /**
+   * Retrieves leave and unavailable blocks for a doctor.
+   */
+  async getDoctorLeaves(doctorId: string | number): Promise<DoctorLeaveDto[]> {
+    const doc = await this.findById(doctorId);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const blocks = await this.prisma.slotBlock.findMany({
+      where: {
+        doctorId: BigInt(doc.id),
+        date: { gte: today },
+      },
+      orderBy: { date: 'asc' },
+    });
+
+    return blocks.map((b) => ({
+      id: b.id.toString(),
+      date: b.date.toISOString().slice(0, 10),
+      startTime: b.startTime || null,
+      endTime: b.endTime || null,
+      reason: b.reason || null,
+      branchId: b.branchId ? Number(b.branchId) : undefined,
+    }));
+  }
+
+  /**
+   * Adds a leave or unavailable block for a doctor.
+   */
+  async addDoctorLeave(
+    doctorId: string | number,
+    dto: DoctorLeaveDto,
+  ): Promise<DoctorLeaveDto> {
+    const doc = await this.findById(doctorId);
+    const dateObj = new Date(dto.date);
+
+    if (isNaN(dateObj.getTime())) {
+      throw new BadRequestException('Invalid leave date format.');
+    }
+    if (dto.startTime && dto.endTime && dto.startTime >= dto.endTime) {
+      throw new BadRequestException('Leave start time must be earlier than end time.');
+    }
+
+    const created = await this.prisma.slotBlock.create({
+      data: {
+        doctorId: BigInt(doc.id),
+        branchId: dto.branchId ? BigInt(dto.branchId) : null,
+        date: dateObj,
+        startTime: dto.startTime || null,
+        endTime: dto.endTime || null,
+        reason: dto.reason?.trim() || 'Leave',
+      },
+    });
+
+    return {
+      id: created.id.toString(),
+      date: created.date.toISOString().slice(0, 10),
+      startTime: created.startTime || null,
+      endTime: created.endTime || null,
+      reason: created.reason || null,
+      branchId: created.branchId ? Number(created.branchId) : undefined,
+    };
+  }
+
+  /**
+   * Removes a leave or unavailable block for a doctor.
+   */
+  async deleteDoctorLeave(
+    doctorId: string | number,
+    blockId: string | number,
+  ): Promise<{ message: string }> {
+    const doc = await this.findById(doctorId);
+    const existing = await this.prisma.slotBlock.findFirst({
+      where: {
+        id: BigInt(blockId),
+        doctorId: BigInt(doc.id),
+      },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Leave block #${blockId} not found for doctor.`);
+    }
+
+    await this.prisma.slotBlock.delete({
+      where: { id: existing.id },
+    });
+
+    return { message: `Leave block #${blockId} removed.` };
   }
 
   /**

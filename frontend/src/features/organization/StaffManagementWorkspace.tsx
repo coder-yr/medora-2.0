@@ -41,10 +41,22 @@ interface ActivityLogItem {
   createdAt: string;
 }
 
+interface PendingInvitation {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
 export const StaffManagementWorkspace: React.FC = () => {
   const { token, apiBaseUrl, currentUser, userBranches, activeBranchId } = useAuth();
 
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [pendingInvitations, setPendingInvitations] = useState<PendingInvitation[]>([]);
+  const [activeTab, setActiveTab] = useState<'staff' | 'invitations'>('staff');
   const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -93,19 +105,31 @@ export const StaffManagementWorkspace: React.FC = () => {
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
-      const [staffRes, activityRes] = await Promise.all([
-        fetch(`${apiBaseUrl}/api/v1/organizations/${orgId}/staff`, { headers }).then((r) => r.json()),
-        fetch(`${apiBaseUrl}/api/v1/organizations/${orgId}/staff/activity`, { headers }).then((r) => r.json()),
+      const [staffRes, activityRes, invRes] = await Promise.all([
+        fetch(`${apiBaseUrl}/api/v1/organizations/${orgId}/staff`, { headers })
+          .then((r) => r.json())
+          .catch(() => ({ data: [] })),
+        fetch(`${apiBaseUrl}/api/v1/organizations/${orgId}/staff/activity`, { headers })
+          .then((r) => r.json())
+          .catch(() => ({ data: { logs: [] } })),
+        fetch(`${apiBaseUrl}/api/v1/organizations/${orgId}/staff/invitations`, { headers })
+          .then((r) => r.json())
+          .catch(() => ({ data: [] })),
       ]);
 
-      if (Array.isArray(staffRes)) {
-        setStaff(staffRes);
-      } else if (staffRes.data) {
-        setStaff(staffRes.data);
+      const staffList = staffRes.data?.data || staffRes.data || staffRes;
+      if (Array.isArray(staffList)) {
+        setStaff(staffList);
       }
 
-      if (activityRes?.logs) {
-        setActivityLogs(activityRes.logs);
+      const invList = invRes.data?.data || invRes.data || invRes;
+      if (Array.isArray(invList)) {
+        setPendingInvitations(invList);
+      }
+
+      const activityData = activityRes.data?.data || activityRes.data || activityRes;
+      if (activityData?.logs) {
+        setActivityLogs(activityData.logs);
       }
     } catch {
       setError('Unable to load organization staff records.');
@@ -142,18 +166,51 @@ export const StaffManagementWorkspace: React.FC = () => {
         }),
       });
 
-      const data = await res.json();
+      const json = await res.json();
       if (!res.ok) {
-        throw new Error(data.message || 'Invitation failed.');
+        throw new Error(json.error?.message || json.message || 'Invitation failed.');
       }
 
-      const inviteUrl = `${window.location.origin}/accept-invitation?token=${data.invitationToken}`;
+      const payload = json.data?.data || json.data || json;
+      const inviteToken = payload.invitationToken || payload.token;
+      if (!inviteToken) {
+        throw new Error('Server did not return a valid invitation token.');
+      }
+
+      const inviteUrl = `${window.location.origin}/accept-invitation?token=${encodeURIComponent(inviteToken)}`;
       setGeneratedInviteLink(inviteUrl);
       await fetchStaffData();
     } catch (err: any) {
       alert(err.message);
     } finally {
       setInviting(false);
+    }
+  };
+
+  // Revoke Pending Invitation
+  const handleRevokeInvitation = async (invitationId: string, email: string) => {
+    const confirmPrompt = window.confirm(`Are you sure you want to revoke the pending invitation for "${email}"?`);
+    if (!confirmPrompt) return;
+
+    try {
+      const res = await fetch(
+        `${apiBaseUrl}/api/v1/organizations/${orgId}/staff/invitations/${invitationId}/revoke`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.error?.message || json.message || 'Failed to revoke invitation.');
+      }
+
+      await fetchStaffData();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -288,137 +345,260 @@ export const StaffManagementWorkspace: React.FC = () => {
 
       {/* Staff Table Card */}
       <div className="card" style={{ borderRadius: 12, border: '1px solid #e2e8f0', background: '#ffffff', overflow: 'hidden' }}>
-        {/* Toolbar */}
-        <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flex: 1 }}>
-            <div style={{ position: 'relative', minWidth: 260 }}>
-              <Search size={15} style={{ position: 'absolute', left: 12, top: 10, color: '#94a3b8' }} />
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Search staff by name or email..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={{ paddingLeft: 34, fontSize: 13 }}
-              />
-            </div>
-            <select
-              className="form-select"
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              style={{ width: 'auto', fontSize: 13 }}
-            >
-              <option value="ALL">All Roles</option>
-              {ALLOWED_STAFF_ROLES.map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div style={{ fontSize: 13, color: '#64748b' }}>
-            {filteredStaff.length} members shown
-          </div>
+        {/* Navigation Tabs */}
+        <div style={{ display: 'flex', borderBottom: '1px solid #e2e8f0', background: '#f8fafc', padding: '0 20px', gap: 8 }}>
+          <button
+            onClick={() => setActiveTab('staff')}
+            style={{
+              padding: '12px 16px',
+              border: 'none',
+              background: 'none',
+              borderBottom: activeTab === 'staff' ? '2px solid #0284c7' : '2px solid transparent',
+              color: activeTab === 'staff' ? '#0284c7' : '#64748b',
+              fontWeight: activeTab === 'staff' ? 700 : 500,
+              fontSize: 13.5,
+              cursor: 'pointer',
+            }}
+          >
+            Active Directory ({staff.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('invitations')}
+            style={{
+              padding: '12px 16px',
+              border: 'none',
+              background: 'none',
+              borderBottom: activeTab === 'invitations' ? '2px solid #0284c7' : '2px solid transparent',
+              color: activeTab === 'invitations' ? '#0284c7' : '#64748b',
+              fontWeight: activeTab === 'invitations' ? 700 : 500,
+              fontSize: 13.5,
+              cursor: 'pointer',
+            }}
+          >
+            Pending Invitations ({pendingInvitations.filter((i) => i.status === 'PENDING').length})
+          </button>
         </div>
 
-        {/* Table */}
-        <div className="table-responsive">
-          <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-            <thead>
-              <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
-                <th style={{ padding: '12px 16px' }}>Staff Member</th>
-                <th style={{ padding: '12px 16px' }}>Role</th>
-                <th style={{ padding: '12px 16px' }}>Branch</th>
-                <th style={{ padding: '12px 16px' }}>Status</th>
-                <th style={{ padding: '12px 16px' }}>Joined</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredStaff.length === 0 ? (
-                <tr>
-                  <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
-                    No staff members match the current filter.
-                  </td>
+        {activeTab === 'staff' ? (
+          <>
+            {/* Toolbar */}
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', flex: 1 }}>
+                <div style={{ position: 'relative', minWidth: 260 }}>
+                  <Search size={15} style={{ position: 'absolute', left: 12, top: 10, color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    className="form-control"
+                    placeholder="Search staff by name or email..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    style={{ paddingLeft: 34, fontSize: 13 }}
+                  />
+                </div>
+                <select
+                  className="form-select"
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  style={{ width: 'auto', fontSize: 13 }}
+                >
+                  <option value="ALL">All Roles</option>
+                  {ALLOWED_STAFF_ROLES.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ fontSize: 13, color: '#64748b' }}>
+                {filteredStaff.length} members shown
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="table-responsive">
+              <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                    <th style={{ padding: '12px 16px' }}>Staff Member</th>
+                    <th style={{ padding: '12px 16px' }}>Role</th>
+                    <th style={{ padding: '12px 16px' }}>Branch</th>
+                    <th style={{ padding: '12px 16px' }}>Status</th>
+                    <th style={{ padding: '12px 16px' }}>Joined</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredStaff.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
+                        No staff members match the current filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStaff.map((member) => (
+                      <tr key={member.membershipId} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '12px 16px' }}>
+                          <div style={{ fontWeight: 700, color: '#0f172a' }}>{member.name}</div>
+                          <div style={{ fontSize: 12, color: '#64748b' }}>{member.email}</div>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              background: member.accessRole === 'Admin' ? '#e0e7ff' : '#f1f5f9',
+                              color: member.accessRole === 'Admin' ? '#4338ca' : '#334155',
+                            }}
+                          >
+                            {member.accessRole}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span className="badge badge-neutral" style={{ fontSize: 11.5 }}>
+                            {member.branchName || 'Main Campus'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px' }}>
+                          <span
+                            style={{
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              background: member.isActive ? '#dcfce7' : '#fee2e2',
+                              color: member.isActive ? '#15803d' : '#b91c1c',
+                            }}
+                          >
+                            {member.isActive ? 'Active' : 'Deactivated'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', color: '#64748b', fontSize: 12 }}>
+                          {new Date(member.assignedAt).toLocaleDateString()}
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                          <div style={{ display: 'inline-flex', gap: 6 }}>
+                            <button
+                              onClick={() => {
+                                setSelectedMember(member);
+                                setNewRole(member.accessRole);
+                                setShowRoleModal(true);
+                              }}
+                              className="btn btn-secondary"
+                              style={{ padding: '4px 8px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
+                            >
+                              <Edit2 size={12} /> Edit Role
+                            </button>
+                            <button
+                              onClick={() => void handleToggleStatus(member)}
+                              className="btn btn-secondary"
+                              style={{
+                                padding: '4px 8px',
+                                fontSize: 12,
+                                color: member.isActive ? '#b91c1c' : '#15803d',
+                                borderColor: member.isActive ? '#fecdd3' : '#bbf7d0',
+                                background: member.isActive ? '#fff1f2' : '#f0fdf4',
+                              }}
+                            >
+                              {member.isActive ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div className="table-responsive">
+            <table className="table" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569' }}>
+                  <th style={{ padding: '12px 16px' }}>Invited Recipient</th>
+                  <th style={{ padding: '12px 16px' }}>Role</th>
+                  <th style={{ padding: '12px 16px' }}>Status</th>
+                  <th style={{ padding: '12px 16px' }}>Issued Date</th>
+                  <th style={{ padding: '12px 16px' }}>Expires</th>
+                  <th style={{ padding: '12px 16px', textAlign: 'right' }}>Actions</th>
                 </tr>
-              ) : (
-                filteredStaff.map((member) => (
-                  <tr key={member.membershipId} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ fontWeight: 700, color: '#0f172a' }}>{member.name}</div>
-                      <div style={{ fontSize: 12, color: '#64748b' }}>{member.email}</div>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: 6,
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          background: member.accessRole === 'Admin' ? '#e0e7ff' : '#f1f5f9',
-                          color: member.accessRole === 'Admin' ? '#4338ca' : '#334155',
-                        }}
-                      >
-                        {member.accessRole}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span className="badge badge-neutral" style={{ fontSize: 11.5 }}>
-                        {member.branchName || 'Main Campus'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span
-                        style={{
-                          padding: '3px 8px',
-                          borderRadius: 6,
-                          fontSize: 11.5,
-                          fontWeight: 600,
-                          background: member.isActive ? '#dcfce7' : '#fee2e2',
-                          color: member.isActive ? '#15803d' : '#b91c1c',
-                        }}
-                      >
-                        {member.isActive ? 'Active' : 'Deactivated'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', color: '#64748b', fontSize: 12 }}>
-                      {new Date(member.assignedAt).toLocaleDateString()}
-                    </td>
-                    <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                      <div style={{ display: 'inline-flex', gap: 6 }}>
-                        <button
-                          onClick={() => {
-                            setSelectedMember(member);
-                            setNewRole(member.accessRole);
-                            setShowRoleModal(true);
-                          }}
-                          className="btn btn-secondary"
-                          style={{ padding: '4px 8px', fontSize: 12, display: 'flex', alignItems: 'center', gap: 4 }}
-                        >
-                          <Edit2 size={12} /> Edit Role
-                        </button>
-                        <button
-                          onClick={() => void handleToggleStatus(member)}
-                          className="btn btn-secondary"
-                          style={{
-                            padding: '4px 8px',
-                            fontSize: 12,
-                            color: member.isActive ? '#b91c1c' : '#15803d',
-                            borderColor: member.isActive ? '#fecdd3' : '#bbf7d0',
-                            background: member.isActive ? '#fff1f2' : '#f0fdf4',
-                          }}
-                        >
-                          {member.isActive ? 'Deactivate' : 'Activate'}
-                        </button>
-                      </div>
+              </thead>
+              <tbody>
+                {pendingInvitations.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 32, textAlign: 'center', color: '#64748b' }}>
+                      No invitations recorded. Click "Invite Staff Member" to issue single-use activation links.
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  pendingInvitations.map((inv) => (
+                    <tr key={inv.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ fontWeight: 700, color: '#0f172a' }}>{inv.name}</div>
+                        <div style={{ fontSize: 12, color: '#64748b' }}>{inv.email}</div>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span className="badge badge-primary" style={{ fontSize: 11.5 }}>
+                          {inv.role}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span
+                          style={{
+                            padding: '3px 8px',
+                            borderRadius: 6,
+                            fontSize: 11.5,
+                            fontWeight: 600,
+                            background:
+                              inv.status === 'PENDING'
+                                ? '#fef3c7'
+                                : inv.status === 'ACCEPTED'
+                                  ? '#dcfce7'
+                                  : '#fee2e2',
+                            color:
+                              inv.status === 'PENDING'
+                                ? '#b45309'
+                                : inv.status === 'ACCEPTED'
+                                  ? '#15803d'
+                                  : '#b91c1c',
+                          }}
+                        >
+                          {inv.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#64748b', fontSize: 12 }}>
+                        {new Date(inv.createdAt).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: '#64748b', fontSize: 12 }}>
+                        {new Date(inv.expiresAt).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                        {inv.status === 'PENDING' && (
+                          <button
+                            onClick={() => void handleRevokeInvitation(inv.id, inv.email)}
+                            className="btn btn-secondary"
+                            style={{
+                              padding: '4px 8px',
+                              fontSize: 12,
+                              color: '#b91c1c',
+                              borderColor: '#fecdd3',
+                              background: '#fff1f2',
+                            }}
+                          >
+                            Revoke
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Modal 1: Invite Staff */}

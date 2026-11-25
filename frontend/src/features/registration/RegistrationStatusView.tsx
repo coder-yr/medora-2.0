@@ -26,6 +26,8 @@ interface RegistrationStatusData {
   rejectionReason?: string | null;
   createdAt: string;
   organizationId?: string | null;
+  adminEmail?: string;
+  invitationToken?: string | null;
 }
 
 export const RegistrationStatusView: React.FC = () => {
@@ -38,13 +40,14 @@ export const RegistrationStatusView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const fetchStatus = async (ref: string) => {
-    if (!ref.trim()) return;
+    const cleanRef = ref.replace(/^[:\s]+/, '').trim();
+    if (!cleanRef) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/v1/organization-registrations/status/${encodeURIComponent(ref.trim())}`);
+      const res = await fetch(`${API_BASE_URL}/api/v1/organization-registrations/status/${encodeURIComponent(cleanRef)}`);
       const json = await res.json();
 
       if (!res.ok) {
@@ -63,16 +66,18 @@ export const RegistrationStatusView: React.FC = () => {
 
   useEffect(() => {
     if (routeRef) {
-      setInputRef(routeRef);
-      void fetchStatus(routeRef);
+      const clean = routeRef.replace(/^[:\s]+/, '').trim();
+      setInputRef(clean);
+      void fetchStatus(clean);
     }
   }, [routeRef]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (inputRef.trim()) {
-      navigate(`/registration-status/${encodeURIComponent(inputRef.trim())}`, { replace: true });
-      void fetchStatus(inputRef.trim());
+    const clean = inputRef.replace(/^[:\s]+/, '').trim();
+    if (clean) {
+      navigate(`/registration-status/${encodeURIComponent(clean)}`, { replace: true });
+      void fetchStatus(clean);
     }
   };
 
@@ -330,27 +335,46 @@ export const RegistrationStatusView: React.FC = () => {
 
             {/* Active Notice */}
             {data.status === 'ACTIVE' && (
-              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, padding: 16, marginBottom: 24, textAlign: 'center' }}>
-                <h4 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700, color: '#047857' }}>
+              <div style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', borderRadius: 10, padding: 18, marginBottom: 24, textAlign: 'center' }}>
+                <h4 style={{ margin: '0 0 6px', fontSize: 16, fontWeight: 700, color: '#047857' }}>
                   Healthcare Facility is Live!
                 </h4>
                 <p style={{ margin: '0 0 14px', fontSize: 13, color: '#065f46' }}>
-                  The initial administrator invitation token has been dispatched. Use your administrator credentials or invitation link to begin organization onboarding.
+                  {data.invitationToken
+                    ? 'The organization has been provisioned and the primary administrator invitation is ready.'
+                    : 'The organization has been provisioned and activated. The administrator account is active.'}
                 </p>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
-                  <Link
-                    to="/accept-invitation"
-                    style={{ padding: '8px 16px', borderRadius: 6, background: '#059669', color: '#fff', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    Accept Admin Invitation
-                  </Link>
-                  <Link
-                    to="/login"
-                    style={{ padding: '8px 16px', borderRadius: 6, background: '#ffffff', color: '#047857', border: '1px solid #059669', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    Platform Login
-                  </Link>
-                </div>
+                {data.invitationToken ? (
+                  <>
+                    <div style={{ background: '#ffffff', border: '1px dashed #059669', borderRadius: 8, padding: 10, marginBottom: 16, fontSize: 12.5, color: '#065f46', wordBreak: 'break-all' }}>
+                      <div style={{ fontWeight: 600, marginBottom: 4 }}>Activation Token:</div>
+                      <code style={{ background: '#f0fdf4', padding: '2px 6px', borderRadius: 4, color: '#047857', display: 'inline-block' }}>{data.invitationToken}</code>
+                    </div>
+                    <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <Link
+                        to={`/accept-invitation?token=${encodeURIComponent(data.invitationToken)}`}
+                        style={{ padding: '9px 18px', borderRadius: 6, background: '#059669', color: '#fff', fontSize: 13.5, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                      >
+                        Accept Admin Invitation <ArrowRight size={15} />
+                      </Link>
+                      <Link
+                        to="/login"
+                        style={{ padding: '9px 18px', borderRadius: 6, background: '#ffffff', color: '#047857', border: '1px solid #059669', fontSize: 13.5, fontWeight: 600, textDecoration: 'none' }}
+                      >
+                        Platform Login
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                    <Link
+                      to="/login"
+                      style={{ padding: '9px 18px', borderRadius: 6, background: '#059669', color: '#fff', fontSize: 13.5, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    >
+                      Sign In to Medora <ArrowRight size={15} />
+                    </Link>
+                  </div>
+                )}
               </div>
             )}
           </div>

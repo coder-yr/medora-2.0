@@ -316,3 +316,62 @@ export interface ValuationReport {
     retailTotal: number;
   }>;
 }
+
+export interface StockTransfer {
+  id: string;
+  transferNumber: string;
+  fromBranchId: string;
+  toBranchId: string;
+  medicineId: string;
+  batchId: string;
+  quantity: number;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  reason?: string | null;
+  transferredById?: string | null;
+  receivedById?: string | null;
+  createdAt: string;
+  fromBranch?: { id: string; name: string };
+  toBranch?: { id: string; name: string };
+  medicine?: { id: string; name: string; code?: string | null; brandName?: string | null };
+  batch?: { id: string; batchNumber: string; expiryDate: string };
+  transferredBy?: { id: string; firstName?: string; lastName?: string; email?: string };
+}
+
+export interface CreateStockTransferDto {
+  fromBranchId: number;
+  toBranchId: number;
+  medicineId: number;
+  batchId: number;
+  quantity: number;
+  reason?: string;
+}
+
+export interface CreateOtcSaleItemDto {
+  medicineId?: number;
+  customName?: string;
+  batchId?: number;
+  quantity: number;
+  unitPrice?: number;
+}
+
+export interface CreateOtcSaleDto {
+  patientId?: number;
+  patientName?: string;
+  customerPhone?: string;
+  saleDate: string;
+  discount?: number;
+  tax?: number;
+  paymentMethod?: string;
+  notes?: string;
+  branchId?: number;
+  generateInvoice?: boolean;
+  items: CreateOtcSaleItemDto[];
+}
+
+export interface ApprovePurchaseOrderDto {
+  notes?: string;
+}
+
+export interface CancelPurchaseOrderDto {
+  reason: string;
+}

@@ -942,6 +942,15 @@ export class AuthService {
         where: { email: { equals: normalizedEmail, mode: 'insensitive' } },
       });
 
+      let targetBranchId = invitation.branchId;
+      if (!targetBranchId) {
+        const defaultBranch = await tx.hospitalBranch.findFirst({
+          where: { organizationId: invitation.organizationId, deletedAt: null, active: true },
+          orderBy: { id: 'asc' },
+        });
+        targetBranchId = defaultBranch ? defaultBranch.id : null;
+      }
+
       if (!existingUser) {
         const displayName = dto.name || invitation.name || 'Staff Member';
         const nameParts = displayName.trim().split(' ');
@@ -961,13 +970,18 @@ export class AuthService {
             group: role,
             isSuperAdmin: false, // Prevents privilege escalation
             organizationId: invitation.organizationId,
-            branchId: invitation.branchId || null,
+            branchId: targetBranchId,
           },
         });
       } else {
-        await tx.user.update({
+        existingUser = await tx.user.update({
           where: { id: existingUser.id },
-          data: { password: hashedPassword },
+          data: {
+            password: hashedPassword,
+            group: role,
+            organizationId: invitation.organizationId,
+            branchId: targetBranchId,
+          },
         });
       }
 
@@ -990,9 +1004,58 @@ export class AuthService {
         update: {
           accessRole: role,
           isActive: true,
+          isDefault: true,
           revokedAt: null,
         },
       });
+
+      // Upsert branch membership if branch is specified
+      if (targetBranchId) {
+        await tx.userBranchMembership.upsert({
+          where: {
+            userId_branchId: {
+              userId: existingUser.id,
+              branchId: targetBranchId,
+            },
+          },
+          create: {
+            userId: existingUser.id,
+            branchId: targetBranchId,
+            accessRole: role,
+            isActive: true,
+            isDefault: true,
+            assignedById: invitation.invitedById,
+          },
+          update: {
+            accessRole: role,
+            isActive: true,
+            isDefault: true,
+            revokedAt: null,
+          },
+        });
+
+        // If user was invited as Doctor, ensure Doctor record exists for this branch
+        if (role === 'Doctor') {
+          const existingDoc = await tx.doctor.findFirst({
+            where: {
+              email: normalizedEmail,
+              branchId: targetBranchId,
+            },
+          });
+          if (!existingDoc) {
+            const docName = dto.name || invitation.name || `${existingUser.firstName} ${existingUser.lastName}`.trim();
+            await tx.doctor.create({
+              data: {
+                name: docName.startsWith('Dr') ? docName : `Dr. ${docName}`,
+                email: normalizedEmail,
+                branchId: targetBranchId,
+                phone: '9876543210',
+                department: 'General Medicine',
+              },
+            });
+          }
+        }
+      }
 
       return existingUser;
     });

@@ -82,6 +82,12 @@ export class CreateLabTestCatalogueDto {
   @MaxLength(100)
   name?: string;
 
+  @ApiPropertyOptional({ description: 'Unique test code', example: 'CBC' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  code?: string;
+
   @ApiPropertyOptional({ description: 'Department or section', example: 'Hematology' })
   @IsOptional()
   @IsString()
@@ -123,6 +129,23 @@ export class CreateLabTestCatalogueDto {
   @IsString()
   instructions?: string;
 
+  @ApiPropertyOptional({ description: 'Specimen collection instructions and container requirements' })
+  @IsOptional()
+  @IsString()
+  collectionNotes?: string;
+
+  @ApiPropertyOptional({ description: 'Critical panic low limit threshold' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  criticalLow?: number;
+
+  @ApiPropertyOptional({ description: 'Critical panic high limit threshold' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  criticalHigh?: number;
+
   @ApiPropertyOptional({ description: 'Initial test parameters', type: [CreateTestParameterDto] })
   @IsOptional()
   @IsArray()
@@ -143,6 +166,12 @@ export class UpdateLabTestCatalogueDto {
   @IsString()
   @MaxLength(100)
   name?: string;
+
+  @ApiPropertyOptional({ description: 'Unique test code', example: 'CBC' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  code?: string;
 
   @ApiPropertyOptional({ description: 'Department or section', example: 'Hematology' })
   @IsOptional()
@@ -184,6 +213,23 @@ export class UpdateLabTestCatalogueDto {
   @IsOptional()
   @IsString()
   instructions?: string;
+
+  @ApiPropertyOptional({ description: 'Specimen collection instructions and container requirements' })
+  @IsOptional()
+  @IsString()
+  collectionNotes?: string;
+
+  @ApiPropertyOptional({ description: 'Critical panic low limit threshold' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  criticalLow?: number;
+
+  @ApiPropertyOptional({ description: 'Critical panic high limit threshold' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  criticalHigh?: number;
 
   @ApiPropertyOptional({ description: 'Active status' })
   @IsOptional()

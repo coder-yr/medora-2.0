@@ -36,6 +36,9 @@ import {
   VisitConsultationContextDto,
 } from './dto/consultation-response.dto';
 import { SaveConsultationDto } from './dto/save-consultation.dto';
+import { AmendConsultationDto } from './dto/amend-consultation.dto';
+import { DoctorDashboardSummaryDto } from './dto/doctor-dashboard.dto';
+import { PatientClinicalChartDto } from './dto/patient-chart.dto';
 
 @ApiTags('Consultations')
 @ApiBearerAuth()
@@ -62,6 +65,48 @@ export class ConsultationController {
     @Request() req: any,
   ): Promise<PaginatedConsultationsDto> {
     return this.consultationService.findAll(query, req.user);
+  }
+
+  @Get('dashboard')
+  @RequirePermissions(HospitalPermission.CONSULTATION_VIEW)
+  @ApiOperation({
+    summary: 'Doctor clinical dashboard overview',
+    description: 'Returns metrics, live OPD queue, and pending drafts for the doctor.',
+  })
+  @ApiQuery({ name: 'doctor', required: false, example: '1' })
+  @ApiQuery({ name: 'branchId', required: false, example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Doctor dashboard summary.',
+    type: DoctorDashboardSummaryDto,
+  })
+  async getDashboard(
+    @Query('doctor') doctorId?: string,
+    @Query('branchId') branchId?: string,
+    @Request() req?: any,
+  ): Promise<DoctorDashboardSummaryDto> {
+    const effectiveDoctorId = doctorId || req?.user?.doctorId;
+    return this.consultationService.getDoctorDashboard(effectiveDoctorId, branchId, req?.user);
+  }
+
+  @Get('patient/:patientId/chart')
+  @RequirePermissions(HospitalPermission.CONSULTATION_VIEW)
+  @ApiOperation({
+    summary: 'Consolidated patient clinical chart',
+    description:
+      'Returns consolidated allergies (NKDA vs recorded), history, vitals trend, past diagnoses, prescriptions, and encounters.',
+  })
+  @ApiParam({ name: 'patientId', description: 'Patient ID or MRN', example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Patient clinical chart data.',
+    type: PatientClinicalChartDto,
+  })
+  async getPatientChart(
+    @Param('patientId') patientId: string,
+    @Request() req: any,
+  ): Promise<PatientClinicalChartDto> {
+    return this.consultationService.getPatientClinicalChart(patientId, req.user);
   }
 
   @Get('templates')
@@ -157,6 +202,31 @@ export class ConsultationController {
   ): Promise<ConsultationResponseDto> {
     const userId = req.user?.id || req.user?.username || '';
     return this.consultationService.saveVisitConsultation(appointmentId, dto, userId, req.user);
+  }
+
+  @Post(':id/amend')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions(HospitalPermission.CONSULTATION_ADD)
+  @ApiOperation({
+    summary: 'Amend signed consultation note',
+    description:
+      'Appends an auditable addendum / correction with author, timestamp, reason, and notes.',
+  })
+  @ApiParam({ name: 'id', description: 'Consultation ID', example: '1' })
+  @ApiResponse({
+    status: 200,
+    description: 'Consultation amended successfully.',
+    type: ConsultationResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Consultation is not signed or invalid amendment data.' })
+  @ApiResponse({ status: 404, description: 'Consultation not found.' })
+  async amendConsultation(
+    @Param('id') id: string,
+    @Body() dto: AmendConsultationDto,
+    @Request() req: any,
+  ): Promise<ConsultationResponseDto> {
+    const userId = req.user?.id || req.user?.username || '';
+    return this.consultationService.amendConsultation(id, dto, userId, req.user);
   }
 
   @Get(':id')

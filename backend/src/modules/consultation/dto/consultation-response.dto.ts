@@ -115,6 +115,60 @@ export class ConsultationResponseDto {
   @ApiPropertyOptional()
   immunizations?: any | null;
 
+  @ApiPropertyOptional({ example: 'Patient complains of cough...' })
+  soapSubjective?: string | null;
+
+  @ApiPropertyOptional({ example: 'Lungs clear, BP 120/80...' })
+  soapObjective?: string | null;
+
+  @ApiPropertyOptional({ example: 'Acute bronchitis...' })
+  soapAssessment?: string | null;
+
+  @ApiPropertyOptional({ example: 'Prescribed bronchodilator...' })
+  soapPlan?: string | null;
+
+  @ApiPropertyOptional()
+  chiefComplaintDetails?: any | null;
+
+  @ApiPropertyOptional()
+  hpiDetails?: any | null;
+
+  @ApiPropertyOptional()
+  vitals?: any | null;
+
+  @ApiPropertyOptional()
+  diagnoses?: any | null;
+
+  @ApiPropertyOptional()
+  treatmentPlan?: any | null;
+
+  @ApiPropertyOptional({ example: 'NKDA' })
+  allergyStatus?: string | null;
+
+  @ApiPropertyOptional()
+  signedAt?: string | null;
+
+  @ApiPropertyOptional({ example: '1' })
+  signedById?: string | null;
+
+  @ApiPropertyOptional()
+  signedBy?: { id: string; name: string } | null;
+
+  @ApiPropertyOptional({ example: '1' })
+  branchId?: string | null;
+
+  @ApiPropertyOptional()
+  amendments?: Array<{
+    id: string;
+    amendedBy: string;
+    amendedByName?: string;
+    reason: string;
+    amendedSection: string;
+    previousNotes?: string | null;
+    newNotes: string;
+    createdAt: string;
+  }>;
+
   @ApiProperty({ example: 'completed' })
   status!: string;
 

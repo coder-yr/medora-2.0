@@ -250,6 +250,49 @@ describe('LaboratoryService (Unit)', () => {
       );
       expect(res.status).toBe('REJECTED');
     });
+
+    it('creates a recollected sample linked to rejected sample and re-links tests', async () => {
+      prismaMock.labSample.findUnique.mockResolvedValue({
+        id: 501n,
+        labId: 101n,
+        sampleNumber: 'SMP-20261124-101-1',
+        sampleType: 'EDTA Blood',
+        status: 'REJECTED',
+      });
+      prismaMock.labSample.create.mockResolvedValue({
+        id: 502n,
+        labId: 101n,
+        sampleNumber: 'SMP-20261124-101-R100',
+        sampleType: 'EDTA Blood',
+        status: 'COLLECTED',
+        isRecollection: true,
+        recollectedFromId: 501n,
+      });
+      prismaMock.labTest.updateMany = jest.fn().mockResolvedValue({ count: 1 });
+      prismaMock.lab.update.mockResolvedValue({ id: 101n, status: 'SAMPLE_COLLECTED' });
+
+      const res = await service.recollectSample(
+        501,
+        { collectorLocation: 'OPD Phlebotomy Room 2', condition: 'FRESH', notes: 'Fresh redraw' },
+        4,
+      );
+      expect(res.status).toBe('COLLECTED');
+      expect(res.isRecollection).toBe(true);
+      expect(prismaMock.labSample.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            isRecollection: true,
+            recollectedFromId: 501n,
+          }),
+        }),
+      );
+      expect(prismaMock.lab.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 101n },
+          data: { status: 'SAMPLE_COLLECTED' },
+        }),
+      );
+    });
   });
 
   describe('Result Processing, Verification & Amendments', () => {
@@ -381,6 +424,100 @@ describe('LaboratoryService (Unit)', () => {
 
       expect(res.amendments).toHaveLength(1);
       expect(prismaMock.labReportAmendment.create).toHaveBeenCalled();
+    });
+
+    it('generates a complete printable laboratory report payload', async () => {
+      prismaMock.lab.findUnique.mockResolvedValue({
+        id: 101n,
+        orderNumber: 'LAB-20261124-1001',
+        date: '2026-11-24',
+        priority: 'ROUTINE',
+        status: 'COMPLETED',
+        clinicalNotes: 'Follow-up CBC',
+        verifiedBy: 2n,
+        verifiedAt: new Date(),
+        approvedBy: 3n,
+        approvedAt: new Date(),
+        patient: {
+          id: 1n,
+          patientId: '000001',
+          name: 'Jane Doe',
+          age: '35',
+          sex: 'Female',
+          phone: '+91 98765 43210',
+          address: '42 Main St',
+        },
+        doctor: {
+          id: 1n,
+          name: 'Dr. Sarah Connor',
+          department: 'Cardiology',
+        },
+        branch: {
+          name: 'Main Hospital',
+          address: '123 Health Ave',
+          organization: {
+            settings: {
+              legalName: 'Medora Healthcare System',
+              phone: '1800-MEDORA',
+              email: 'care@medora.com',
+            },
+          },
+        },
+        samples: [
+          {
+            id: 501n,
+            sampleNumber: 'SMP-20261124-101-1',
+            sampleType: 'EDTA Blood',
+            status: 'RECEIVED',
+            collectorLocation: 'Phlebotomy Room 1',
+            condition: 'GOOD',
+            isRecollection: false,
+            collectedAt: new Date(),
+            receivedAt: new Date(),
+          },
+        ],
+        tests: [
+          {
+            id: 201n,
+            name: 'Complete Blood Count (CBC)',
+            sampleType: 'EDTA Blood',
+            result: 'Normal hemogram',
+            status: 'reported',
+            labCategory: { department: 'Hematology' },
+            resultParameters: [
+              {
+                id: 301n,
+                parameterName: 'Hemoglobin',
+                value: '14.2',
+                unitSnapshot: 'g/dL',
+                referenceRangeSnapshot: '12.0 - 16.0',
+                abnormalFlag: 'NORMAL',
+                clinicalComments: null,
+                enteredBy: { firstName: 'Lab', lastName: 'Tech' },
+                enteredAt: new Date(),
+              },
+            ],
+          },
+        ],
+        amendments: [],
+      });
+      prismaMock.hospitalSettings = { findFirst: jest.fn().mockResolvedValue(null) };
+      prismaMock.user = {
+        findUnique: jest
+          .fn()
+          .mockResolvedValueOnce({ firstName: 'Dr. Verifier', lastName: 'MD' })
+          .mockResolvedValueOnce({ firstName: 'Dr. Approver', lastName: 'Pathologist' }),
+      };
+
+      const printout = await service.getPrintout(101);
+      expect(printout.orderNumber).toBe('LAB-20261124-1001');
+      expect(printout.patient.name).toBe('Jane Doe');
+      expect(printout.hospital.name).toBe('Medora Healthcare System');
+      expect(printout.tests).toHaveLength(1);
+      expect(printout.tests[0].parameters).toHaveLength(1);
+      expect(printout.tests[0].parameters[0].parameterName).toBe('Hemoglobin');
+      expect(printout.verification.verifiedByName).toBe('Dr. Verifier MD');
+      expect(printout.verification.approvedByName).toBe('Dr. Approver Pathologist');
     });
   });
 });

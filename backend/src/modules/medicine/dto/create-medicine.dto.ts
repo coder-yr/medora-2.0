@@ -149,6 +149,79 @@ export class CreateMedicineDto {
   expiryDate?: string;
 
   @ApiPropertyOptional({
+    example: 'Amoxil',
+    description: 'Commercial brand name',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  brandName?: string;
+
+  @ApiPropertyOptional({
+    example: 'MED-AMOX-500',
+    description: 'Unique internal medicine catalogue code',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  code?: string;
+
+  @ApiPropertyOptional({
+    example: 'Amoxicillin Trihydrate Eq. to Amoxicillin 500mg',
+    description: 'Active pharmaceutical ingredient composition',
+  })
+  @IsOptional()
+  @IsString()
+  composition?: string;
+
+  @ApiPropertyOptional({
+    example: '8901234567890',
+    description: 'Barcode or GS1 identifier',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  barcode?: string;
+
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Whether a valid doctor prescription is required to dispense (Default true)',
+  })
+  @IsOptional()
+  @IsBoolean()
+  prescriptionRequired?: boolean;
+
+  @ApiPropertyOptional({
+    example: 10,
+    description: 'Inventory reorder threshold level (Default 10)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  reorderLevel?: number;
+
+  @ApiPropertyOptional({
+    example: 5,
+    description: 'Minimum stock safety buffer (Default 5)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  minStockLevel?: number;
+
+  @ApiPropertyOptional({
+    example: 1000,
+    description: 'Maximum warehouse inventory capacity (Default 1000)',
+  })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  maxStockLevel?: number;
+
+  @ApiPropertyOptional({
     example: true,
     description: 'Active status in hospital catalogue (Default true)',
   })

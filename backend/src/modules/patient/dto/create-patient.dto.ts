@@ -140,4 +140,48 @@ export class CreatePatientDto {
   @IsOptional()
   @IsString()
   photoData?: string;
+
+  // Clinic Edition fields (Phase 10.5.1)
+  @ApiPropertyOptional({ example: 'Zainab Bibi' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  emergencyContactName?: string;
+
+  @ApiPropertyOptional({ example: '03009876543' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  emergencyContactPhone?: string;
+
+  @ApiPropertyOptional({ example: 'Spouse' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  emergencyContactRelation?: string;
+
+  @ApiPropertyOptional({ example: 'Penicillin, NSAIDs, Shellfish' })
+  @IsOptional()
+  @IsString()
+  allergies?: string;
+
+  @ApiPropertyOptional({ example: 'Type 2 Diabetes Mellitus diagnosed in 2018' })
+  @IsOptional()
+  @IsString()
+  medicalHistory?: string;
+
+  @ApiPropertyOptional({ example: 'Appendectomy (2015)' })
+  @IsOptional()
+  @IsString()
+  surgicalHistory?: string;
+
+  @ApiPropertyOptional({ example: 'Hypertension in both parents' })
+  @IsOptional()
+  @IsString()
+  familyHistory?: string;
+
+  @ApiPropertyOptional({ example: 'Metformin 500mg BID' })
+  @IsOptional()
+  @IsString()
+  currentMedications?: string;
 }

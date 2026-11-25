@@ -56,6 +56,78 @@ export class PrescriptionItemDto {
   @IsString()
   @MaxLength(500)
   instructions?: string;
+
+  @ApiPropertyOptional({
+    description: 'Prescribed quantity',
+    example: 10,
+    default: 1,
+  })
+  @IsOptional()
+  @IsInt()
+  quantityPrescribed?: number;
+
+  @ApiPropertyOptional({
+    description: 'Dose unit (tablets, capsules, ml, etc.)',
+    example: 'tablets',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  unit?: string;
+
+  @ApiPropertyOptional({
+    description: 'Route of administration (oral, IV, IM, topical, etc.)',
+    example: 'oral',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  route?: string;
+
+  @ApiPropertyOptional({
+    description: 'Administration frequency (OD, BD, TDS, QID, PRN)',
+    example: 'BD (Twice Daily)',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  frequency?: string;
+
+  @ApiPropertyOptional({
+    description: 'Meal / timing instructions (Before food, After food, With food)',
+    example: 'After food',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  timing?: string;
+
+  @ApiPropertyOptional({
+    description: 'Permitted refills count',
+    example: 0,
+    default: 0,
+  })
+  @IsOptional()
+  @IsInt()
+  refills?: number;
+
+  @ApiPropertyOptional({
+    description: 'Therapy start date (YYYY-MM-DD)',
+    example: '2026-11-24',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  startDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Therapy end date (YYYY-MM-DD)',
+    example: '2026-11-29',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  endDate?: string;
 }
 
 export class CreatePrescriptionDto {
@@ -156,4 +228,19 @@ export class CreatePrescriptionDto {
   @IsOptional()
   @Allow()
   branch_id?: string | number;
+
+  @ApiPropertyOptional({ description: 'Linked consultation ID', example: 1 })
+  @IsOptional()
+  @IsInt()
+  consultationId?: number;
+
+  @ApiPropertyOptional({ description: 'Prescription lifecycle status (DRAFT, SIGNED)', example: 'SIGNED', default: 'DRAFT' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  status?: string;
+
+  @ApiPropertyOptional({ description: 'Sign the prescription immediately upon creation', example: true, default: false })
+  @IsOptional()
+  signImmediately?: boolean;
 }

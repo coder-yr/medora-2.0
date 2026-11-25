@@ -12,9 +12,10 @@ import { BranchAuthorizationService } from '../../common/services/branch-authori
 import { AuthUser } from '../../common/types/auth-user.interface';
 import { CreateBatchDto, UpdateBatchStatusDto } from './dto/batch.dto';
 import { CreateGoodsReceiptDto, CreatePurchaseOrderDto } from './dto/purchase.dto';
-import { DispensePrescriptionDto } from './dto/dispensation.dto';
+import { CreateOtcSaleDto, DispensePrescriptionDto } from './dto/dispensation.dto';
 import { CreateStockAdjustmentDto } from './dto/adjustment.dto';
 import { CreatePharmacyReturnDto } from './dto/return.dto';
+import { CreateStockTransferDto, QueryStockTransferDto } from './dto/transfer.dto';
 import {
   QueryBatchDto,
   QueryDispensationDto,
@@ -117,6 +118,60 @@ export class PharmacyService {
       : { branchId: { in: branchIds } };
   }
 
+  private async generatePoNumber(tx: Prisma.TransactionClient): Promise<string> {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `PO-${todayStr}`;
+    const count = typeof (tx.purchaseOrder as any)?.count === 'function'
+      ? await tx.purchaseOrder.count({ where: { poNumber: { startsWith: prefix } } })
+      : Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  private async generateGrnNumber(tx: Prisma.TransactionClient): Promise<string> {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `GRN-${todayStr}`;
+    const count = typeof (tx.goodsReceipt as any)?.count === 'function'
+      ? await tx.goodsReceipt.count({ where: { receiptNumber: { startsWith: prefix } } })
+      : Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  private async generateDispensationNumber(tx: Prisma.TransactionClient): Promise<string> {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `DSP-${todayStr}`;
+    const count = typeof (tx.pharmacyDispensation as any)?.count === 'function'
+      ? await tx.pharmacyDispensation.count({ where: { dispensationNumber: { startsWith: prefix } } })
+      : Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  private async generateTransferNumber(tx: Prisma.TransactionClient): Promise<string> {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `TRF-${todayStr}`;
+    const count = typeof (tx.stockTransfer as any)?.count === 'function'
+      ? await tx.stockTransfer.count({ where: { transferNumber: { startsWith: prefix } } })
+      : Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  private async generateReturnNumber(tx: Prisma.TransactionClient): Promise<string> {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `RTN-${todayStr}`;
+    const count = typeof (tx.pharmacyReturn as any)?.count === 'function'
+      ? await tx.pharmacyReturn.count({ where: { returnNumber: { startsWith: prefix } } })
+      : Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
+  private async generateInvoiceNumber(tx: Prisma.TransactionClient): Promise<string> {
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `INV-${todayStr}`;
+    const count = typeof (tx.payment as any)?.count === 'function'
+      ? await tx.payment.count({ where: { invoiceNumber: { startsWith: prefix } } })
+      : Math.floor(1000 + Math.random() * 9000);
+    return `${prefix}-${String(count + 1).padStart(4, '0')}`;
+  }
+
   // ===========================================================================
   // 1. DASHBOARD & SUMMARY METRICS
   // ===========================================================================
@@ -137,6 +192,7 @@ export class PharmacyService {
       recentMovements,
       pendingPOs,
       todayDispensations,
+      prescriptionsAwaitingDispense,
     ] = await Promise.all([
       this.prisma.medicine.count({ where: { isActive: true } }),
       this.prisma.medicine.count({ where: { isActive: true, quantity: { lte: 10 } } }),
@@ -160,7 +216,7 @@ export class PharmacyService {
         },
       }),
       this.prisma.purchaseOrder.findMany({
-        where: { status: { in: ['DRAFT', 'ORDERED', 'PARTIALLY_RECEIVED'] }, ...branchFilter },
+        where: { status: { in: ['DRAFT', 'ORDERED', 'APPROVED', 'PARTIALLY_RECEIVED'] }, ...branchFilter },
         take: 5,
         orderBy: { createdAt: 'desc' },
         include: { supplier: { select: { name: true } } },
@@ -169,23 +225,32 @@ export class PharmacyService {
         where: { dispenseDate: today.toISOString().split('T')[0], ...branchFilter },
         select: { totalAmount: true },
       }),
+      this.prisma.prescription.count({
+        where: { status: { in: ['ISSUED', 'PARTIALLY_DISPENSED'] }, ...branchFilter },
+      }),
     ]);
 
     let totalCostValuation = 0;
     let totalRetailValuation = 0;
     let expiringWithin30Days = 0;
     let expiredBatchesCount = 0;
+    let activeBatchesCount = 0;
+    let totalInventoryQuantity = 0;
 
     for (const b of batches) {
       const qty = b.currentQuantity;
+      totalInventoryQuantity += qty;
       totalCostValuation += qty * Number(b.costPrice);
       totalRetailValuation += qty * Number(b.sellingPrice || b.costPrice);
 
       const exp = new Date(b.expiryDate);
       if (exp < today) {
         expiredBatchesCount++;
-      } else if (exp <= thirtyDaysAhead) {
-        expiringWithin30Days++;
+      } else {
+        if (b.status === 'ACTIVE') activeBatchesCount++;
+        if (exp <= thirtyDaysAhead) {
+          expiringWithin30Days++;
+        }
       }
     }
 
@@ -197,12 +262,15 @@ export class PharmacyService {
     return {
       totalMedicines,
       lowStockCount,
+      activeBatchesCount,
+      totalInventoryQuantity,
       totalCostValuation: Math.round(totalCostValuation * 100) / 100,
       totalRetailValuation: Math.round(totalRetailValuation * 100) / 100,
       expiringWithin30Days,
       expiredBatchesCount,
       todayDispensationsCount: todayDispensations.length,
       todayTakings: Math.round(todayTakings * 100) / 100,
+      prescriptionsAwaitingDispense,
       recentMovements: this.serialize(recentMovements),
       pendingPurchaseOrders: this.serialize(pendingPOs),
     };
@@ -426,7 +494,6 @@ export class PharmacyService {
     }
 
     const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
-    const poNumber = `PO-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     let totalAmount = 0;
     const itemsData = dto.items.map((item) => {
@@ -441,29 +508,104 @@ export class PharmacyService {
       };
     });
 
-    const po = await this.prisma.purchaseOrder.create({
-      data: {
-        poNumber,
-        supplierId: BigInt(dto.supplierId),
-        orderDate: dto.orderDate,
-        expectedDate: dto.expectedDate,
-        totalAmount,
-        status: 'ORDERED',
-        notes: dto.notes,
-        createdById: userId ? BigInt(userId) : null,
-        organizationId,
-        branchId,
-        items: {
-          create: itemsData,
+    return this.prisma.$transaction(async (tx) => {
+      const poNumber = await this.generatePoNumber(tx);
+      const po = await tx.purchaseOrder.create({
+        data: {
+          poNumber,
+          supplierId: BigInt(dto.supplierId),
+          orderDate: dto.orderDate,
+          expectedDate: dto.expectedDate,
+          totalAmount,
+          status: 'ORDERED',
+          notes: dto.notes,
+          createdById: userId ? BigInt(userId) : null,
+          organizationId,
+          branchId,
+          items: {
+            create: itemsData,
+          },
         },
-      },
-      include: {
-        supplier: true,
-        items: { include: { medicine: true } },
-      },
-    });
+        include: {
+          supplier: true,
+          items: { include: { medicine: true } },
+        },
+      });
 
-    return this.serialize(po);
+      return this.serialize(po);
+    });
+  }
+
+  async approvePurchaseOrder(id: number | string, notes?: string, user?: AuthUser) {
+    const poId = BigInt(id);
+    return this.prisma.$transaction(async (tx) => {
+      const po = await tx.purchaseOrder.findUnique({
+        where: { id: poId },
+      });
+      if (!po) throw new NotFoundException(`Purchase Order #${id} not found.`);
+
+      if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+        await this.branchAuth.assertResourceAccess(user, po.branchId, 'purchase order');
+      }
+
+      if (po.status !== 'ORDERED' && po.status !== 'DRAFT') {
+        throw new BadRequestException(
+          `Cannot approve PO in status "${po.status}". Only DRAFT or ORDERED purchase orders can be approved.`,
+        );
+      }
+
+      const updated = await tx.purchaseOrder.update({
+        where: { id: poId },
+        data: {
+          status: 'APPROVED',
+          approvedById: user?.id ? BigInt(user.id) : null,
+          approvedAt: new Date(),
+          ...(notes ? { notes: po.notes ? `${po.notes}\n[Approved]: ${notes}` : `[Approved]: ${notes}` } : {}),
+        },
+        include: {
+          supplier: true,
+          branch: true,
+          items: { include: { medicine: true } },
+        },
+      });
+
+      return this.serialize(updated);
+    });
+  }
+
+  async cancelPurchaseOrder(id: number | string, reason: string, user?: AuthUser) {
+    const poId = BigInt(id);
+    return this.prisma.$transaction(async (tx) => {
+      const po = await tx.purchaseOrder.findUnique({
+        where: { id: poId },
+      });
+      if (!po) throw new NotFoundException(`Purchase Order #${id} not found.`);
+
+      if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+        await this.branchAuth.assertResourceAccess(user, po.branchId, 'purchase order');
+      }
+
+      if (po.status === 'RECEIVED' || po.status === 'PARTIALLY_RECEIVED') {
+        throw new BadRequestException(
+          `Cannot cancel PO in status "${po.status}" as goods have already been received.`,
+        );
+      }
+
+      const updated = await tx.purchaseOrder.update({
+        where: { id: poId },
+        data: {
+          status: 'CANCELLED',
+          notes: po.notes ? `${po.notes}\n[Cancelled]: ${reason}` : `[Cancelled]: ${reason}`,
+        },
+        include: {
+          supplier: true,
+          branch: true,
+          items: { include: { medicine: true } },
+        },
+      });
+
+      return this.serialize(updated);
+    });
   }
 
   async getPurchaseOrders(
@@ -531,13 +673,20 @@ export class PharmacyService {
     }
 
     const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
-    const receiptNumber = `GRN-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     return this.prisma.$transaction(async (tx) => {
+      const receiptNumber = await this.generateGrnNumber(tx);
       let grnTotal = 0;
       const receiptItemsToCreate: any[] = [];
 
       for (const item of dto.items) {
+        if (item.quantityReceived <= 0) {
+          throw new BadRequestException('Received quantity must be greater than zero.');
+        }
+
         const medicine = await tx.medicine.findUnique({
           where: { id: BigInt(item.medicineId) },
         });
@@ -546,28 +695,23 @@ export class PharmacyService {
         }
 
         const expiry = new Date(item.expiryDate);
+        if (expiry < today) {
+          throw new BadRequestException(
+            `Cannot receive expired batch "${item.batchNumber}". Expiry date ${expiry.toISOString().split('T')[0]} has already passed.`,
+          );
+        }
+
         const lineTotal = item.quantityReceived * item.unitCost;
         grnTotal += lineTotal;
 
         // Upsert or create MedicineBatch scoped to target branch
-        let batch =
-          (await tx.medicineBatch.findFirst({
-            where: {
-              branchId: branchId ?? null,
-              medicineId: BigInt(item.medicineId),
-              batchNumber: item.batchNumber.trim(),
-            },
-          })) ||
-          (tx.medicineBatch.findUnique
-            ? await tx.medicineBatch.findUnique({
-                where: {
-                  medicineId_batchNumber: {
-                    medicineId: BigInt(item.medicineId),
-                    batchNumber: item.batchNumber.trim(),
-                  },
-                } as any,
-              }).catch(() => null)
-            : null);
+        let batch = await tx.medicineBatch.findFirst({
+          where: {
+            branchId: branchId ?? null,
+            medicineId: BigInt(item.medicineId),
+            batchNumber: item.batchNumber.trim(),
+          },
+        });
 
         const sellingPrice =
           item.sellingPrice !== undefined ? item.sellingPrice : medicine.sPrice ? Number(medicine.sPrice) : item.unitCost;
@@ -890,7 +1034,9 @@ export class PharmacyService {
         let availableStock = 0;
         let fefoPlan: any = null;
 
-        const quantityPrescribed = estimatePrescriptionQuantity(line.dosage, line.duration);
+        const quantityPrescribed = (line as any).quantityPrescribed && (line as any).quantityPrescribed > 0
+          ? (line as any).quantityPrescribed
+          : estimatePrescriptionQuantity(line.dosage, line.duration);
         const quantityRemaining = Math.max(0, quantityPrescribed - line.dispensedQuantity);
 
         if (medicine) {
@@ -969,23 +1115,53 @@ export class PharmacyService {
         );
       }
 
-      if (prescription.state === 'dispensed') {
+      if (prescription.status === 'CANCELLED' || prescription.state === 'cancelled') {
         throw new BadRequestException(
-          `Prescription #${dto.prescriptionId} is already fully dispensed.`,
+          `Cannot dispense cancelled prescription #${prescription.prescriptionNumber || dto.prescriptionId}.`,
+        );
+      }
+
+      if (prescription.status === 'DRAFT') {
+        throw new BadRequestException(
+          `Cannot dispense draft prescription #${prescription.prescriptionNumber || dto.prescriptionId}. Prescription must be digitally SIGNED before dispensing.`,
+        );
+      }
+
+      if (prescription.status === 'DISPENSED' || prescription.state === 'dispensed') {
+        throw new BadRequestException(
+          `Prescription #${prescription.prescriptionNumber || dto.prescriptionId} is already fully dispensed.`,
         );
       }
     }
 
-    const dispensationNumber = `DSP-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
     const isOrg1 = !organizationId || organizationId === 1n;
 
     return this.prisma.$transaction(async (tx) => {
+      const dispensationNumber = await this.generateDispensationNumber(tx);
       let subtotal = 0;
       const dispensationItemsData: any[] = [];
       const movementsToCreate: any[] = [];
       const prescriptionLinesToUpdate: Map<bigint, number> = new Map();
 
       for (const item of dto.items) {
+        if (item.isSubstituted && (!item.substitutionReason || item.substitutionReason.trim().length === 0)) {
+          throw new BadRequestException('Substitution reason is mandatory when dispensing an alternative medication.');
+        }
+
+        if (item.prescriptionMedicineId) {
+          const pm = await tx.prescriptionMedicine.findUnique({
+            where: { id: BigInt(item.prescriptionMedicineId) },
+          });
+          if (pm) {
+            const alreadyScheduled = prescriptionLinesToUpdate.get(pm.id) || 0;
+            const remaining = (pm.quantityPrescribed || 1) - (pm.dispensedQuantity || 0) - alreadyScheduled;
+            if (item.quantity > remaining) {
+              throw new BadRequestException(
+                `Cannot dispense ${item.quantity} units for line item "${pm.name || item.customName || 'Medication'}". Prescribed: ${pm.quantityPrescribed}, Already dispensed: ${pm.dispensedQuantity || 0}, Remaining: ${remaining}.`,
+              );
+            }
+          }
+        }
         let medicineName = item.customName || 'Unlisted Medication';
         let unitPrice = item.unitPrice || 0;
 
@@ -1084,6 +1260,9 @@ export class PharmacyService {
             quantity: item.quantity,
             unitPrice: price,
             totalPrice: lineTotal,
+            isSubstituted: !!item.isSubstituted,
+            originalMedicineId: item.originalMedicineId ? BigInt(item.originalMedicineId) : null,
+            substitutionReason: item.substitutionReason || null,
           });
 
           movementsToCreate.push({
@@ -1184,6 +1363,9 @@ export class PharmacyService {
               quantity: takeQty,
               unitPrice: price,
               totalPrice: lineTotal,
+              isSubstituted: !!item.isSubstituted,
+              originalMedicineId: item.originalMedicineId ? BigInt(item.originalMedicineId) : null,
+              substitutionReason: item.substitutionReason || null,
             });
 
             movementsToCreate.push({
@@ -1238,8 +1420,12 @@ export class PharmacyService {
       // Optional Outpatient InvoiceModule integration
       let invoiceId: bigint | null = null;
       if (!admissionId && dto.generateInvoice && patientId) {
+        const invNumber = await this.generateInvoiceNumber(tx);
         const invoice = await tx.payment.create({
           data: {
+            invoiceNumber: invNumber,
+            organizationId,
+            branchId,
             patientId,
             date: dto.dispenseDate,
             amount: subtotal,
@@ -1359,10 +1545,16 @@ export class PharmacyService {
           where: { prescriptionId: prescription.id },
         });
 
-        const anyDispensed = allLines.some((l) => l.dispensedQuantity > 0);
+        const allDone = allLines.every((l) => (l.dispensedQuantity || 0) >= (l.quantityPrescribed || 1));
+        const anyDispensed = allLines.some((l) => (l.dispensedQuantity || 0) > 0);
+        const newStatus = allDone ? 'DISPENSED' : (anyDispensed ? 'PARTIALLY_DISPENSED' : prescription.status);
+
         await tx.prescription.update({
           where: { id: prescription.id },
-          data: { state: anyDispensed ? 'dispensed' : prescription.state },
+          data: {
+            status: newStatus,
+            state: allDone ? 'dispensed' : (anyDispensed ? 'partially_dispensed' : prescription.state),
+          },
         });
       }
 
@@ -1441,15 +1633,246 @@ export class PharmacyService {
     return this.serialize(dispensation);
   }
 
+  /**
+   * Direct Over-the-Counter (OTC) pharmacy retail sale.
+   * STRICT REGULATION: Automatically verifies that no medication with prescriptionRequired=true can be dispensed without a prescription.
+   * Allocates batch stock via pessimistic locks (FEFO), creates Phase 10.5.6 invoice, and records stock movements.
+   */
+  async sellOtc(dto: CreateOtcSaleDto, userId?: number | string, user?: AuthUser) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
+
+    // 1. Regulatory check: No prescriptionRequired medication allowed OTC
+    for (const item of dto.items) {
+      if (!item.medicineId) continue;
+      const med = await this.prisma.medicine.findUnique({
+        where: { id: BigInt(item.medicineId) },
+        select: { id: true, name: true, prescriptionRequired: true, brandName: true, code: true },
+      });
+      if (!med) {
+        throw new NotFoundException(`Medicine #${item.medicineId} not found in catalogue.`);
+      }
+      if (med.prescriptionRequired) {
+        throw new BadRequestException(
+          `Medication "${med.name}" (${med.brandName || med.code || 'ID ' + med.id}) is prescription-restricted and cannot be sold over the counter without a doctor prescription.`,
+        );
+      }
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const dispensationNumber = await this.generateDispensationNumber(tx);
+      let subtotal = 0;
+      const dispensationItemsData: any[] = [];
+      const movementsToCreate: any[] = [];
+
+      for (const item of dto.items) {
+        let medicineName = item.customName || 'Unlisted Medication';
+        let unitPrice = item.unitPrice || 0;
+
+        if (!item.medicineId) {
+          const lineTotal = item.quantity * unitPrice;
+          subtotal += lineTotal;
+          dispensationItemsData.push({
+            prescriptionMedicineId: null,
+            medicineId: null,
+            batchId: null,
+            medicineName,
+            batchNumber: null,
+            quantity: item.quantity,
+            unitPrice,
+            totalPrice: lineTotal,
+            isSubstituted: false,
+            originalMedicineId: null,
+            substitutionReason: null,
+          });
+          continue;
+        }
+
+        const medicine = await tx.medicine.findUnique({
+          where: { id: BigInt(item.medicineId) },
+        });
+        if (!medicine) {
+          throw new NotFoundException(`Medicine #${item.medicineId} not found.`);
+        }
+        medicineName = medicine.name;
+
+        // FEFO allocation with branch scoping and row locks
+        const activeBatches = branchId
+          ? await tx.$queryRaw<
+              Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any; branch_id: bigint | null }>
+            >`
+              SELECT id, batch_number, current_quantity, expiry_date, status, selling_price, branch_id
+              FROM medicine_batch
+              WHERE medicine_id = ${BigInt(item.medicineId)}
+                AND status = 'ACTIVE'
+                AND current_quantity > 0
+                AND expiry_date >= ${today}
+                AND (branch_id = ${branchId} OR branch_id IS NULL)
+              ORDER BY expiry_date ASC, id ASC
+              FOR UPDATE
+            `
+          : await tx.$queryRaw<
+              Array<{ id: bigint; batch_number: string; current_quantity: number; expiry_date: Date; status: string; selling_price: any; branch_id: bigint | null }>
+            >`
+              SELECT id, batch_number, current_quantity, expiry_date, status, selling_price, branch_id
+              FROM medicine_batch
+              WHERE medicine_id = ${BigInt(item.medicineId)}
+                AND status = 'ACTIVE'
+                AND current_quantity > 0
+                AND expiry_date >= ${today}
+              ORDER BY expiry_date ASC, id ASC
+              FOR UPDATE
+            `;
+
+        const totalAvailable = activeBatches.reduce((acc, b) => acc + b.current_quantity, 0);
+        if (totalAvailable < item.quantity) {
+          throw new BadRequestException(
+            `Insufficient stock for "${medicine.name}". Available in branch: ${totalAvailable}, Requested: ${item.quantity}.`,
+          );
+        }
+
+        let remainingToFulfill = item.quantity;
+        for (const batch of activeBatches) {
+          if (remainingToFulfill <= 0) break;
+          const takeQty = Math.min(batch.current_quantity, remainingToFulfill);
+          const price = item.unitPrice ?? (batch.selling_price ? Number(batch.selling_price) : Number(medicine.sPrice || 0));
+          const lineTotal = takeQty * price;
+          subtotal += lineTotal;
+
+          await tx.$executeRaw`
+            UPDATE medicine_batch
+            SET current_quantity = current_quantity - ${takeQty},
+                status = CASE WHEN current_quantity - ${takeQty} = 0 THEN 'DEPLETED' ELSE status END,
+                updated_at = NOW()
+            WHERE id = ${batch.id} AND current_quantity >= ${takeQty}
+          `;
+
+          await tx.medicine.update({
+            where: { id: BigInt(item.medicineId) },
+            data: { quantity: { decrement: takeQty } },
+          });
+
+          dispensationItemsData.push({
+            prescriptionMedicineId: null,
+            medicineId: BigInt(item.medicineId),
+            batchId: batch.id,
+            medicineName,
+            batchNumber: batch.batch_number,
+            quantity: takeQty,
+            unitPrice: price,
+            totalPrice: lineTotal,
+            isSubstituted: false,
+            originalMedicineId: null,
+            substitutionReason: null,
+          });
+
+          movementsToCreate.push({
+            medicineId: BigInt(item.medicineId),
+            batchId: batch.id,
+            movementType: 'DISPENSING',
+            quantity: -takeQty,
+            balanceAfter: batch.current_quantity - takeQty,
+            unitCost: price,
+            referenceType: 'DISPENSATION',
+            organizationId,
+            branchId,
+          });
+
+          remainingToFulfill -= takeQty;
+        }
+      }
+
+      const discount = dto.discount ? Math.max(0, dto.discount) : 0;
+      const tax = dto.tax ? Math.max(0, dto.tax) : 0;
+      const totalAmount = Math.max(0, subtotal - discount + tax);
+      const patientId = dto.patientId ? BigInt(dto.patientId) : null;
+
+      let invoiceId: bigint | null = null;
+      if (dto.generateInvoice !== false && patientId) {
+        const invNumber = await this.generateInvoiceNumber(tx);
+        const invoice = await tx.payment.create({
+          data: {
+            invoiceNumber: invNumber,
+            organizationId,
+            branchId,
+            patientId,
+            date: dto.saleDate || (dto as any).dispenseDate || new Date().toISOString().slice(0, 10),
+            amount: subtotal,
+            discount,
+            vat: tax,
+            grossTotal: totalAmount,
+            amountReceived: totalAmount,
+            status: 'paid',
+            category: 'PHARMACY',
+            categoryName: dispensationItemsData.map((d) => d.medicineName).join(', ').slice(0, 1000),
+            categoryAmount: dispensationItemsData.map((d) => d.totalPrice.toString()).join(', ').slice(0, 1000),
+            items: {
+              create: dispensationItemsData.map((d) => ({
+                name: `[OTC Sale] ${d.medicineName} (${d.quantity}x)`,
+                quantity: d.quantity,
+                unitPrice: d.unitPrice,
+                lineTotal: d.totalPrice,
+              })),
+            },
+          },
+        });
+        invoiceId = invoice.id;
+      }
+
+      const dispensation = await tx.pharmacyDispensation.create({
+        data: {
+          dispensationNumber,
+          prescriptionId: null,
+          patientId,
+          patientName: dto.patientName || 'Walk-in Customer',
+          dispenseDate: dto.saleDate || (dto as any).dispenseDate || new Date().toISOString().slice(0, 10),
+          subtotal,
+          discount,
+          tax,
+          totalAmount,
+          status: 'COMPLETED',
+          invoiceId,
+          dispensedById: userId ? BigInt(userId) : null,
+          organizationId,
+          branchId,
+          notes: dto.notes ? `[OTC Sale] ${dto.notes}` : '[OTC Sale] Counter Walk-in',
+          items: {
+            create: dispensationItemsData,
+          },
+        },
+        include: {
+          items: true,
+          patient: { select: { id: true, name: true, patientId: true } },
+          branch: { select: { id: true, name: true } },
+        },
+      });
+
+      for (const m of movementsToCreate) {
+        await tx.stockMovement.create({
+          data: {
+            ...m,
+            referenceId: dispensation.id,
+            performedBy: userId ? BigInt(userId) : null,
+            reason: `OTC Counter Sale ${dispensationNumber}`,
+          },
+        });
+      }
+
+      return this.serialize(dispensation);
+    });
+  }
+
   // ===========================================================================
   // 5. RETURNS & ADJUSTMENTS
   // ===========================================================================
 
   async processReturn(dto: CreatePharmacyReturnDto, userId?: number | string, user?: AuthUser) {
     const { organizationId, branchId } = await this.resolveBranchScope(user, dto.branchId);
-    const returnNumber = `RET-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     return this.prisma.$transaction(async (tx) => {
+      const returnNumber = await this.generateReturnNumber(tx);
       let totalRefund = 0;
       const returnItemsData: any[] = [];
       const movementsToCreate: any[] = [];
@@ -1777,7 +2200,239 @@ export class PharmacyService {
   }
 
   // ===========================================================================
-  // 6. LEDGER & REPORTS
+  // 6. INTER-BRANCH STOCK TRANSFERS
+  // ===========================================================================
+
+  /**
+   * Concurrency-safe, transactional inter-branch stock transfer.
+   * Acquires pessimistic row lock on source batch, deducts stock, increments/upserts destination batch,
+   * creates immutable StockTransfer record and records TRANSFER_OUT / TRANSFER_IN movements in the stock ledger.
+   */
+  async transferStock(dto: CreateStockTransferDto, userId?: number | string, user?: AuthUser) {
+    if (BigInt(dto.fromBranchId) === BigInt(dto.toBranchId)) {
+      throw new BadRequestException('Source and destination branches cannot be the same.');
+    }
+
+    const { organizationId } = await this.resolveBranchScope(user, dto.fromBranchId);
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      await this.branchAuth.assertBranchAccess(user, dto.fromBranchId);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const transferNumber = await this.generateTransferNumber(tx);
+
+      // 1. Pessimistic row-lock on source batch
+      const lockedBatchRows = await tx.$queryRaw<
+        Array<{
+          id: bigint;
+          batch_number: string;
+          current_quantity: number;
+          expiry_date: Date;
+          mfg_date: string | null;
+          status: string;
+          cost_price: any;
+          selling_price: any;
+          branch_id: bigint | null;
+        }>
+      >`
+        SELECT id, batch_number, current_quantity, expiry_date, mfg_date, status, cost_price, selling_price, branch_id
+        FROM medicine_batch
+        WHERE id = ${BigInt(dto.batchId)} AND medicine_id = ${BigInt(dto.medicineId)}
+        FOR UPDATE
+      `;
+
+      if (!lockedBatchRows || lockedBatchRows.length === 0) {
+        throw new NotFoundException(`Source batch #${dto.batchId} not found.`);
+      }
+
+      const sourceBatch = lockedBatchRows[0];
+      if (sourceBatch.current_quantity < dto.quantity) {
+        throw new BadRequestException(
+          `Insufficient stock in source batch ${sourceBatch.batch_number}. Available: ${sourceBatch.current_quantity}, Requested: ${dto.quantity}.`,
+        );
+      }
+
+      // 2. Deduct from source batch
+      await tx.$executeRaw`
+        UPDATE medicine_batch
+        SET current_quantity = current_quantity - ${dto.quantity},
+            status = CASE WHEN current_quantity - ${dto.quantity} = 0 THEN 'DEPLETED' ELSE status END,
+            updated_at = NOW()
+        WHERE id = ${sourceBatch.id} AND current_quantity >= ${dto.quantity}
+      `;
+
+      // 3. Upsert destination batch at toBranchId
+      const destBatch = await tx.medicineBatch.findFirst({
+        where: {
+          medicineId: BigInt(dto.medicineId),
+          batchNumber: sourceBatch.batch_number,
+          branchId: BigInt(dto.toBranchId),
+        },
+      });
+
+      if (destBatch) {
+        await tx.medicineBatch.update({
+          where: { id: destBatch.id },
+          data: {
+            currentQuantity: { increment: dto.quantity },
+            status: 'ACTIVE',
+          },
+        });
+      } else {
+        await tx.medicineBatch.create({
+          data: {
+            medicineId: BigInt(dto.medicineId),
+            batchNumber: sourceBatch.batch_number,
+            expiryDate: sourceBatch.expiry_date,
+            mfgDate: sourceBatch.mfg_date,
+            costPrice: sourceBatch.cost_price,
+            sellingPrice: sourceBatch.selling_price,
+            initialQuantity: dto.quantity,
+            currentQuantity: dto.quantity,
+            status: 'ACTIVE',
+            branchId: BigInt(dto.toBranchId),
+          },
+        });
+      }
+
+      // 4. Create StockTransfer record
+      const transfer = await tx.stockTransfer.create({
+        data: {
+          transferNumber,
+          fromBranchId: BigInt(dto.fromBranchId),
+          toBranchId: BigInt(dto.toBranchId),
+          medicineId: BigInt(dto.medicineId),
+          batchId: sourceBatch.id,
+          quantity: dto.quantity,
+          status: 'COMPLETED',
+          reason: dto.reason || (dto as any).notes || null,
+          transferredById: userId ? BigInt(userId) : null,
+          receivedById: userId ? BigInt(userId) : null,
+          organizationId,
+        },
+        include: {
+          fromBranch: { select: { id: true, name: true } },
+          toBranch: { select: { id: true, name: true } },
+          medicine: { select: { id: true, name: true, code: true, brandName: true } },
+          batch: { select: { id: true, batchNumber: true, expiryDate: true } },
+          transferredBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      });
+
+      // 5. Stock movements: TRANSFER_OUT at source, TRANSFER_IN at destination
+      await tx.stockMovement.create({
+        data: {
+          medicineId: BigInt(dto.medicineId),
+          batchId: sourceBatch.id,
+          movementType: 'TRANSFER_OUT',
+          quantity: -dto.quantity,
+          balanceAfter: sourceBatch.current_quantity - dto.quantity,
+          unitCost: sourceBatch.selling_price ? Number(sourceBatch.selling_price) : 0,
+          reason: `Transfer to branch #${dto.toBranchId} (${transferNumber})`,
+          referenceType: 'TRANSFER',
+          referenceId: transfer.id,
+          organizationId,
+          branchId: BigInt(dto.fromBranchId),
+          performedBy: userId ? BigInt(userId) : null,
+        },
+      });
+
+      await tx.stockMovement.create({
+        data: {
+          medicineId: BigInt(dto.medicineId),
+          batchId: sourceBatch.id,
+          movementType: 'TRANSFER_IN',
+          quantity: dto.quantity,
+          balanceAfter: destBatch ? destBatch.currentQuantity + dto.quantity : dto.quantity,
+          unitCost: sourceBatch.selling_price ? Number(sourceBatch.selling_price) : 0,
+          reason: `Transfer from branch #${dto.fromBranchId} (${transferNumber})`,
+          referenceType: 'TRANSFER',
+          referenceId: transfer.id,
+          organizationId,
+          branchId: BigInt(dto.toBranchId),
+          performedBy: userId ? BigInt(userId) : null,
+        },
+      });
+
+      return this.serialize(transfer);
+    });
+  }
+
+  async getTransfers(query: QueryStockTransferDto, user?: AuthUser) {
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.max(1, Math.min(100, query.limit || 20));
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (query.fromBranchId) where.fromBranchId = BigInt(query.fromBranchId);
+    if (query.toBranchId) where.toBranchId = BigInt(query.toBranchId);
+    if (query.medicineId) where.medicineId = BigInt(query.medicineId);
+    if (query.status) where.status = query.status;
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessibleBranchIds = await this.branchAuth.resolveAccessibleBranchIds(user);
+      where.OR = [
+        { fromBranchId: { in: accessibleBranchIds } },
+        { toBranchId: { in: accessibleBranchIds } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      this.prisma.stockTransfer.count({ where }),
+      this.prisma.stockTransfer.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { id: 'desc' },
+        include: {
+          fromBranch: { select: { id: true, name: true } },
+          toBranch: { select: { id: true, name: true } },
+          medicine: { select: { id: true, name: true, code: true, brandName: true } },
+          batch: { select: { id: true, batchNumber: true, expiryDate: true } },
+          transferredBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        },
+      }),
+    ]);
+
+    return {
+      items: items.map((t) => this.serialize(t)),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
+  async getTransferById(id: number | bigint, user?: AuthUser) {
+    const transfer = await this.prisma.stockTransfer.findUnique({
+      where: { id: BigInt(id) },
+      include: {
+        fromBranch: { select: { id: true, name: true } },
+        toBranch: { select: { id: true, name: true } },
+        medicine: { select: { id: true, name: true, code: true, brandName: true } },
+        batch: { select: { id: true, batchNumber: true, expiryDate: true } },
+        transferredBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+        receivedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+      },
+    });
+
+    if (!transfer) {
+      throw new NotFoundException(`Stock transfer #${id} not found.`);
+    }
+
+    if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
+      const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
+      const canAccess =
+        accessible &&
+        ((transfer.fromBranchId && accessible.includes(transfer.fromBranchId)) ||
+          (transfer.toBranchId && accessible.includes(transfer.toBranchId)));
+      if (!canAccess) {
+        throw new BadRequestException('You do not have permission to view this transfer.');
+      }
+    }
+
+    return this.serialize(transfer);
+  }
+
+  // ===========================================================================
+  // 7. LEDGER & REPORTS
   // ===========================================================================
 
   async getStockLedger(query: QueryStockMovementDto, user?: AuthUser) {

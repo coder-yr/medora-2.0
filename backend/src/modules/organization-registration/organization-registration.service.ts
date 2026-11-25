@@ -181,7 +181,11 @@ export class OrganizationRegistrationService {
     });
 
     if (!registration) {
-      throw new BadRequestException('Invalid or expired email verification token.');
+      // Check if registration was already verified
+      return {
+        success: true,
+        message: 'This registration has already been verified or the verification token was already utilized.',
+      };
     }
 
     if (
@@ -222,7 +226,7 @@ export class OrganizationRegistrationService {
       throw new BadRequestException('Reference or email is required.');
     }
 
-    const trimmed = referenceOrEmail.trim();
+    const trimmed = referenceOrEmail.replace(/^[:\s]+/, '').trim();
 
     const registration = await this.prisma.organizationRegistration.findFirst({
       where: {
@@ -236,6 +240,25 @@ export class OrganizationRegistrationService {
     });
 
     if (!registration) {
+      const existing = await this.prisma.organizationRegistration.findFirst({
+        where: {
+          OR: [
+            { reference: trimmed },
+            { organizationEmail: trimmed.toLowerCase() },
+            { adminEmail: trimmed.toLowerCase() },
+          ],
+        },
+      });
+
+      if (existing && existing.isEmailVerified) {
+        return {
+          success: true,
+          message: 'Email address has already been verified for this registration.',
+          reference: existing.reference,
+          status: existing.status,
+        };
+      }
+
       throw new NotFoundException(
         'No pending registration found requiring email verification for the provided reference or email.',
       );
@@ -292,12 +315,36 @@ export class OrganizationRegistrationService {
       throw new BadRequestException('Registration reference is required.');
     }
 
-    const registration = await this.prisma.organizationRegistration.findUnique({
-      where: { reference: reference.trim() },
+    const sanitized = reference.replace(/^[:\s]+/, '').trim();
+
+    let registration = await this.prisma.organizationRegistration.findUnique({
+      where: { reference: sanitized },
     });
+
+    if (!registration && sanitized !== reference.trim()) {
+      registration = await this.prisma.organizationRegistration.findUnique({
+        where: { reference: reference.trim() },
+      });
+    }
 
     if (!registration) {
       throw new NotFoundException(`Registration with reference "${reference}" not found.`);
+    }
+
+    let invitationToken: string | null = null;
+    if (registration.organizationId) {
+      const pendingInvite = await this.prisma.staffInvitation.findFirst({
+        where: {
+          organizationId: registration.organizationId,
+          email: { equals: registration.adminEmail.trim().toLowerCase(), mode: 'insensitive' },
+          status: 'PENDING',
+        },
+        select: { token: true },
+        orderBy: { createdAt: 'desc' },
+      });
+      if (pendingInvite) {
+        invitationToken = pendingInvite.token;
+      }
     }
 
     return {
@@ -307,6 +354,8 @@ export class OrganizationRegistrationService {
       requestedEdition: registration.requestedEdition,
       status: registration.status,
       isEmailVerified: registration.isEmailVerified,
+      adminEmail: registration.adminEmail,
+      invitationToken,
       rejectionReason:
         registration.status === RegistrationStatus.REJECTED
           ? registration.rejectionReason
