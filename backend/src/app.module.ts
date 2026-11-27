@@ -37,6 +37,7 @@ import { OrganizationRegistrationModule } from './modules/organization-registrat
 import { NotificationModule } from './modules/notification/notification.module';
 import { FollowUpModule } from './modules/follow-up/follow-up.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { PrismaModule } from './modules/prisma/prisma.module';
 import { AppController } from './app.controller';
 
@@ -80,6 +81,7 @@ import { AppController } from './app.controller';
     NotificationModule,
     FollowUpModule,
     DashboardModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

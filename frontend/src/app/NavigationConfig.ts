@@ -58,6 +58,15 @@ export const NAVIGATION_ITEMS: NavigationItem[] = [
     order: 1,
   },
   {
+    id: 'analytics',
+    label: 'Clinic Analytics & BI',
+    path: '/analytics',
+    icon: Activity,
+    category: 'Clinical Operations',
+    requiredPermissions: ['dashboard_view'],
+    order: 1.5,
+  },
+  {
     id: 'patients',
     label: 'Patient Central Registry',
     path: '/patients',

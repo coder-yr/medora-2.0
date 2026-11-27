@@ -39,6 +39,7 @@ import { AccountingWorkspace } from './components/AccountingWorkspace';
 import { SettingsWorkspace } from './components/SettingsWorkspace';
 import { NotificationAdminWorkspace } from './features/notifications/NotificationAdminWorkspace';
 import { FollowUpWorkspace } from './features/follow-up/FollowUpWorkspace';
+import { ClinicAnalyticsWorkspace } from './features/analytics/ClinicAnalyticsWorkspace';
 
 // Types
 import type { Patient } from './types/patient';
@@ -509,6 +510,14 @@ export function App() {
               element={
                 <RequirePermission permission="notification_view">
                   <NotificationRoute />
+                </RequirePermission>
+              }
+            />
+            <Route
+              path="/analytics"
+              element={
+                <RequirePermission permission="dashboard_view">
+                  <ClinicAnalyticsWorkspace />
                 </RequirePermission>
               }
             />
