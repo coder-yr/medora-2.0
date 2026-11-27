@@ -122,6 +122,28 @@ export function PharmacyWorkspace({
   >([]);
   const [generateInvoice, setGenerateInvoice] = useState(true);
   const [dispensationReceipt, setDispensationReceipt] = useState<PharmacyDispensation | null>(null);
+  // Auth fetch wrapper
+  const apiFetch = useCallback(
+    async (path: string, options: RequestInit = {}) => {
+      const base = apiBaseUrl ? `${apiBaseUrl}${path}` : path;
+      const res = await fetch(base, {
+        ...options,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+          ...(options.headers || {}),
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const errorMsg = data?.error?.message || data?.message || 'Server request failed';
+        throw new Error(Array.isArray(errorMsg) ? errorMsg.join('; ') : errorMsg);
+      }
+      return data;
+    },
+    [apiBaseUrl, token],
+  );
+
   const [rxQueue, setRxQueue] = useState<any[]>([]);
   const [loadingRxQueue, setLoadingRxQueue] = useState(false);
 
@@ -176,28 +198,6 @@ export function PharmacyWorkspace({
 
   // Permissions helper
   const canManage = userRole === 'Admin' || userRole === 'Pharmacist';
-
-  // Auth fetch wrapper
-  const apiFetch = useCallback(
-    async (path: string, options: RequestInit = {}) => {
-      const base = apiBaseUrl ? `${apiBaseUrl}${path}` : path;
-      const res = await fetch(base, {
-        ...options,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-          ...(options.headers || {}),
-        },
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        const errorMsg = data?.error?.message || data?.message || 'Server request failed';
-        throw new Error(Array.isArray(errorMsg) ? errorMsg.join('; ') : errorMsg);
-      }
-      return data;
-    },
-    [apiBaseUrl, token],
-  );
 
   // 1. Fetch Dashboard
   const loadDashboard = useCallback(async () => {
