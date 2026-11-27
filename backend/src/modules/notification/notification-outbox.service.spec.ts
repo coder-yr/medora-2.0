@@ -207,6 +207,33 @@ describe('NotificationOutboxService', () => {
         }),
       );
     });
+
+    it('should skip jobs already claimed atomically by another concurrent worker', async () => {
+      const mockItem = {
+        id: BigInt(4),
+        notificationId: BigInt(103),
+        channel: 'IN_APP',
+        attempts: 0,
+        maxAttempts: 5,
+        status: 'PENDING',
+        notification: {
+          id: BigInt(103),
+          channel: 'IN_APP',
+          title: 'Test',
+          message: 'Test',
+          recipients: [{ id: BigInt(1), userId: BigInt(2), destination: null }],
+        },
+      };
+
+      mockPrisma.notificationOutbox.findMany.mockResolvedValue([mockItem]);
+      mockPrisma.notificationOutbox.updateMany.mockResolvedValue({ count: 0 });
+      const sendSpy = jest.spyOn(inAppProvider, 'send');
+
+      const stats = await service.processPendingOutbox(10);
+      expect(stats.processed).toBe(0);
+      expect(stats.delivered).toBe(0);
+      expect(sendSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('recoverInterruptedJobs', () => {

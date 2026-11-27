@@ -66,6 +66,7 @@ export class NotificationOutboxService {
     let deliveredCount = 0;
     let failedCount = 0;
     let retryableCount = 0;
+    let claimedCount = 0;
 
     for (const job of candidateJobs) {
       // Phase 10.4: Check tenant organization status before processing
@@ -90,14 +91,21 @@ export class NotificationOutboxService {
         }
       }
 
-      // 2. Lock job transition to PROCESSING
-      await this.prisma.notificationOutbox.update({
-        where: { id: job.id },
+      // 2. Atomic job claim transition to PROCESSING (prevents concurrent worker double-dispatch)
+      const claimed = await this.prisma.notificationOutbox.updateMany({
+        where: {
+          id: job.id,
+          status: { in: ['PENDING', 'RETRYABLE'] },
+        },
         data: {
           status: 'PROCESSING',
           processingStartedAt: new Date(),
         },
       });
+      if (claimed && typeof claimed.count === 'number' && claimed.count === 0) {
+        continue;
+      }
+      claimedCount++;
 
       const channel = job.channel;
       const provider = this.getProvider(channel);
@@ -248,7 +256,7 @@ export class NotificationOutboxService {
     }
 
     return {
-      processed: candidateJobs.length,
+      processed: claimedCount,
       delivered: deliveredCount,
       failed: failedCount,
       retryable: retryableCount,

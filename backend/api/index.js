@@ -1,15 +1,18 @@
-// Safe environment variable fallbacks for Vercel serverless cold starts
-process.env.DATABASE_URL =
-  process.env.DATABASE_URL ||
-  'postgresql://postgres:postgres@localhost:5432/medora?schema=public';
-process.env.DIRECT_URL = process.env.DIRECT_URL || process.env.DATABASE_URL;
-process.env.JWT_SECRET =
-  process.env.JWT_SECRET || 'temporary-serverless-jwt-secret-min32chars-for-medora-v2';
+// Safe environment variable defaults only for non-production local debugging
+if (process.env.NODE_ENV !== 'production') {
+  process.env.DATABASE_URL =
+    process.env.DATABASE_URL ||
+    'postgresql://postgres:postgres@localhost:5432/medora?schema=public';
+  process.env.DIRECT_URL = process.env.DIRECT_URL || process.env.DATABASE_URL;
+  process.env.JWT_SECRET =
+    process.env.JWT_SECRET || 'local-dev-only-jwt-secret-min32chars-medora-v2';
+} else {
+  process.env.DIRECT_URL = process.env.DIRECT_URL || process.env.DATABASE_URL;
+}
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 process.env.PORT = process.env.PORT || '3000';
 process.env.API_PREFIX = process.env.API_PREFIX || 'api';
 process.env.API_VERSION = process.env.API_VERSION || 'v1';
-process.env.CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 require('reflect-metadata');
 const { NestFactory } = require('@nestjs/core');
