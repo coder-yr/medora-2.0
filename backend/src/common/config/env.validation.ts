@@ -60,6 +60,50 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   SUPABASE_JWT_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  NOTIFICATION_PROVIDER_MODE?: string;
+
+  @IsString()
+  @IsOptional()
+  CRON_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  RESEND_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_HOST?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_PORT?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_USER?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_PASS?: string;
+
+  @IsString()
+  @IsOptional()
+  SMTP_FROM?: string;
+
+  @IsString()
+  @IsOptional()
+  TWILIO_ACCOUNT_SID?: string;
+
+  @IsString()
+  @IsOptional()
+  TWILIO_AUTH_TOKEN?: string;
+
+  @IsString()
+  @IsOptional()
+  TWILIO_FROM_NUMBER?: string;
 }
 
 /**
@@ -84,6 +128,19 @@ export function validateEnv(config: Record<string, unknown>): EnvironmentVariabl
     throw new Error(
       `[ConfigValidation] Environment configuration error:\n  - ${errorDetails.join('\n  - ')}`,
     );
+  }
+
+  if (validatedConfig.NODE_ENV === Environment.Production) {
+    if (validatedConfig.JWT_SECRET.length < 32) {
+      throw new Error(
+        '[ConfigValidation] JWT_SECRET must be at least 32 characters in production.',
+      );
+    }
+    if (validatedConfig.NOTIFICATION_PROVIDER_MODE?.toLowerCase() === 'mock') {
+      throw new Error(
+        '[ConfigValidation] Mock notification providers (NOTIFICATION_PROVIDER_MODE=mock) cannot be enabled in production.',
+      );
+    }
   }
 
   return validatedConfig;

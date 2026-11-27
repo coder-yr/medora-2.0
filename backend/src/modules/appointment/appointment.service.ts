@@ -119,10 +119,14 @@ export class AppointmentService {
     }
 
     return await this.prisma.$transaction(async (tx) => {
-      // Lock doctor row to serialize concurrent bookings for the same doctor
-      await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(doctor.id)} FOR UPDATE`;
+      // Slot-keyed PostgreSQL advisory lock (doctor + branch + date + slot) eliminates cross-slot/cross-branch contention
+      const slotScopeKey = `apt_slot:${doctor.id}:${targetBranchId ? targetBranchId.toString() : '0'}`;
+      const slotTimeKey = `${dto.date}:${timeSlot}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${slotScopeKey}), hashtext(${slotTimeKey}))`;
 
       if (checkedInAt) {
+        const queueKey = `apt_queue:${doctor.id}`;
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${queueKey}), hashtext(${dto.date}))`;
         const maxToken = await tx.appointment.aggregate({
           where: { doctorId: BigInt(doctor.id), date: dto.date },
           _max: { tokenNo: true },
@@ -524,8 +528,10 @@ export class AppointmentService {
     );
 
     return await this.prisma.$transaction(async (tx) => {
-      // Lock doctor row
-      await tx.$executeRaw`SELECT id FROM doctor WHERE id = ${BigInt(existing.doctorId)} FOR UPDATE`;
+      // Slot-keyed advisory lock for target reschedule slot
+      const slotScopeKey = `apt_slot:${existing.doctorId}:${existing.branchId ? existing.branchId.toString() : '0'}`;
+      const slotTimeKey = `${dto.date}:${timeSlot}`;
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${slotScopeKey}), hashtext(${slotTimeKey}))`;
 
       // Verify doctor is bookable on new date/time
       await this.assertDoctorBookable(
@@ -625,15 +631,7 @@ export class AppointmentService {
       where.branchId = authorizedBranchId;
     } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
       const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
-      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
-      if (isOrg1) {
-        where.OR = [
-          { branchId: { in: accessible || [] } },
-          { branchId: null },
-        ];
-      } else {
-        where.branchId = { in: accessible || [] };
-      }
+      where.branchId = { in: accessible || [] };
     }
 
     const [activeAppointments, completedCount] = await Promise.all([
@@ -784,15 +782,7 @@ export class AppointmentService {
       where.branchId = authorizedBranchId;
     } else if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
       const accessible = await this.branchAuth.resolveAccessibleBranchIds(user);
-      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
-      if (isOrg1) {
-        where.OR = [
-          { branchId: { in: accessible || [] } },
-          { branchId: null },
-        ];
-      } else {
-        where.branchId = { in: accessible || [] };
-      }
+      where.branchId = { in: accessible || [] };
     }
 
     const [records, total] = await Promise.all([

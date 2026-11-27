@@ -7,10 +7,15 @@ import {
   Query,
   Body,
   UseGuards,
+  Headers,
+  UnauthorizedException,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import * as crypto from 'crypto';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { Public } from '../../common/decorators/public.decorator';
+import { SkipBranchCheck } from '../../common/decorators/skip-branch.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PermissionsGuard } from '../../common/guards/permissions.guard';
 import { RequirePermissions } from '../../common/decorators/permissions.decorator';
@@ -75,6 +80,41 @@ export class NotificationAdminController {
   async processOutbox(@Query('batchSize') batchSize?: string) {
     const limit = batchSize ? parseInt(batchSize, 10) : 25;
     return this.outboxService.processPendingOutbox(limit);
+  }
+
+  @Public()
+  @SkipBranchCheck()
+  @Post('cron/process-outbox')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Machine-to-machine scheduled outbox cron endpoint (CRON_SECRET authenticated)' })
+  @ApiResponse({ status: 200, description: 'Scheduled outbox pass completed or skipped on overlap' })
+  async cronProcessOutbox(
+    @Headers('authorization') authHeader?: string,
+    @Headers('x-cron-secret') cronHeader?: string,
+    @Query('batchSize') batchSize?: string,
+  ) {
+    const expectedSecret = process.env.CRON_SECRET;
+    if (!expectedSecret || expectedSecret.length < 16) {
+      throw new UnauthorizedException('CRON_SECRET is not configured on this server.');
+    }
+
+    const bearer = authHeader?.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
+    const provided = cronHeader?.trim() || bearer;
+    if (!provided) {
+      throw new UnauthorizedException('Missing cron authentication secret.');
+    }
+
+    const expectedBuf = Buffer.from(expectedSecret, 'utf8');
+    const providedBuf = Buffer.from(provided, 'utf8');
+    if (
+      expectedBuf.length !== providedBuf.length ||
+      !crypto.timingSafeEqual(expectedBuf, providedBuf)
+    ) {
+      throw new UnauthorizedException('Invalid cron authentication secret.');
+    }
+
+    const limit = batchSize ? parseInt(batchSize, 10) : 25;
+    return this.outboxService.runScheduledOutboxPass(Number.isFinite(limit) ? limit : 25);
   }
 
   @Post('recover-stuck')

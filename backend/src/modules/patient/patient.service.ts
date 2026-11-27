@@ -119,18 +119,13 @@ export class PatientService {
     let branchFilter: any = {};
     if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
       const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
-      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
 
       if (query.branchId) {
         const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
-        branchFilter = isOrg1
-          ? { OR: [{ branchId: authorizedBranchId }, { branchId: null }] }
-          : { branchId: authorizedBranchId };
+        branchFilter = { branchId: authorizedBranchId };
       } else {
         const branchIds = accessibleBranches || [];
-        branchFilter = isOrg1
-          ? { OR: [{ branchId: { in: branchIds } }, { branchId: null }] }
-          : { branchId: { in: branchIds } };
+        branchFilter = { branchId: { in: branchIds } };
       }
     } else if (query.branchId && user && this.branchAuth) {
       const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
@@ -404,18 +399,13 @@ export class PatientService {
     let branchFilter: Record<string, unknown> = {};
     if (user && this.branchAuth && !this.branchAuth.isGlobalAdmin(user)) {
       const accessibleBranches = await this.branchAuth.resolveAccessibleBranchIds(user);
-      const isOrg1 = !user.organizationId || BigInt(user.organizationId) === 1n;
 
       if (query.branchId) {
         const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);
-        branchFilter = isOrg1
-          ? { OR: [{ branchId: authorizedBranchId }, { branchId: null }] }
-          : { branchId: authorizedBranchId };
+        branchFilter = { branchId: authorizedBranchId };
       } else {
         const branchIds = accessibleBranches || [];
-        branchFilter = isOrg1
-          ? { OR: [{ branchId: { in: branchIds } }, { branchId: null }] }
-          : { branchId: { in: branchIds } };
+        branchFilter = { branchId: { in: branchIds } };
       }
     } else if (query.branchId && user && this.branchAuth) {
       const authorizedBranchId = await this.branchAuth.assertBranchAccess(user, query.branchId);

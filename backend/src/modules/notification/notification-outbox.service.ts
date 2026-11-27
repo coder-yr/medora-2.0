@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { InAppNotificationProvider } from './providers/in-app.provider';
 import { DevMockEmailProvider } from './providers/dev-mock-email.provider';
 import { DevMockSmsProvider } from './providers/dev-mock-sms.provider';
+import { ProductionEmailProvider } from './providers/production-email.provider';
+import { ProductionSmsProvider } from './providers/production-sms.provider';
 import { INotificationProvider, DeliveryResult } from './providers/notification-provider.interface';
 
 @Injectable()
@@ -14,18 +16,78 @@ export class NotificationOutboxService {
     private readonly inAppProvider: InAppNotificationProvider,
     private readonly emailProvider: DevMockEmailProvider,
     private readonly smsProvider: DevMockSmsProvider,
+    @Optional() private readonly prodEmailProvider?: ProductionEmailProvider,
+    @Optional() private readonly prodSmsProvider?: ProductionSmsProvider,
   ) {}
 
-  private getProvider(channel: string): INotificationProvider {
+  public getProvider(channel: string): INotificationProvider {
+    const isProd = process.env.NODE_ENV === 'production';
+    if (isProd && process.env.NOTIFICATION_PROVIDER_MODE?.toLowerCase() === 'mock') {
+      throw new Error('Mock notification providers are strictly forbidden in production.');
+    }
+
     switch (channel) {
       case 'IN_APP':
         return this.inAppProvider;
       case 'EMAIL':
-        return this.emailProvider;
+        if (isProd) {
+          if (!this.prodEmailProvider) {
+            throw new Error('ProductionEmailProvider is required in production.');
+          }
+          return this.prodEmailProvider;
+        }
+        return this.prodEmailProvider?.isConfigured()
+          ? this.prodEmailProvider
+          : this.emailProvider;
       case 'SMS':
-        return this.smsProvider;
+        if (isProd) {
+          if (!this.prodSmsProvider) {
+            throw new Error('ProductionSmsProvider is required in production.');
+          }
+          return this.prodSmsProvider;
+        }
+        return this.prodSmsProvider?.isConfigured()
+          ? this.prodSmsProvider
+          : this.smsProvider;
       default:
         throw new Error(`Unsupported notification channel: "${channel}"`);
+    }
+  }
+
+  /**
+   * Executes a bounded cron pass guarded by a non-blocking PostgreSQL advisory lock
+   * to prevent overlapping serverless cron invocations.
+   */
+  async runScheduledOutboxPass(batchSize = 25): Promise<{
+    skipped: boolean;
+    reason?: string;
+    recovered?: number;
+    processed?: number;
+    delivered?: number;
+    failed?: number;
+    retryable?: number;
+  }> {
+    const bounded = Math.min(50, Math.max(1, batchSize));
+    const lockRes = await this.prisma.$queryRawUnsafe<Array<{ acquired: boolean }>>(
+      `SELECT pg_try_advisory_lock(hashtext('medora_outbox_cron')) AS acquired;`,
+    );
+    const acquired = Boolean(lockRes?.[0]?.acquired);
+    if (!acquired) {
+      return { skipped: true, reason: 'Overlapping outbox cron invocation in progress' };
+    }
+
+    try {
+      const recovered = await this.recoverInterruptedJobs(5);
+      const stats = await this.processPendingOutbox(bounded);
+      return {
+        skipped: false,
+        recovered,
+        ...stats,
+      };
+    } finally {
+      await this.prisma
+        .$queryRawUnsafe(`SELECT pg_advisory_unlock(hashtext('medora_outbox_cron'));`)
+        .catch((err) => this.logger.warn(`Failed to release outbox cron lock: ${err}`));
     }
   }
 

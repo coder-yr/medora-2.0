@@ -7,6 +7,8 @@ import { NotificationAdminController, NotificationTemplateAdminController } from
 import { InAppNotificationProvider } from './providers/in-app.provider';
 import { DevMockEmailProvider } from './providers/dev-mock-email.provider';
 import { DevMockSmsProvider } from './providers/dev-mock-sms.provider';
+import { ProductionEmailProvider } from './providers/production-email.provider';
+import { ProductionSmsProvider } from './providers/production-sms.provider';
 
 @Module({
   imports: [PrismaModule],
@@ -21,6 +23,8 @@ import { DevMockSmsProvider } from './providers/dev-mock-sms.provider';
     InAppNotificationProvider,
     DevMockEmailProvider,
     DevMockSmsProvider,
+    ProductionEmailProvider,
+    ProductionSmsProvider,
   ],
   exports: [
     NotificationService,
