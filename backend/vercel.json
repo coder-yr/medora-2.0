@@ -10,7 +10,7 @@
   "crons": [
     {
       "path": "/api/v1/admin/notifications/cron/process-outbox",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ],
   "rewrites": [
