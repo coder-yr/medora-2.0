@@ -27,6 +27,7 @@ import type {
   PatientEncounterResponse,
   PatientDocument,
 } from '../../types/patient';
+import { useAuth } from '../../context/AuthContext';
 
 interface PatientWorkspaceProps {
   token: string;
@@ -45,6 +46,12 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
   onRaiseInvoice,
   initialAction,
 }) => {
+  const { userPermissions, userRole } = useAuth();
+  const canRegisterPatient =
+    userPermissions.includes('patient_add') ||
+    userRole === 'Hospital Admin' ||
+    userRole === 'Organization Admin' ||
+    userRole === 'Clinic Admin';
   const [patients, setPatients] = useState<Patient[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -469,17 +476,19 @@ export const PatientWorkspace: React.FC<PatientWorkspaceProps> = ({
           </p>
         </div>
 
-        <button
-          className="btn btn-primary"
-          onClick={() => {
-            setShowRegisterModal(true);
-            setDuplicateCheck(null);
-            setIgnoreDuplicateWarning(false);
-          }}
-          style={{ display: 'flex', alignItems: 'center', gap: 8 }}
-        >
-          <Plus size={16} /> Register New Patient
-        </button>
+        {canRegisterPatient && (
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              setShowRegisterModal(true);
+              setDuplicateCheck(null);
+              setIgnoreDuplicateWarning(false);
+            }}
+            style={{ display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <Plus size={16} /> Register New Patient
+          </button>
+        )}
       </div>
 
       {/* Search Toolbar */}
